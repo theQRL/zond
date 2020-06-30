@@ -62,3 +62,7 @@ go_repository(
     sum = "h1:g61tztE5qeGQ89tm6NTjjM9VPIm088od1l6aSorWRWg=",
     version = "v0.3.0",
 )
+
+load("//:deps.bzl", "zond_deps")
+
+zond_deps()
