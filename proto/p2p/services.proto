@@ -1,0 +1,49 @@
+// Distributed under the MIT software license, see the accompanying
+// file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+
+syntax = "proto3";
+
+option go_package = "github.com/theQRL/zond/proto/p2p";
+
+package p2p;
+
+service P2PProtocol {
+    rpc Transmit (stream P2PMessage) returns (stream P2PMessage) {};
+}
+
+message P2PMessage {
+    oneof type {
+        Request req = 1;
+        Response resp = 2;
+    }
+}
+
+message Request {
+    oneof type {
+        PingReq pingReq = 1;
+        BlockReq BlockReq = 2;
+    }
+}
+
+message Response {
+    oneof type {
+        PingResp pingResp = 1;
+        BlockResp blockResp = 2;
+    }
+}
+
+message PingReq {
+    uint64 timestamp = 1;
+}
+
+message PingResp {
+    uint64 timestamp = 1;
+}
+
+message BlockReq {
+    uint64 blockNumber = 1;
+}
+
+message BlockResp {
+    uint64 blockNumber = 1;
+}
