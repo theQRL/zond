@@ -1,0 +1,19 @@
+// Distributed under the MIT software license, see the accompanying
+// file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+
+syntax = "proto3";
+
+option go_package = "github.com/theQRL/zond/protos";
+
+package protos;
+
+message Wallet {
+    string version = 1;
+    repeated XMSSInfo xmss_info = 2;
+}
+
+message XMSSInfo {
+    string address = 1;
+    string hex_seed = 2;
+    string mnemonic = 3;
+}

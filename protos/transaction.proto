@@ -1,0 +1,45 @@
+// Distributed under the MIT software license, see the accompanying
+// file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+
+syntax = "proto3";
+
+option go_package = "github.com/theQRL/zond/protos";
+
+package protos;
+
+// This transaction must be rejected if the number of
+// Dilithium pks is not proportional to the 10k funds
+message Stake {
+    repeated bytes dilithium_pks = 1;  // Max 100, each key will lock 10k funds
+    bool destake = 2;  // True when you want to destake the list of dilithium pks
+}
+
+message Transfer {
+    repeated bytes addrs_to = 1;
+    repeated uint64 amounts = 2;
+    repeated bytes slave_pks = 3;
+    bytes message = 4;
+}
+
+message CoinBase {
+    bytes block_proposer = 1;
+    repeated bytes attestors = 2;
+    uint64 block_proposer_reward = 3;
+    repeated uint64 attestor_reward = 4;
+}
+
+message Transaction {
+    uint64 network_id = 1;
+    bytes master_addr = 2;
+    uint64 fee = 3;
+    uint64 nonce = 4;
+    bytes pk = 5;
+    bytes signature = 6;
+    bytes transaction_hash = 7;
+
+    oneof type {
+        CoinBase coin_base = 8;
+        Stake stake = 9;
+        Transfer transfer = 10;
+    }
+}

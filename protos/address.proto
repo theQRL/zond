@@ -1,0 +1,14 @@
+// Distributed under the MIT software license, see the accompanying
+// file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+
+syntax = "proto3";
+
+option go_package = "github.com/theQRL/zond/protos";
+
+package protos;
+
+message AddressState {
+    bytes address = 1;
+    uint64 balance = 2;
+    uint64 nonce = 3;
+}
