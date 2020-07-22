@@ -3,22 +3,26 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
 proto_library(
-    name = "p2p_proto",
-    srcs = ["services.proto"],
+    name = "protos_proto",
+    srcs = [
+        "address.proto",
+        "block.proto",
+        "transaction.proto",
+        "wallet.proto",
+    ],
     visibility = ["//visibility:public"],
 )
 
 go_proto_library(
-    name = "p2p_go_proto",
-    compilers = ["@io_bazel_rules_go//proto:go_grpc"],
-    importpath = "github.com/theQRL/zond/proto/p2p",
-    proto = ":p2p_proto",
+    name = "protos_go_proto",
+    importpath = "github.com/theQRL/zond/protos",
+    proto = ":protos_proto",
     visibility = ["//visibility:public"],
 )
 
 go_library(
     name = "go_default_library",
-    embed = [":p2p_go_proto"],
-    importpath = "github.com/theQRL/zond/proto/p2p",
+    embed = [":protos_go_proto"],
+    importpath = "github.com/theQRL/zond/protos",
     visibility = ["//visibility:public"],
 )

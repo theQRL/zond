@@ -1,0 +1,25 @@
+// Distributed under the MIT software license, see the accompanying
+// file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+
+syntax = "proto3";
+
+option go_package = "github.com/theQRL/zond/protos";
+
+package protos;
+
+import "protos/transaction.proto";
+
+message BlockHeader {
+    uint64 slot_number = 1;
+    bytes prev_header_hash = 2;
+    bytes header_hash = 3;
+}
+
+message Block {
+    BlockHeader header = 1;
+    repeated Transaction transactions = 2;
+}
+
+message BlockMetadata {
+    repeated bytes child_header_hashes = 1;
+}
