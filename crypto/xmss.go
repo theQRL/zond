@@ -62,7 +62,8 @@ func NewXMSS(xmssFast goqrllib.XmssFast) *XMSS {
 	return x
 }
 
-func FromExtendedSeed(extendedSeed goqrllib.UcharVector) *XMSS {
+func FromExtendedSeed(extendedSeedBytes []byte) *XMSS {
+	extendedSeed := misc.BytesToUCharVector(extendedSeedBytes)
 	moddedExtendedSeed := misc.NewUCharVector()
 	moddedExtendedSeed.New(extendedSeed)
 	if extendedSeed.Size() != 51 {
@@ -87,7 +88,7 @@ func FromExtendedSeed(extendedSeed goqrllib.UcharVector) *XMSS {
 	return NewXMSS(goqrllib.NewXmssFast__SWIG_1(tmp.GetData(), height, hashFunction))
 }
 
-func FromHeight(treeHeight uint, hashFunction goqrllib.EHashFunction) *XMSS {
+func FromHeight(treeHeight uint64, hashFunction goqrllib.EHashFunction) *XMSS {
 	seed := goqrllib.GetRandomSeed(48, "")
 	return NewXMSS(goqrllib.NewXmssFast__SWIG_1(seed, byte(treeHeight), hashFunction))
 }
