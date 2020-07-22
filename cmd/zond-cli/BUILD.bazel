@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["zond-cli.go"],
+    importpath = "github.com/theQRL/zond/cmd/zond-cli",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//crypto:go_default_library",
+        "@com_github_urfave_cli//:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "zond-cli",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
