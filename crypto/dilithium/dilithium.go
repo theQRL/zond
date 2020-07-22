@@ -1,4 +1,4 @@
-package crypto
+package dilithium
 
 import (
 	"github.com/theQRL/qrllib/goqrllib/dilithium"
@@ -8,7 +8,6 @@ import (
 
 type DilithiumInterface interface {
 	Sign(message []byte) []byte
-	Verify(signature []byte, pk []byte, message []byte) bool
 }
 
 type Dilithium struct {
