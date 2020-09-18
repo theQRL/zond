@@ -1,0 +1,22 @@
+// Distributed under the MIT software license, see the accompanying
+// file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+
+syntax = "proto3";
+
+option go_package = "github.com/theQRL/zond/protos";
+
+package protos;
+
+message DilithiumKeys {
+    string version = 1;
+    repeated DilithiumGroup dilithium_group = 2;
+}
+
+message DilithiumGroup {
+    repeated DilithiumInfo dilithium_info = 1;
+}
+
+message DilithiumInfo {
+    string PK = 1;
+    string SK = 2;
+}
