@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "dilithiumkey.go",
+        "genesis.go",
+        "tx.go",
+        "wallet.go",
+    ],
+    importpath = "github.com/theQRL/zond/cli/commands",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//chain/block/genesis:go_default_library",
+        "//chain/transactions:go_default_library",
+        "//cli/flags:go_default_library",
+        "//keys:go_default_library",
+        "//misc:go_default_library",
+        "//protos:go_default_library",
+        "//wallet:go_default_library",
+        "@com_github_theqrl_qrllib//goqrllib/goqrllib:go_default_library",
+        "@com_github_urfave_cli_v2//:go_default_library",
+    ],
+)
