@@ -1,11 +1,11 @@
 #!/bin/bash
 
-bazel build //proto/...
+bazel build //protos/...
 
 proto_list=()
 while IFS= read -d $'\0' -r file; do
     proto_list=("${proto_list[@]}" "$file")
-done < <(find -L $(bazel info bazel-bin)/proto -type f -regextype sed -regex ".*pb\.\(gw\.\)\?go$" -print0)
+done < <(find -L $(bazel info bazel-bin)/protos -type f -regextype sed -regex ".*pb\.\(gw\.\)\?go$" -print0)
 
 arraylength=${#proto_list[@]}
 searchstring="theQRL/zond/"
@@ -16,5 +16,5 @@ for ((i = 0; i < ${arraylength}; i++)); do
     cp -R -L "${proto_list[i]}" "$destination"
 done
 
-goimports -w proto/**/*.pb.go
-gofmt -s -w proto/
+goimports -w protos/**/*.pb.go
+gofmt -s -w protos/
