@@ -1,13 +1,14 @@
 package wallet
 
 import (
+	"errors"
 	"fmt"
 	"github.com/theQRL/qrllib/goqrllib/goqrllib"
 	"github.com/theQRL/zond/crypto"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"google.golang.org/protobuf/encoding/protojson"
 	"io/ioutil"
-	"os"
 )
 
 type Wallet struct {
@@ -58,7 +59,7 @@ func (w *Wallet) Save() {
 func (w *Wallet) Load() {
 	w.pbData = &protos.Wallet{}
 
-	if !fileExists(w.outFileName) {
+	if !misc.FileExists(w.outFileName) {
 		return
 	}
 	data, err := ioutil.ReadFile(w.outFileName)
@@ -73,19 +74,19 @@ func (w *Wallet) Load() {
 	}
 }
 
-func NewWallet(outFileName string) *Wallet {
+func (w *Wallet) GetXMSSByIndex(index uint) (*crypto.XMSS, error) {
+	if int(index) > len(w.pbData.XmssInfo) {
+		return nil, errors.New(fmt.Sprintf("Invalid XMSS Index"))
+	}
+	strHexSeed := w.pbData.XmssInfo[index - 1].HexSeed
+	return crypto.FromExtendedSeed(misc.HStr2Bin(strHexSeed)), nil
+}
+
+func NewWallet(walletFileName string) *Wallet {
 	w := &Wallet{
-		outFileName: outFileName,
+		outFileName: walletFileName,
 	}
 	w.Load()
 
 	return w
-}
-
-func fileExists(fileName string) bool {
-	info, err := os.Stat(fileName)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir()
 }
