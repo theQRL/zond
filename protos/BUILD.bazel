@@ -7,6 +7,10 @@ proto_library(
     srcs = [
         "address.proto",
         "block.proto",
+        "dilithiumkeys.proto",
+        "metadata.proto",
+        "p2p.proto",
+        "prestate.proto",
         "transaction.proto",
         "wallet.proto",
     ],

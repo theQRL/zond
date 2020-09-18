@@ -9,14 +9,12 @@ package protos;
 
 import "protos/transaction.proto";
 
-message BlockHeader {
-    uint64 slot_number = 1;
-    bytes parent_header_hash = 2;
+message AddressBalance {
+    bytes address = 1;
+    uint64 balance = 2;
 }
 
-message Block {
-    BlockHeader header = 1;
-    repeated ProtocolTransaction protocol_transactions = 2;
-    repeated Transaction transactions = 3;
+message PreState {
+    repeated Transaction transactions = 1;
+    repeated AddressBalance address_balance = 2;
 }
-

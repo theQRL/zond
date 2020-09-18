@@ -1,0 +1,145 @@
+// Distributed under the MIT software license, see the accompanying
+// file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+
+syntax = "proto3";
+
+option go_package = "github.com/theQRL/zond/protos";
+
+package protos;
+
+import "protos/block.proto";
+import "protos/transaction.proto";
+
+// Adding old code to refactor while keeping things working
+message LegacyMessage {
+    enum FuncName {
+        VE = 0;             // Version
+        PL = 1;             // Peers List
+        PONG = 2;           // Pong TODO: Obsolete
+
+        MR = 3;             // Message received
+        SFM = 4;            // Send Full Message
+
+        BA = 5;             // Block for Attestation
+        BK = 6;             // Block
+        FB = 7;             // Fetch request for block
+        PB = 8;             // Push Block
+
+        TT = 9;             // Transfer Transaction
+        ST = 10;             // Stake Transaction
+        AT = 11;            // Attest Transaction
+
+        SYNC = 12;          // Add into synced list, if the node replies
+        CHAINSTATE = 13;    // Chain State
+        EBHREQ = 14;        // Epoch Block Hashes Request
+        EBHRESP = 15;       // Epoch Block Hashes Response
+        P2P_ACK = 16;       // P2P Acknowledgement
+    }
+
+    FuncName func_name = 1;
+
+    oneof data {
+        NoData no_data = 3;
+        VEData ve_data = 4;
+        PLData pl_data = 5;
+        PONGData pong_data = 6;
+
+        MRData mrData = 7;
+
+        BlockForAttestation block_for_attestation = 8;
+        Block block = 9;
+        FBData fb_data = 10;
+        PBData pb_data = 11;
+
+        Transaction tt_data = 12;
+        Transaction st_data = 13;
+        ProtocolTransactionData at_data = 14;
+
+        SYNCData sync_data = 15;
+        NodeChainState chain_state_data = 16;
+        EpochBlockHashesRequest epoch_block_hashes_request = 17;
+        EpochBlockHashesResponse epoch_block_hashes_response = 18;
+        P2PAcknowledgement p2p_ack_data = 19;
+    }
+}
+
+message NoData { }
+
+message VEData
+{
+    string version = 1;
+    bytes genesis_prev_hash = 2;
+    uint64 rate_limit = 3;
+}
+
+message PLData
+{
+    repeated string peer_ips = 1;
+    uint32 public_port = 2;
+}
+
+message PONGData
+{
+}
+
+message MRData {
+    bytes hash = 1;
+    LegacyMessage.FuncName type = 2;
+
+    bytes block_proposer = 3;
+    bytes parent_header_hash = 4;
+    uint64 slot_number = 5;
+}
+
+message BKData {
+    MRData mrData = 1;
+    Block block = 2;
+}
+
+message BlockForAttestation {
+    Block block = 1;
+    bytes signature = 2;
+}
+
+message FBData {
+    bytes block_header_hash = 1;
+}
+
+message PBData {
+    Block block = 1;
+}
+
+message SYNCData
+{
+    string state = 1;
+}
+
+message P2PAcknowledgement {
+    uint32 bytes_processed = 1;
+}
+
+message NodeChainState {
+    uint64 slot_number = 1;
+    bytes header_hash = 2;
+    uint64 cumulative_stake = 3;
+    string version = 4;
+    uint64 timestamp = 5;
+}
+
+message ProtocolTransactionData {
+    ProtocolTransaction tx = 1;
+    bytes partial_block_signing_hash = 2;
+}
+
+message EpochBlockHashesRequest {
+    bytes finalized_header_hash = 1;
+}
+
+message EpochBlockHashesResponse {
+    repeated BlockHashesBySlotNumber block_hashes_by_slot_number = 1;
+}
+
+message BlockHashesBySlotNumber {
+    uint64 slot_number = 1;
+    repeated bytes header_hashes = 2;
+}
