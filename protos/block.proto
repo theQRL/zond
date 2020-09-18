@@ -11,15 +11,12 @@ import "protos/transaction.proto";
 
 message BlockHeader {
     uint64 slot_number = 1;
-    bytes prev_header_hash = 2;
-    bytes header_hash = 3;
+    bytes parent_header_hash = 2;
 }
 
 message Block {
     BlockHeader header = 1;
-    repeated Transaction transactions = 2;
+    repeated ProtocolTransaction protocol_transactions = 2;
+    repeated Transaction transactions = 3;
 }
 
-message BlockMetadata {
-    repeated bytes child_header_hashes = 1;
-}
