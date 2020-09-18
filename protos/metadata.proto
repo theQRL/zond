@@ -1,0 +1,62 @@
+// Distributed under the MIT software license, see the accompanying
+// file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+
+syntax = "proto3";
+
+option go_package = "github.com/theQRL/zond/protos";
+
+package protos;
+
+message DilithiumMetaData {
+    // tx_hash, dilithium_pk, address must be updated only once, when the metadata is created for the first time
+    bytes tx_hash = 1;
+    bytes dilithium_pk = 2;
+    bytes address = 3;
+
+    bool stake = 4;
+}
+
+message SlaveMetaData {
+    // tx_hash, address, slavePK must be updated only once, when the metadata is created for the first time
+    bytes tx_hash = 1;
+    bytes address = 2;
+    bytes slave_pk = 3;
+}
+
+message OTSIndexMetaData {
+    // tx_hash, address, page_number must be updated only once, when the metadata is created for the first time
+    bytes tx_hash = 1;
+    bytes address = 2;
+    uint64 page_number = 3;
+
+    repeated bytes bitfield = 4;
+}
+
+message BlockMetaData {
+    bytes parent_header_hash = 1;
+    bytes header_hash = 2;
+    uint64 slot_number = 3;
+
+    repeated bytes child_header_hashes = 4;
+    bytes finalized_child_header_hash = 5;  //
+}
+
+message EpochMetaData {
+    uint64 epoch = 1;
+    bytes prev_slot_last_block_header_hash = 2;
+    repeated SlotInfo slot_info = 3;
+    repeated bytes validators = 4;
+}
+
+message SlotInfo {
+    uint64 slot_leader = 1;
+    repeated uint64 attestors = 2;
+}
+
+message MainChainMetaData {
+    bytes finalized_block_header_hash = 1;
+    uint64 finalized_block_slot_number = 2;
+
+    bytes last_block_header_hash = 3;
+    uint64 last_block_slot_number = 4;
+}
