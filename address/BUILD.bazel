@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["addressstate.go"],
+    importpath = "github.com/theQRL/zond/address",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//db:go_default_library",
+        "//misc:go_default_library",
+        "//protos:go_default_library",
+        "@com_github_golang_protobuf//proto:go_default_library",
+        "@io_etcd_go_bbolt//:go_default_library",
+    ],
+)
