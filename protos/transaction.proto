@@ -11,7 +11,7 @@ package protos;
 // Dilithium pks is not proportional to the 10k funds
 message Stake {
     repeated bytes dilithium_pks = 1;  // Max 100, each key will lock 10k funds
-    bool destake = 2;  // True when you want to destake the list of dilithium pks
+    bool stake = 2;  // True when you want to stake the list of dilithium pks
 }
 
 message Transfer {
@@ -22,10 +22,10 @@ message Transfer {
 }
 
 message CoinBase {
-    bytes block_proposer = 1;
-    repeated bytes attestors = 2;
-    uint64 block_proposer_reward = 3;
-    repeated uint64 attestor_reward = 4;
+    uint64 block_proposer_reward = 1;
+    uint64 attestor_reward = 2;
+
+    uint64 fee_reward = 3;  // TODO: merge multiple rewards into a single reward variable
 }
 
 message Transaction {
@@ -35,11 +35,28 @@ message Transaction {
     uint64 nonce = 4;
     bytes pk = 5;
     bytes signature = 6;
-    bytes transaction_hash = 7;
 
     oneof type {
-        CoinBase coin_base = 8;
-        Stake stake = 9;
-        Transfer transfer = 10;
+        Stake stake = 7;
+        Transfer transfer = 8;
     }
+}
+
+message TransactionList {
+    repeated Transaction txs = 1;
+}
+
+message ProtocolTransaction {
+    uint64 network_id = 1;
+    uint64 nonce = 2;
+    bytes pk = 3;
+    bytes signature = 4;
+
+    oneof type {
+        CoinBase coin_base = 5;
+        Attest attest = 6;
+    }
+}
+
+message Attest {
 }
