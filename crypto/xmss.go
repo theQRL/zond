@@ -114,12 +114,12 @@ func (x *XMSS) Height() uint64 {
 	return uint64(x.xmss.GetHeight())
 }
 
-func (x *XMSS) sk() goqrllib.UcharVector {
-	return x.xmss.GetSK()
+func (x *XMSS) sk() []byte {
+	return misc.UCharVectorToBytes(x.xmss.GetSK())
 }
 
-func (x *XMSS) PK() goqrllib.UcharVector {
-	return x.xmss.GetPK()
+func (x *XMSS) PK() []byte {
+	return misc.UCharVectorToBytes(x.xmss.GetPK())
 }
 
 func (x *XMSS) NumberSignatures() uint64 {
@@ -134,12 +134,12 @@ func (x *XMSS) Mnemonic() string {
 	return goqrllib.Bin2mnemonic(x.xmss.GetExtendedSeed())
 }
 
-func (x *XMSS) Address() goqrllib.UcharVector {
-	return x.xmss.GetAddress()
+func (x *XMSS) Address() []byte {
+	return misc.UCharVectorToBytes(x.xmss.GetAddress())
 }
 
 func (x *XMSS) QAddress() string {
-	return "Q" + goqrllib.Bin2hstr(x.Address())
+	return fmt.Sprintf("Q%s", misc.Bin2HStr(x.Address()))
 }
 
 func (x *XMSS) OTSIndex() uint64 {
@@ -166,4 +166,9 @@ func (x *XMSS) Sign(message []byte) []byte {
 	msg := misc.UcharVector{}
 	msg.New(x.xmss.Sign(misc.BytesToUCharVector(message)))
 	return msg.GetBytes()
+}
+
+func XMSSVerify(message []byte, signature []byte, pk []byte) bool {
+	return goqrllib.XmssFastVerify(misc.BytesToUCharVector(message),
+		misc.BytesToUCharVector(signature), misc.BytesToUCharVector(pk))
 }
