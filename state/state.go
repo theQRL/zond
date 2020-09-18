@@ -1,22 +1,23 @@
 package state
 
 import (
-	"path"
-	bolt "github.com/etcd-io/bbolt"
-	"time"
+	"github.com/theQRL/zond/db"
 )
 
 type State struct {
-	db *bolt.DB
+	db *db.DB
 }
 
-func NewState(filename string, directory string) (*State, error) {
-	absoluteFilePath := path.Join(directory, filename)
-	db, err := bolt.Open(absoluteFilePath, 0600, &bolt.Options{Timeout: 1 * time.Second, InitialMmapSize: 10e6})
+func (s *State) DB() *db.DB {
+	return s.db
+}
+
+func NewState(directory string, filename string) (*State, error) {
+	d, err := db.NewDB(directory, filename)
 	if err != nil {
 		return nil, err
 	}
 	return &State {
-		db,
+		d,
 	}, nil
 }
