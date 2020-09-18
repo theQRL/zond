@@ -2,10 +2,18 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["helper.go"],
+    srcs = [
+        "helper.go",
+        "protocoltransactionlist.go",
+        "transactionlist.go",
+    ],
     importpath = "github.com/theQRL/zond/misc",
     visibility = ["//visibility:public"],
-    deps = ["@com_github_theqrl_qrllib//goqrllib/goqrllib:go_default_library"],
+    deps = [
+        "//protos:go_default_library",
+        "@com_github_theqrl_qrllib//goqrllib/goqrllib:go_default_library",
+        "@org_golang_google_protobuf//encoding/protojson:go_default_library",
+    ],
 )
 
 go_test(
