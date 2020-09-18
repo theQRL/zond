@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/theQRL/qrllib/goqrllib/goqrllib"
 	"math"
+	"os"
 	"runtime"
 	"strconv"
 )
@@ -220,4 +221,20 @@ func ShorsToQuantas(data []uint64) []string {
 		convertedData[i] = ShorToQuanta(data[i])
 	}
 	return convertedData
+}
+
+func FileExists(fileName string) bool {
+	info, err := os.Stat(fileName)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
+}
+
+func IsValidAddress(address []byte) bool {
+	// Warning: Never pass this validation True for Coinbase Address
+	if goqrllib.QRLHelperAddressIsValid(BytesToUCharVector(address)) {
+		return true
+	}
+	return false
 }
