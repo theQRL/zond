@@ -1,131 +1,494 @@
 package p2p
 
 import (
+	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	"github.com/theQRL/zond/proto/p2p"
-	"google.golang.org/grpc"
-	"io"
+	"github.com/theQRL/zond/chain"
+	"github.com/theQRL/zond/chain/block"
+	"github.com/theQRL/zond/chain/transactions"
+	"github.com/theQRL/zond/config"
+	"github.com/theQRL/zond/misc"
+	"github.com/theQRL/zond/ntp"
+	"github.com/theQRL/zond/p2p/messages"
+	"github.com/theQRL/zond/protos"
+	"github.com/willf/bloom"
 	"net"
 	"sync"
+	"time"
 )
 
-type P2PServer struct {
-	running  bool
-	exit     chan struct{}
-	chanSend chan *p2p.P2PMessage
-
-	lock   sync.Mutex
-	loopWG sync.WaitGroup
-
-	grpcServer *grpc.Server
-
-	p2p.UnimplementedP2PProtocolServer
+type conn struct {
+	fd      net.Conn
+	inbound bool
 }
 
-func (p *P2PServer) HandleRequest(srv p2p.P2PProtocol_TransmitServer, req *p2p.Request) {
-	resp := &p2p.Response{}
+type peerDrop struct {
+	*Peer
+	err       error
+	requested bool  // true if signaled by the peer
+}
 
-	switch req.Type.(type) {
-	case *p2p.Request_PingReq:
-		pingResp := &p2p.PingResp {
-			Timestamp: 1000,
-		}
-		resp.Type = &p2p.Response_PingResp {
-			PingResp: pingResp,
-		}
+type PeerInfo struct {
+	IP                      string `json:"IP"`
+	Port                    uint16 `json:"Port"`
+	LastConnectionTimestamp uint64 `json:"LastConnectionTimestamp"`
+}
 
-	case *p2p.Request_BlockReq:
-		blockResp := &p2p.BlockResp {
-			BlockNumber: 9898,
-		}
-		resp.Type = &p2p.Response_BlockResp {
-			BlockResp: blockResp,
-		}
-	}
+type PeersInfo struct {
+	PeersInfo []PeerInfo `json:"PeersInfo"`
+}
 
-	msgResp := &p2p.P2PMessage{
-		Type: &p2p.P2PMessage_Resp {
-			Resp: resp,
+type Server struct {
+	config *config.Config
+
+	chain        *chain.Chain
+	ntp          ntp.NTPInterface
+	peersInfo    *PeersInfo
+	ipCount      map[string]int
+	inboundCount uint16
+
+	listener     net.Listener
+	lock         sync.Mutex
+	peerInfoLock sync.Mutex
+
+	running bool
+	loopWG  sync.WaitGroup
+
+	exit                        chan struct{}
+	connectPeersExit            chan struct{}
+	mrDataConn                  chan *MRDataConn
+	addPeerToPeerList           chan *protos.PLData
+	blockAndPeerChan            chan *BlockAndPeer
+	addPeer                     chan *conn
+	delPeer                     chan *peerDrop
+	registerAndBroadcastChan    chan *messages.RegisterMessage
+	blockReceivedForAttestation chan *block.Block
+
+	filter          *bloom.BloomFilter
+	mr              *MessageReceipt
+	downloader		*Downloader
+	messagePriority map[protos.LegacyMessage_FuncName]uint64
+}
+
+func (srv *Server) SetBlockReceivedForAttestation(b chan *block.Block) {
+	srv.blockReceivedForAttestation = b
+}
+
+func (srv *Server) BroadcastBlock(block *block.Block) {
+	msg := &messages.RegisterMessage{
+		Msg: &protos.LegacyMessage{
+			FuncName: protos.LegacyMessage_BK,
+			Data: &protos.LegacyMessage_Block {
+				Block: block.PBData(),
+			},
 		},
+		MsgHash: misc.Bin2HStr(block.HeaderHash()),
 	}
-	log.Info("Request from Client", req.GetBlockReq().BlockNumber)
-	if err := srv.Send(msgResp); err != nil {
-		log.Error("Error while transmitting message to client ", err)
+	srv.registerAndBroadcastChan <-msg
+}
+
+func (srv *Server) BroadcastBlockForAttestation(block *block.Block, signature []byte) {
+	msg := &messages.RegisterMessage{
+		Msg: &protos.LegacyMessage{
+			FuncName: protos.LegacyMessage_BA,
+			Data: &protos.LegacyMessage_BlockForAttestation{
+				BlockForAttestation: &protos.BlockForAttestation{
+					Block: block.PBData(),
+					Signature: signature,
+				},
+			},
+		},
+		MsgHash: misc.Bin2HStr(block.PartialBlockSigningHash()),
+	}
+	srv.registerAndBroadcastChan <-msg
+}
+
+func (srv *Server) BroadcastAttestationTransaction(attestTx *transactions.Attest,
+	partialBlockSigningHash []byte) {
+	msg := &messages.RegisterMessage{
+		Msg: &protos.LegacyMessage{
+			FuncName: protos.LegacyMessage_AT,
+			Data: &protos.LegacyMessage_AtData{
+				AtData: &protos.ProtocolTransactionData{
+					Tx: attestTx.PBData(),
+					PartialBlockSigningHash: partialBlockSigningHash,
+				},
+			},
+		},
+		MsgHash: misc.Bin2HStr(attestTx.TxHash(partialBlockSigningHash)),
+	}
+	srv.registerAndBroadcastChan <-msg
+}
+
+func (srv *Server) Start() (err error) {
+	srv.lock.Lock()
+	defer srv.lock.Unlock()
+	if srv.running {
+		return errors.New("server is already running")
+	}
+
+	srv.filter = bloom.New(200000, 5)
+	//srv.chain.GetTransactionPool().SetRegisterAndBroadcastChan(srv.registerAndBroadcastChan)
+	if err := srv.startListening(); err != nil {
+		return err
+	}
+
+	srv.running = true
+	go srv.run()
+	go srv.downloader.DownloadMonitor()
+
+	return nil
+}
+
+func (srv *Server) Stop() (err error) {
+	srv.lock.Lock()
+	defer srv.lock.Unlock()
+
+	if !srv.running {
+		return
+	}
+	srv.running = false
+	if srv.listener != nil {
+		srv.listener.Close()
+	}
+
+	close(srv.exit)
+	srv.loopWG.Wait()
+
+	return nil
+}
+
+func (srv *Server) listenLoop(listener net.Listener) {
+	srv.loopWG.Add(1)
+	defer srv.loopWG.Done()
+
+	for {
+		c, err := listener.Accept()
+
+		if err != nil {
+			log.Error("Read ERROR Reason: ", err)
+			return
+		}
+		log.Info("New Peer joined")
+		srv.addPeer <- &conn{c, true}
 	}
 }
 
-func (p *P2PServer) HandleResponse(srv p2p.P2PProtocol_TransmitServer, resp *p2p.Response) {
-	switch resp.Type.(type) {
-	case *p2p.Response_PingResp:
-		resp.GetPingResp()
-
-	case *p2p.Response_BlockResp:
-		resp.GetBlockResp()
+func (srv *Server) ConnectPeer(peer string) error {
+	ip, _, _ := net.SplitHostPort(peer)
+	if _, ok := srv.ipCount[ip]; ok {
+		return nil
 	}
+
+	c, err := net.DialTimeout("tcp", peer, 10 * time.Second)
+
+	if err != nil {
+		log.Warn("Error while connecting to Peer ",
+			"IP:PORT", peer)
+		return err
+	}
+	log.Info("Connected to peer ",
+		"IP:PORT ", peer)
+	srv.addPeer <- &conn{c, false}
+
+	return nil
 }
 
-func (p *P2PServer) Send(srv p2p.P2PProtocol_TransmitServer) {
-
+func (srv *Server) ConnectPeers() error {
+	return nil
 }
 
-func (p *P2PServer) Transmit(srv p2p.P2PProtocol_TransmitServer) error {
-	peer := NewPeerClient(srv)
+func (srv *Server) startListening() error {
+	bindingAddress := fmt.Sprintf("%s:%d",
+		srv.config.User.Node.BindingIP,
+		srv.config.User.Node.LocalPort)
 
-	ctx := srv.Context()
-	var err error
+	listener, err := net.Listen("tcp", bindingAddress)
+	if err != nil {
+		return err
+	}
 
-	Loop:
+	srv.listener = listener
+	go srv.listenLoop(listener)
+
+	return nil
+}
+
+func (srv *Server) run() {
+	var (
+		peers        = make(map[string]*Peer)
+	)
+
+	srv.loopWG.Add(1)
+	defer srv.loopWG.Done()
+
+running:
 	for {
 		select {
-		case <- ctx.Done():
-			err = ctx.Err()
-			break Loop
-		case <- p.exit:
-			break Loop
+		case <-srv.exit:
+			srv.downloader.Exit()
+			log.Debug("Shutting Down Server")
+			break running
+		case c := <-srv.addPeer:
+			srv.peerInfoLock.Lock()
+
+			log.Debug("Adding peer", "addr", c.fd.RemoteAddr())
+			p := newPeer(
+				&c.fd,
+				c.inbound,
+				srv.chain,
+				srv.filter,
+				srv.mr,
+				srv.mrDataConn,
+				srv.registerAndBroadcastChan,
+				srv.addPeerToPeerList,
+				srv.blockAndPeerChan,
+				srv.messagePriority)
+			go srv.runPeer(p)
+			peers[c.fd.RemoteAddr().String()] = p
+
+			ip, _, _ := net.SplitHostPort(c.fd.RemoteAddr().String())
+			srv.ipCount[ip] += 1
+			if p.inbound {
+				srv.inboundCount++
+			}
+			if srv.ipCount[ip] > srv.config.User.Node.MaxRedundantConnections {
+				p.Disconnect()
+				// TODO: Ban peer
+			}
+
+			srv.peerInfoLock.Unlock()
+
+		case pd := <-srv.delPeer:
+			srv.peerInfoLock.Lock()
+
+			log.Debug("Removing Peer", "err", pd.err)
+			//peer := peers[pd.conn.RemoteAddr().String()]
+			delete(peers, pd.conn.RemoteAddr().String())
+			if pd.inbound {
+				srv.inboundCount--
+			}
+			ip, _, _ := net.SplitHostPort(pd.conn.RemoteAddr().String())
+			srv.ipCount[ip] -= 1
+			srv.peerInfoLock.Unlock()
+
+		case mrDataConn := <-srv.mrDataConn:
+			// TODO: Process Message Recpt
+			// Need to get connection too
+			mrData := mrDataConn.mrData
+			msgHash := misc.Bin2HStr(mrData.Hash)
+			switch mrData.Type {
+			case protos.LegacyMessage_BA:
+				//TODO: Logic to be written
+				//srv.blockReceivedForAttestation
+			case protos.LegacyMessage_BK:
+				// TODO: Replace this with current slot number
+				if mrData.SlotNumber > srv.chain.Height() + uint64(srv.config.Dev.MaxMarginBlockNumber) {
+					log.Debug("Skipping block #%s as beyond lead limit",
+						"Block #", mrData.SlotNumber)
+					break
+				}
+				// TODO: Replace this with Finalized slot Number
+				if mrData.SlotNumber < srv.chain.Height() - uint64(srv.config.Dev.MinMarginBlockNumber) {
+					log.Debug("'Skipping block #%s as beyond the limit",
+						"Block #", mrData.SlotNumber)
+					break
+				}
+				_, err := srv.chain.GetBlock(mrData.ParentHeaderHash)
+				if err != nil {
+					log.Debug("Missing Parent Block",
+						"#", mrData.SlotNumber,
+						"Block:", misc.Bin2HStr(mrData.Hash),
+						"Parent Block ", misc.Bin2HStr(mrData.ParentHeaderHash))
+					break
+				}
+				if srv.mr.contains(mrData.Hash, mrData.Type) {
+					break
+				}
+
+				srv.mr.addPeer(mrData, mrDataConn.peer)
+
+				value, _ := srv.mr.GetRequestedHash(msgHash)
+				if value.GetRequested() {
+					break
+				}
+
+				go srv.RequestFullMessage(mrData)
+				// Request for full message
+				// Check if its already being feeded by any other peer
+			case protos.LegacyMessage_TT:
+				srv.HandleTransaction(mrDataConn)
+			case protos.LegacyMessage_ST:
+				srv.HandleTransaction(mrDataConn)
+			case protos.LegacyMessage_AT:
+				srv.HandleTransaction(mrDataConn)
+			default:
+				log.Warn("Unknown Message Receipt Type",
+					"Type", mrData.Type)
+				mrDataConn.peer.Disconnect()
+			}
+		case blockAndPeer := <-srv.blockAndPeerChan:
+			srv.BlockReceived(blockAndPeer.peer, blockAndPeer.block)
+		case addPeerToPeerList := <-srv.addPeerToPeerList:
+			srv.UpdatePeerList(addPeerToPeerList)
+		case registerAndBroadcast := <-srv.registerAndBroadcastChan:
+			srv.mr.Register(registerAndBroadcast.MsgHash, registerAndBroadcast.Msg)
+			out := &Msg{
+				msg: &protos.LegacyMessage {
+					FuncName: protos.LegacyMessage_MR,
+					Data: &protos.LegacyMessage_MrData {
+						MrData: &protos.MRData {
+							Hash:misc.HStr2Bin(registerAndBroadcast.MsgHash),
+							Type:registerAndBroadcast.Msg.FuncName,
+						},
+					},
+				},
+			}
+			ignorePeers := make(map[*Peer]bool, 0)
+			if msgRequest, ok := srv.mr.GetRequestedHash(registerAndBroadcast.MsgHash); ok {
+				ignorePeers = msgRequest.peers
+			}
+			for _, p := range peers {
+				if _, ok := ignorePeers[p]; !ok {
+					p.Send(out)
+				}
+			}
 		}
 	}
-	return err
-}
-
-func (p *P2PServer) Start() {
-	port := 15005
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		log.Fatal("failed %v", err)
-		return
-	}
-	p.grpcServer = grpc.NewServer()
-
-	p2p.RegisterP2PProtocolServer(p.grpcServer, p)
-	p.running = true  // TODO: Changing value without lock
-
-	if err = p.grpcServer.Serve(lis); err != nil {
-		log.Error("Error while starting listener ", err)
-		return
+	for _, p := range peers {
+		p.Disconnect()
 	}
 }
 
-func (p *P2PServer) Init() {
-	p.exit = make(chan struct{})
-}
+func (srv *Server) HandleTransaction(mrDataConn *MRDataConn) {
+	mrData := mrDataConn.mrData
+	srv.mr.addPeer(mrData, mrDataConn.peer)
 
-func (p *P2PServer) Stop() {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	if !p.running {
+	// TODO: Ignore transaction if node is syncing
+	if srv.downloader.isSyncing {
 		return
 	}
-	p.running = false
-
-	p.grpcServer.Stop()
-
-	close(p.exit)
-	p.loopWG.Wait()
+	if srv.chain.GetTransactionPool().IsFull() {
+		return
+	}
+	go srv.RequestFullMessage(mrData)
 }
 
-func NewServer() *P2PServer {
-	srv := &P2PServer{}
-	srv.Init()
+func (srv *Server) RequestFullMessage(mrData *protos.MRData) {
+	for {
+		msgHash := misc.Bin2HStr(mrData.Hash)
+		_, ok := srv.mr.GetHashMsg(msgHash)
+		if ok {
+			if _, ok = srv.mr.GetRequestedHash(msgHash); ok {
+				srv.mr.RemoveRequestedHash(msgHash)
+			}
+			return
+		}
+
+		requestedHash, ok := srv.mr.GetRequestedHash(msgHash)
+		if !ok {
+			return
+		}
+
+		peer := requestedHash.GetPeer()
+		if peer == nil {
+			return
+		}
+		requestedHash.SetPeer(peer, true)
+		mrData := &protos.MRData{
+			Hash: mrData.Hash,
+			Type: mrData.Type,
+		}
+		out := &Msg{}
+		out.msg = &protos.LegacyMessage{
+			FuncName: protos.LegacyMessage_SFM,
+			Data: &protos.LegacyMessage_MrData {
+				MrData: mrData,
+			},
+		}
+		peer.Send(out)
+
+		time.Sleep(time.Duration(srv.config.Dev.MessageReceiptTimeout) * time.Second)
+	}
+}
+
+func (srv *Server) LoadPeerList() {
+
+}
+
+func (srv *Server) WritePeerList() error {
+	return nil
+}
+
+func (srv *Server) BlockReceived(peer *Peer, b *block.Block) {
+	headerHash := misc.Bin2HStr(b.HeaderHash())
+	log.Info(">>> Received Block",
+		"Block Number", b.SlotNumber(),
+		"HeaderHash", headerHash)
+
+	// TODO: Trigger Syncing/Block downloader
+	select {
+	case srv.downloader.blockAndPeerChannel <- &BlockAndPeer{b, peer}:
+	case <-time.After(5 * time.Second):
+		log.Info("Timeout for Received Block",
+			"#", b.SlotNumber(),
+			"HeaderHash", headerHash)
+	}
+}
+
+func (srv *Server) UpdatePeerList(pl *protos.PLData) error {
+	return nil
+}
+
+func (srv *Server) runPeer(p *Peer) {
+	remoteRequested := p.run()
+
+	srv.delPeer <- &peerDrop{p, nil, remoteRequested}
+}
+
+func NewServer(chain *chain.Chain) *Server {
+	srv := &Server{
+		config: config.GetConfig(),
+		chain: chain,
+		ntp: ntp.GetNTP(),
+		peersInfo: &PeersInfo{},
+		ipCount: make(map[string]int),
+		mr: CreateMR(),
+		downloader: NewDownloader(chain),
+
+		exit: make(chan struct{}),
+		connectPeersExit: make(chan struct{}),
+		mrDataConn: make(chan *MRDataConn),
+		addPeerToPeerList: make(chan *protos.PLData),
+		blockAndPeerChan: make(chan *BlockAndPeer),
+		addPeer: make(chan *conn),
+		delPeer: make(chan *peerDrop),
+		registerAndBroadcastChan: make(chan *messages.RegisterMessage, 100),
+
+		messagePriority: make(map[protos.LegacyMessage_FuncName]uint64),
+	}
+
+	srv.messagePriority[protos.LegacyMessage_VE] = 0
+	srv.messagePriority[protos.LegacyMessage_PL] = 0
+	srv.messagePriority[protos.LegacyMessage_PONG] = 0
+
+	srv.messagePriority[protos.LegacyMessage_MR] = 2
+	srv.messagePriority[protos.LegacyMessage_SFM] = 1
+
+	srv.messagePriority[protos.LegacyMessage_BK] = 1
+	srv.messagePriority[protos.LegacyMessage_FB] = 0
+	srv.messagePriority[protos.LegacyMessage_PB] = 0
+
+	srv.messagePriority[protos.LegacyMessage_TT] = 1
+	srv.messagePriority[protos.LegacyMessage_ST] = 1
+	srv.messagePriority[protos.LegacyMessage_AT] = 1
+
+	srv.messagePriority[protos.LegacyMessage_SYNC] = 0
+	srv.messagePriority[protos.LegacyMessage_CHAINSTATE] = 0
+	srv.messagePriority[protos.LegacyMessage_EBHREQ] = 0
+	srv.messagePriority[protos.LegacyMessage_EBHRESP] = 0
+	srv.messagePriority[protos.LegacyMessage_P2P_ACK] = 0
+
 	return srv
 }
