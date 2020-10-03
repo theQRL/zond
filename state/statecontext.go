@@ -5,6 +5,7 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/address"
+	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/misc"
@@ -30,6 +31,7 @@ type StateContext struct {
 	validatorsToXMSSAddress map[string][]byte
 
 	epochMetaData *metadata.EpochMetaData
+	epochBlockHashes *metadata.EpochBlockHashes
 	mainChainMetaData *metadata.MainChainMetaData
 }
 
@@ -171,7 +173,7 @@ func (s *StateContext) GetOTSIndexState(address string, otsIndex uint64) *metada
 	return otsIndexMetaData
 }
 
-func (s *StateContext) Commit(bytesBlock []byte, isFinalizedState bool) error {
+func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinalizedState bool) error {
 	blockMetaData := metadata.NewBlockMetaData(s.parentBlockHeaderHash, s.blockHeaderHash, s.slotNumber)
 	var parentBlockMetaData *metadata.BlockMetaData
 	var err error
@@ -190,6 +192,16 @@ func (s *StateContext) Commit(bytesBlock []byte, isFinalizedState bool) error {
 			log.Error("Failed to commit BlockMetaData")
 			return err
 		}
+		err = s.epochBlockHashes.AddHeaderHashBySlotNumber(s.blockHeaderHash, s.slotNumber)
+		if err != nil {
+			log.Error("Failed to Add HeaderHash into EpochBlockHashes")
+			return err
+		}
+		if err:= s.epochBlockHashes.Commit(b); err != nil {
+			log.Error("Failed to commit EpochBlockHashes")
+			return err
+		}
+
 		if s.slotNumber != 0 {
 			if err := parentBlockMetaData.Commit(b); err != nil {
 				log.Error("Failed to commit ParentBlockMetaData")
@@ -197,15 +209,14 @@ func (s *StateContext) Commit(bytesBlock []byte, isFinalizedState bool) error {
 			}
 		}
 
-		if s.slotNumber != 0 && blockMetaData.Epoch() != parentBlockMetaData.Epoch() {
+		if s.slotNumber == 0 || blockMetaData.Epoch() != parentBlockMetaData.Epoch() {
 			if err := s.epochMetaData.Commit(b); err != nil {
 				log.Error("Failed to commit EpochMetaData")
 				return err
 			}
 		}
 
-		// TODO: Move Key prefix to config
-		err = b.Put([]byte(fmt.Sprintf("BLOCK-%s", s.blockHeaderHash)), bytesBlock)
+		err = b.Put(blockStorageKey, bytesBlock)
 		if err != nil {
 			log.Error("Failed to commit block")
 			return err
@@ -214,6 +225,7 @@ func (s *StateContext) Commit(bytesBlock []byte, isFinalizedState bool) error {
 		if isFinalizedState {
 			// Update Main Chain Finalized Block Data
 			s.mainChainMetaData.UpdateFinalizedBlockData(s.blockHeaderHash, s.slotNumber)
+			s.mainChainMetaData.UpdateLastBlockData(s.blockHeaderHash, s.slotNumber)
 			if err := s.mainChainMetaData.Commit(b); err != nil {
 				log.Error("Failed to commit MainChainMetaData")
 				return err
@@ -276,6 +288,12 @@ func NewStateContext(db *db.DB, slotNumber uint64, blockProposer []byte,
 		return nil, err
 	}
 
+	epoch := slotNumber / config.GetDevConfig().BlocksPerEpoch
+	epochBlockHashes, err := metadata.GetEpochBlockHashes(db, epoch)
+	if err != nil {
+		epochBlockHashes = metadata.NewEpochBlockHashes(epoch)
+	}
+
 	return &StateContext {
 		db:             db,
 		addressesState: make(map[string]*address.AddressState),
@@ -292,6 +310,7 @@ func NewStateContext(db *db.DB, slotNumber uint64, blockProposer []byte,
 		validatorsToXMSSAddress: make(map[string][]byte),
 
 		epochMetaData: epochMetaData,
+		epochBlockHashes: epochBlockHashes,
 		mainChainMetaData: mainChainMetaData,
 	}, nil
 }
