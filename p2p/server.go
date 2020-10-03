@@ -14,6 +14,7 @@ import (
 	"github.com/theQRL/zond/protos"
 	"github.com/willf/bloom"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -137,6 +138,7 @@ func (srv *Server) Start() (err error) {
 	srv.running = true
 	go srv.run()
 	go srv.downloader.DownloadMonitor()
+	go srv.ConnectPeers()
 
 	return nil
 }
@@ -154,6 +156,7 @@ func (srv *Server) Stop() (err error) {
 	}
 
 	close(srv.exit)
+	close(srv.connectPeersExit)
 	srv.loopWG.Wait()
 
 	return nil
@@ -196,7 +199,78 @@ func (srv *Server) ConnectPeer(peer string) error {
 }
 
 func (srv *Server) ConnectPeers() error {
-	return nil
+	srv.loopWG.Add(1)
+	defer srv.loopWG.Done()
+
+	for _, peer := range srv.config.User.Node.PeerList {
+		log.Info("Connecting peer",
+			"IP:PORT", peer)
+		srv.ConnectPeer(peer)
+		// TODO: Update last connection time
+	}
+
+	for {
+		select {
+		case <-time.After(15*time.Second):
+			srv.peerInfoLock.Lock()
+			if srv.inboundCount > srv.config.User.Node.MaxPeersLimit {
+				srv.peerInfoLock.Unlock()
+				break
+			}
+
+			maxConnectionTry := 10
+			peerList := make([]string, 0)
+			removePeerList := make([]string, 0)
+
+			count := 0
+
+			for _, p := range srv.peersInfo.PeersInfo {
+
+				if count > maxConnectionTry {
+					break
+				}
+
+				if _, ok := srv.ipCount[p.IP]; ok {
+					continue
+				}
+
+				count += 1
+				peerList = append(peerList, net.JoinHostPort(p.IP, strconv.FormatInt(int64(p.Port), 10)))
+				p.LastConnectionTimestamp = srv.ntp.Time()
+			}
+			srv.peerInfoLock.Unlock()
+
+			for _, ipPort := range peerList {
+				if !srv.running {
+					break
+				}
+				fmt.Println("Trying to Connect",
+					"Peer", ipPort)
+				err := srv.ConnectPeer(ipPort)
+				if err != nil {
+					removePeerList = append(removePeerList, ipPort)
+				}
+			}
+
+			srv.peerInfoLock.Lock()
+			for _, ipPort := range removePeerList {
+				ip, port, _ := net.SplitHostPort(ipPort)
+				var index int
+				for i, p := range srv.peersInfo.PeersInfo {
+					if p.IP == ip && strconv.FormatInt(int64(p.Port), 10) == port {
+						index = i
+						break
+					}
+				}
+				srv.peersInfo.PeersInfo = append(srv.peersInfo.PeersInfo[:index], srv.peersInfo.PeersInfo[index+1:]...)
+			}
+
+			srv.WritePeerList()
+			srv.peerInfoLock.Unlock()
+		case <-srv.connectPeersExit:
+			return nil
+		}
+	}
 }
 
 func (srv *Server) startListening() error {
@@ -259,12 +333,13 @@ running:
 			}
 
 			srv.peerInfoLock.Unlock()
+			srv.downloader.AddPeer(p)
 
 		case pd := <-srv.delPeer:
 			srv.peerInfoLock.Lock()
 
 			log.Debug("Removing Peer", "err", pd.err)
-			//peer := peers[pd.conn.RemoteAddr().String()]
+			peer := peers[pd.conn.RemoteAddr().String()]
 			delete(peers, pd.conn.RemoteAddr().String())
 			if pd.inbound {
 				srv.inboundCount--
@@ -272,6 +347,8 @@ running:
 			ip, _, _ := net.SplitHostPort(pd.conn.RemoteAddr().String())
 			srv.ipCount[ip] -= 1
 			srv.peerInfoLock.Unlock()
+
+			srv.downloader.RemovePeer(peer)
 
 		case mrDataConn := <-srv.mrDataConn:
 			// TODO: Process Message Recpt
@@ -289,20 +366,17 @@ running:
 						"Block #", mrData.SlotNumber)
 					break
 				}
-				// TODO: Replace this with Finalized slot Number
-				if mrData.SlotNumber < srv.chain.Height() - uint64(srv.config.Dev.MinMarginBlockNumber) {
-					log.Debug("'Skipping block #%s as beyond the limit",
-						"Block #", mrData.SlotNumber)
-					break
-				}
+				// TODO: Add to skip slot number beyond the Finalized slot Number
+
 				_, err := srv.chain.GetBlock(mrData.ParentHeaderHash)
 				if err != nil {
-					log.Debug("Missing Parent Block",
-						"#", mrData.SlotNumber,
-						"Block:", misc.Bin2HStr(mrData.Hash),
-						"Parent Block ", misc.Bin2HStr(mrData.ParentHeaderHash))
+					log.Info("Missing Parent Block ",
+						" #", mrData.SlotNumber,
+						" Block ", misc.Bin2HStr(mrData.Hash),
+						" Parent Block ", misc.Bin2HStr(mrData.ParentHeaderHash))
 					break
 				}
+
 				if srv.mr.contains(mrData.Hash, mrData.Type) {
 					break
 				}
@@ -339,8 +413,10 @@ running:
 					FuncName: protos.LegacyMessage_MR,
 					Data: &protos.LegacyMessage_MrData {
 						MrData: &protos.MRData {
-							Hash:misc.HStr2Bin(registerAndBroadcast.MsgHash),
-							Type:registerAndBroadcast.Msg.FuncName,
+							Hash: misc.HStr2Bin(registerAndBroadcast.MsgHash),
+							Type: registerAndBroadcast.Msg.FuncName,
+							SlotNumber: registerAndBroadcast.Msg.GetBlock().Header.SlotNumber,
+							ParentHeaderHash: registerAndBroadcast.Msg.GetBlock().Header.ParentHeaderHash,
 						},
 					},
 				},
