@@ -37,6 +37,7 @@ type EBHRespInfo struct {
 }
 
 type Peer struct {
+	id      string
 	conn    net.Conn
 	inbound bool
 
@@ -44,24 +45,23 @@ type Peer struct {
 
 	chain *chain.Chain
 
-	wg                          sync.WaitGroup
-	disconnectLock              sync.Mutex
-	disconnected                bool
-	disconnectReason            chan struct{}
-	exitMonitorChainState       chan struct{}
-	txPool                      *pool.TransactionPool
-	filter                      *bloom.BloomFilter  // TODO: Check usage
-	mr                          *MessageReceipt
-	config                      *config.Config
-	ntp                         ntp.NTPInterface
-	chainState                  *protos.NodeChainState
+	wg                    sync.WaitGroup
+	disconnectLock        sync.Mutex
+	disconnected          bool
+	disconnectReason      chan struct{}
+	exitMonitorChainState chan struct{}
+	txPool                *pool.TransactionPool
+	filter                *bloom.BloomFilter // TODO: Check usage
+	mr                    *MessageReceipt
+	config                *config.Config
+	ntp                   ntp.NTPInterface
+	chainState            *protos.NodeChainState
 	//nodeHeaderHashWithTimestamp *NodeHeaderHashWithTimestamp
-	addPeerToPeerList           chan *protos.PLData
-	blockAndPeerChan            chan *BlockAndPeer
-	mrDataConn                  chan *MRDataConn
-	registerAndBroadcastChan    chan *messages.RegisterMessage
-	ebhRespInfo					*EBHRespInfo
-
+	addPeerToPeerList        chan *protos.PLData
+	blockAndPeerChan         chan *BlockAndPeer
+	mrDataConn               chan *MRDataConn
+	registerAndBroadcastChan chan *messages.RegisterMessage
+	ebhRespInfo              *EBHRespInfo // TODO: Add Lock before reading / writing
 
 	inCounter           uint64
 	outCounter          uint64
@@ -71,7 +71,9 @@ type Peer struct {
 	messagePriority     map[protos.LegacyMessage_FuncName]uint64
 	outgoingQueue       *PriorityQueue
 
-	isPLShared     bool // Flag to mark once peer list has been received by the peer
+	epochToBeRequested uint64 // Used by downloader to keep track of EBH request
+
+	isPLShared bool // Flag to mark once peer list has been received by the peer
 }
 
 func newPeer(conn *net.Conn, inbound bool, chain *chain.Chain, filter *bloom.BloomFilter, mr *MessageReceipt, mrDataConn chan *MRDataConn, registerAndBroadcastChan chan *messages.RegisterMessage, addPeerToPeerList chan *protos.PLData, blockAndPeerChan chan *BlockAndPeer, messagePriority map[protos.LegacyMessage_FuncName]uint64) *Peer {
@@ -95,14 +97,14 @@ func newPeer(conn *net.Conn, inbound bool, chain *chain.Chain, filter *bloom.Blo
 		messagePriority:          messagePriority,
 		outgoingQueue:            &PriorityQueue{},
 	}
-
+	p.id = p.conn.RemoteAddr().String()
 	log.Info("New Peer connected",
 		"Peer Addr", p.conn.RemoteAddr().String())
 	return p
 }
 
 func (p *Peer) ID() string {
-	return p.conn.RemoteAddr().String()
+	return p.id
 }
 
 func (p *Peer) ChainState() *protos.NodeChainState {
@@ -120,6 +122,36 @@ func (p *Peer) GetCumulativeStake() uint64 {
 	return p.chainState.CumulativeStake
 }
 
+func (p *Peer) GetEpochToBeRequested() uint64 {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	return p.epochToBeRequested
+}
+
+func (p *Peer) IncreaseEpochToBeRequested() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	maxSlotNumber := p.chain.GetMaxPossibleSlotNumber()
+	maxEpoch := maxSlotNumber / config.GetDevConfig().BlocksPerEpoch
+
+	p.epochToBeRequested += 1
+
+	if p.epochToBeRequested > maxEpoch {
+		p.epochToBeRequested = maxEpoch
+	}
+}
+
+func (p *Peer) UpdateEpochToBeRequested(epoch uint64) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	if epoch > p.epochToBeRequested {
+		p.epochToBeRequested = epoch
+	}
+}
+
 //func (p *Peer) GetNodeHeaderHashWithTimestamp() *NodeHeaderHashWithTimestamp {
 //	return p.nodeHeaderHashWithTimestamp
 //}
@@ -133,13 +165,17 @@ func (p *Peer) updateCounters() {
 	}
 }
 
-func (p *Peer) SendEBHReq(targetHeaderHash []byte) error {
+func (p *Peer) SendEBHReq(epoch uint64, finalizedHeaderHash []byte) error {
+	p.UpdateEpochToBeRequested(epoch)
+
+	log.Info("Sending Request for Epoch >>>>> ", p.epochToBeRequested)
 	msg := &Msg{
 		msg: &protos.LegacyMessage{
 			FuncName: protos.LegacyMessage_EBHREQ,
 			Data: &protos.LegacyMessage_EpochBlockHashesRequest{
 				EpochBlockHashesRequest: &protos.EpochBlockHashesRequest{
-					FinalizedHeaderHash: targetHeaderHash,
+					Epoch: p.GetEpochToBeRequested(),
+					FinalizedHeaderHash: finalizedHeaderHash,
 				},
 			},
 		},
@@ -401,29 +437,37 @@ func (p *Peer) handle(msg *Msg) error {
 		p.HandleBlock(b)
 
 	case protos.LegacyMessage_EBHREQ:
-		ebhReq := msg.msg.GetEpochBlockHashesRequest()
-		headerHash := ebhReq.FinalizedHeaderHash
-		b, err := p.chain.GetBlock(headerHash)
-		if err != nil {
-			log.Warn("EBHReq block not found for headerHash ",
-				misc.Bin2HStr(headerHash))
-			return nil
-		}
-		parentBlockMetaData, err := p.chain.GetBlockMetaData(
-			b.ParentHeaderHash())
-		if err != nil {
-			log.Warn("EBHReq block metadata not found for headerHash ",
-				misc.Bin2HStr(headerHash))
-			return nil
-		}
-		if parentBlockMetaData.FinalizedChildHeaderHash() == nil {
-			// TODO: Chain Behind with unfinalized header hash
-		} else if !reflect.DeepEqual(parentBlockMetaData.FinalizedChildHeaderHash(), headerHash) {
-			// TODO: incompatible chain
-		}
-		blockHashesBySlotNumber, err := p.chain.GetEpochHeaderHashes(headerHash)
 		epochHeaderHashResp := &protos.EpochBlockHashesResponse{
-			BlockHashesBySlotNumber: blockHashesBySlotNumber,
+			IsHeaderHashFinalized: true,
+		}
+
+		ebhReq := msg.msg.GetEpochBlockHashesRequest()
+		b, err := p.chain.GetBlock(ebhReq.FinalizedHeaderHash)
+		if err != nil {
+			epochHeaderHashResp.IsHeaderHashFinalized = false
+		}
+
+		if b != nil && b.SlotNumber() > 0 {
+			parentBlockMetaData, err := p.chain.GetBlockMetaData(b.ParentHeaderHash())
+			if err != nil {
+				log.Error("Block found but parent Block MetaData not found ", err.Error())
+				return nil
+			}
+			if !reflect.DeepEqual(
+				parentBlockMetaData.FinalizedChildHeaderHash(), ebhReq.FinalizedHeaderHash) {
+				epochHeaderHashResp.IsHeaderHashFinalized = false
+			}
+		}
+
+		if epochHeaderHashResp.IsHeaderHashFinalized {
+			epoch := ebhReq.Epoch
+			epochBlockHashes, err := p.chain.GetEpochHeaderHashes(epoch)
+			if err != nil {
+				log.Error("Error in GetEpochHeaderHashes")
+				return nil
+			}
+
+			epochHeaderHashResp.EpochBlockHashesMetaData = epochBlockHashes
 		}
 		out := &Msg{}
 		out.msg = &protos.LegacyMessage{
@@ -624,8 +668,9 @@ func (p *Peer) HandleProtocolTransaction(msg *Msg, txData *protos.ProtocolTransa
 func (p *Peer) HandleChainState(nodeChainState *protos.NodeChainState) {
 	p.chainState = nodeChainState
 	p.chainState.Timestamp = p.ntp.Time()
-	log.Info("Chain State updated",
-		"Peer", p.ID())
+	//log.Info("Chain State updated ",
+	//	"Peer ", p.ID())
+	//log.Info("Chain State ", p.chainState.SlotNumber, " ", misc.Bin2HStr(p.chainState.HeaderHash))
 }
 
 func (p *Peer) SendFetchBlock(blockHeaderHash []byte) error {
