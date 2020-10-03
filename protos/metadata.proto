@@ -60,3 +60,13 @@ message MainChainMetaData {
     bytes last_block_header_hash = 3;
     uint64 last_block_slot_number = 4;
 }
+
+message EpochBlockHashesMetaData {
+    uint64 epoch = 1;
+    repeated BlockHashesBySlotNumber block_hashes_by_slot_number = 2;
+}
+
+message BlockHashesBySlotNumber {
+    uint64 slot_number = 1;
+    repeated bytes header_hashes = 2;
+}

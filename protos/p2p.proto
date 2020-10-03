@@ -8,6 +8,7 @@ option go_package = "github.com/theQRL/zond/protos";
 package protos;
 
 import "protos/block.proto";
+import "protos/metadata.proto";
 import "protos/transaction.proto";
 
 // Adding old code to refactor while keeping things working
@@ -132,14 +133,11 @@ message ProtocolTransactionData {
 }
 
 message EpochBlockHashesRequest {
-    bytes finalized_header_hash = 1;
+    uint64 epoch = 1;
+    bytes finalized_header_hash = 2;
 }
 
 message EpochBlockHashesResponse {
-    repeated BlockHashesBySlotNumber block_hashes_by_slot_number = 1;
-}
-
-message BlockHashesBySlotNumber {
-    uint64 slot_number = 1;
-    repeated bytes header_hashes = 2;
+    bool is_header_hash_finalized = 1;
+    EpochBlockHashesMetaData epoch_block_hashes_meta_data = 2;
 }
