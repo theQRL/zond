@@ -98,8 +98,8 @@ func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
 
 	// TODO: Generate pre-state.yml
 	dilithiumInfos := dilithiumGroup[0].DilithiumInfo
-	b := block.NewBlock(networkID, misc.HStr2Bin(dilithiumInfos[0].PK), 0,
-		c.Genesis.GenesisPrevHeaderHash, transactions, nil, 0)
+	b := block.NewBlock(networkID, c.Genesis.GenesisTimestamp, misc.HStr2Bin(dilithiumInfos[0].PK),
+		0,  c.Genesis.GenesisPrevHeaderHash, transactions, nil, 0)
 
 	for i := 0; i < len(dilithiumGroup); i++ {
 		for j := 0; j < len(dilithiumGroup[i].DilithiumInfo); j++ {
