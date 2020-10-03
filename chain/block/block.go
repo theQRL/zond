@@ -29,6 +29,10 @@ func (b *Block) Header() *protos.BlockHeader {
 	return b.pbData.Header
 }
 
+func (b *Block) Timestamp() uint64 {
+	return b.pbData.Header.TimestampSeconds
+}
+
 func (b *Block) ParentHeaderHash() []byte {
 	return b.pbData.Header.ParentHeaderHash
 }
@@ -166,6 +170,102 @@ func (b *Block) ProcessEpochMetaData(epochMetaData *metadata.EpochMetaData) erro
 	return nil
 }
 
+func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error {
+	blockHeader := b.Header()
+	blockHeaderHash := b.HeaderHash()
+
+	blockProposerDilithiumPK := b.ProtocolTransactions()[0].GetPk()
+
+	epochMetaData := metadata.NewEpochMetaData(0, b.ParentHeaderHash(), make([][]byte, 0))
+	stateContext, err := state.NewStateContext(db, blockHeader.SlotNumber, blockProposerDilithiumPK,
+		blockHeader.ParentHeaderHash, blockHeaderHash, b.PartialBlockSigningHash(),
+		b.BlockSigningHash(), epochMetaData)
+	if err != nil {
+		return err
+	}
+
+	if err := stateContext.PrepareAddressState(misc.Bin2HStr(blockProposerXMSSAddress)); err != nil {
+		return err
+	}
+
+	if err != nil {
+		return err
+	}
+	// Loading States for related address, Dilithium PK, slaves etc.
+	for _, pbData := range b.Transactions() {
+		tx := transactions.ProtoToTransaction(pbData)
+		if err := tx.SetAffectedAddress(stateContext); err != nil {
+			return err
+		}
+	}
+
+	// Validating Transactions
+	for _, pbData := range b.Transactions() {
+		tx := transactions.ProtoToTransaction(pbData)
+		if !tx.Validate(stateContext) {
+			return errors.New(fmt.Sprintf("Transaction Validation failed %s",
+				tx.TxHash(tx.Signature())))
+		}
+	}
+
+	// Applying State Changes by Transactions
+	for _, pbData := range b.Transactions() {
+		tx := transactions.ProtoToTransaction(pbData)
+		if err := tx.ApplyStateChanges(stateContext); err != nil {
+			return err
+		}
+	}
+
+	// Validating Protocol Transactionss
+	for _, pbData := range b.ProtocolTransactions() {
+		tx := transactions.ProtoToProtocolTransaction(pbData)
+		if err := tx.SetAffectedAddress(stateContext); err != nil {
+			return err
+		}
+	}
+
+	// Validating Protocol Transactions
+	for _, pbData := range b.ProtocolTransactions() {
+		tx := transactions.ProtoToProtocolTransaction(pbData)
+		if !tx.Validate(stateContext) {
+			return errors.New(fmt.Sprintf("Protocol Transaction Validation failed %s",
+				tx.TxHash(tx.Signature())))
+		}
+	}
+
+	// Applying Protocol State Changes by Transactions
+	for _, pbData := range b.ProtocolTransactions() {
+		tx := transactions.ProtoToProtocolTransaction(pbData)
+		if err := tx.ApplyStateChanges(stateContext); err != nil {
+			return err
+		}
+	}
+
+	err = b.ProcessEpochMetaData(epochMetaData)
+	if err != nil {
+		log.Error("Failed to Process Epoch MetaData")
+		return err
+	}
+	var randomSeed int64
+	h := md5.New()
+	h.Write(b.ParentHeaderHash())
+	randomSeed = int64(binary.BigEndian.Uint64(h.Sum(nil)))
+
+	currentEpoch := uint64(0)
+	epochMetaData.AllotSlots(randomSeed, currentEpoch, b.ParentHeaderHash())
+
+	/* TODO:
+	1. Add code to check new finality, if finality reached move it to finalized state
+	2. Ensure Number of validators should never be less than 2x of blocks per epoch
+	3. De-stake must not be allowed if number of validators reduces to less than 2x of blocks per epoch
+	*/
+	bytesBlock, err := b.Serialize()
+	if err != nil {
+		return err
+	}
+	return stateContext.Commit(GetBlockStorageKey(blockHeaderHash), bytesBlock, true)
+}
+
 func (b *Block) Commit(db *db.DB, finalizedHeaderHash []byte, isFinalizedState bool) error {
 	/* TODO:
 	1. Calculate EpochMetaData
@@ -180,6 +280,18 @@ func (b *Block) Commit(db *db.DB, finalizedHeaderHash []byte, isFinalizedState b
 	if b.SlotNumber() == 0 {
 		parentHeaderHash = b.HeaderHash()
 	}
+	parentBlock, err := GetBlock(db, parentHeaderHash)
+	if err != nil {
+		log.Error("[Commit] Error getting Parent Block ", misc.Bin2HStr(parentHeaderHash))
+		return err
+	}
+	if b.Timestamp() <= parentBlock.Timestamp() {
+		log.Error("[Commit] Block Timestamp must be greater than Parent Block Timestamp")
+		log.Error("Parent Block Timestamp ", parentBlock.Timestamp())
+		log.Error("Block Timestamp ", b.Timestamp())
+		return err
+	}
+
 	parentBlockMetaData, err := metadata.GetBlockMetaData(db, blockHeader.ParentHeaderHash)
 	if err != nil {
 		log.Error("[Commit] Failed to get Parent Block MetaData")
@@ -286,7 +398,7 @@ func (b *Block) Commit(db *db.DB, finalizedHeaderHash []byte, isFinalizedState b
 	if err != nil {
 		return err
 	}
-	return stateContext.Commit(bytesBlock, isFinalizedState)
+	return stateContext.Commit(GetBlockStorageKey(blockHeaderHash), bytesBlock, isFinalizedState)
 }
 
 func (b *Block) Revert() bool {
@@ -294,14 +406,15 @@ func (b *Block) Revert() bool {
 	return true
 }
 
-func NewBlock(networkId uint64, proposerAddress []byte, slotNumber uint64, parentHeaderHash []byte,
-	txs []*protos.Transaction, protocolTxs []*protos.ProtocolTransaction,
+func NewBlock(networkId uint64, timestamp uint64, proposerAddress []byte, slotNumber uint64,
+	parentHeaderHash []byte, txs []*protos.Transaction, protocolTxs []*protos.ProtocolTransaction,
 	lastCoinBaseNonce uint64) *Block {
 	b := &Block {
 		pbData: &protos.Block{},
 	}
 
 	blockHeader := &protos.BlockHeader{}
+	blockHeader.TimestampSeconds = timestamp
 	blockHeader.SlotNumber = slotNumber
 	blockHeader.ParentHeaderHash = parentHeaderHash
 
@@ -329,16 +442,16 @@ func NewBlock(networkId uint64, proposerAddress []byte, slotNumber uint64, paren
 func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 	parentHeaderHash []byte, parentSlotNumber uint64) (*metadata.EpochMetaData, error) {
 
-	if slotNumber == 0 || parentSlotNumber == 0 {
-		key := metadata.GetEpochMetaDataKey(0, []byte(""))
-		data, err := db.Get(key)
-		if err != nil {
-			log.Error("Failed to load EpochMetaData for genesis block")
-			return nil, err
-		}
-		epochMetaData := metadata.NewEpochMetaData(0, nil, nil)
-		return epochMetaData, epochMetaData.DeSerialize(data)
-	}
+	//if slotNumber == 0 {
+	//	key := metadata.GetEpochMetaDataKey(0, []byte(""))
+	//	data, err := db.Get(key)
+	//	if err != nil {
+	//		log.Error("Failed to load EpochMetaData for genesis block")
+	//		return nil, err
+	//	}
+	//	epochMetaData := metadata.NewEpochMetaData(0, nil, nil)
+	//	return epochMetaData, epochMetaData.DeSerialize(data)
+	//}
 
 	blocksPerEpoch := config.GetDevConfig().BlocksPerEpoch
 	parentBlockMetaData, err := metadata.GetBlockMetaData(db, parentHeaderHash)
@@ -354,13 +467,17 @@ func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 
 	epoch = parentEpoch
 	var pathToFirstBlockOfEpoch [][]byte
-	for ; epoch == parentEpoch ; {
+	if parentBlockMetaData.SlotNumber() == 0 {
 		pathToFirstBlockOfEpoch = append(pathToFirstBlockOfEpoch, parentBlockMetaData.HeaderHash())
-		parentBlockMetaData, err = metadata.GetBlockMetaData(db, parentBlockMetaData.ParentHeaderHash())
-		if err != nil {
-			return nil, err
+	} else {
+		for ; epoch == parentEpoch; {
+			pathToFirstBlockOfEpoch = append(pathToFirstBlockOfEpoch, parentBlockMetaData.HeaderHash())
+			parentBlockMetaData, err = metadata.GetBlockMetaData(db, parentBlockMetaData.ParentHeaderHash())
+			if err != nil {
+				return nil, err
+			}
+			parentEpoch = parentBlockMetaData.SlotNumber() / blocksPerEpoch
 		}
-		parentEpoch = parentBlockMetaData.SlotNumber() / blocksPerEpoch
 	}
 
 	lenPathToFirstBlockOfEpoch := len(pathToFirstBlockOfEpoch)
@@ -376,6 +493,7 @@ func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 
 	epochMetaData, err := metadata.GetEpochMetaData(db, blockMetaData.SlotNumber(),
 		blockMetaData.ParentHeaderHash())
+
 	if err != nil {
 		return nil, err
 	}
@@ -391,6 +509,7 @@ func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 		}
 		// TODO: Calculate RandomSeed
 	}
+
 	// TODO: Temporary random seed calculation
 	var randomSeed int64
 	h := md5.New()
@@ -403,8 +522,12 @@ func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 	return epochMetaData, nil
 }
 
+func GetBlockStorageKey(blockHeaderHash []byte) []byte {
+	return []byte(fmt.Sprintf("BLOCK-%s", blockHeaderHash))
+}
+
 func GetBlock(db *db.DB, blockHeaderHash []byte) (*Block, error) {
-	data, err  := db.Get([]byte(fmt.Sprintf("BLOCK-%s", blockHeaderHash)))
+	data, err  := db.Get(GetBlockStorageKey(blockHeaderHash))
 	if err != nil {
 		return nil, err
 	}
