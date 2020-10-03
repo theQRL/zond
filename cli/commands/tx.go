@@ -70,7 +70,7 @@ func getTransactionSubCommands() []*cli.Command {
 				for _, dilithiumInfo := range dilithiumGroup.DilithiumInfo {
 					dilithiumPKs = append(dilithiumPKs, misc.HStr2Bin(dilithiumInfo.PK))
 				}
-				tx := transactions.NewStake(c.Uint64("network-id"), dilithiumPKs, false,
+				tx := transactions.NewStake(c.Uint64("network-id"), dilithiumPKs, true,
 					fee, c.Uint64("nonce"), xmss.PK(), nil)
 				tx.Sign(xmss, tx.GetSigningHash())
 
