@@ -506,6 +506,116 @@ func (x *MainChainMetaData) GetLastBlockSlotNumber() uint64 {
 	return 0
 }
 
+type EpochBlockHashesMetaData struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Epoch                   uint64                     `protobuf:"varint,1,opt,name=epoch,proto3" json:"epoch,omitempty"`
+	BlockHashesBySlotNumber []*BlockHashesBySlotNumber `protobuf:"bytes,2,rep,name=block_hashes_by_slot_number,json=blockHashesBySlotNumber,proto3" json:"block_hashes_by_slot_number,omitempty"`
+}
+
+func (x *EpochBlockHashesMetaData) Reset() {
+	*x = EpochBlockHashesMetaData{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_protos_metadata_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *EpochBlockHashesMetaData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EpochBlockHashesMetaData) ProtoMessage() {}
+
+func (x *EpochBlockHashesMetaData) ProtoReflect() protoreflect.Message {
+	mi := &file_protos_metadata_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EpochBlockHashesMetaData.ProtoReflect.Descriptor instead.
+func (*EpochBlockHashesMetaData) Descriptor() ([]byte, []int) {
+	return file_protos_metadata_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *EpochBlockHashesMetaData) GetEpoch() uint64 {
+	if x != nil {
+		return x.Epoch
+	}
+	return 0
+}
+
+func (x *EpochBlockHashesMetaData) GetBlockHashesBySlotNumber() []*BlockHashesBySlotNumber {
+	if x != nil {
+		return x.BlockHashesBySlotNumber
+	}
+	return nil
+}
+
+type BlockHashesBySlotNumber struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SlotNumber   uint64   `protobuf:"varint,1,opt,name=slot_number,json=slotNumber,proto3" json:"slot_number,omitempty"`
+	HeaderHashes [][]byte `protobuf:"bytes,2,rep,name=header_hashes,json=headerHashes,proto3" json:"header_hashes,omitempty"`
+}
+
+func (x *BlockHashesBySlotNumber) Reset() {
+	*x = BlockHashesBySlotNumber{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_protos_metadata_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *BlockHashesBySlotNumber) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockHashesBySlotNumber) ProtoMessage() {}
+
+func (x *BlockHashesBySlotNumber) ProtoReflect() protoreflect.Message {
+	mi := &file_protos_metadata_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockHashesBySlotNumber.ProtoReflect.Descriptor instead.
+func (*BlockHashesBySlotNumber) Descriptor() ([]byte, []int) {
+	return file_protos_metadata_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *BlockHashesBySlotNumber) GetSlotNumber() uint64 {
+	if x != nil {
+		return x.SlotNumber
+	}
+	return 0
+}
+
+func (x *BlockHashesBySlotNumber) GetHeaderHashes() [][]byte {
+	if x != nil {
+		return x.HeaderHashes
+	}
+	return nil
+}
+
 var File_protos_metadata_proto protoreflect.FileDescriptor
 
 var file_protos_metadata_proto_rawDesc = []byte{
@@ -580,10 +690,25 @@ var file_protos_metadata_proto_rawDesc = []byte{
 	0x64, 0x65, 0x72, 0x48, 0x61, 0x73, 0x68, 0x12, 0x33, 0x0a, 0x16, 0x6c, 0x61, 0x73, 0x74, 0x5f,
 	0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x5f, 0x73, 0x6c, 0x6f, 0x74, 0x5f, 0x6e, 0x75, 0x6d, 0x62, 0x65,
 	0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x04, 0x52, 0x13, 0x6c, 0x61, 0x73, 0x74, 0x42, 0x6c, 0x6f,
-	0x63, 0x6b, 0x53, 0x6c, 0x6f, 0x74, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x42, 0x1f, 0x5a, 0x1d,
-	0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x74, 0x68, 0x65, 0x51, 0x52,
-	0x4c, 0x2f, 0x7a, 0x6f, 0x6e, 0x64, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x62, 0x06, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x63, 0x6b, 0x53, 0x6c, 0x6f, 0x74, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x22, 0x8f, 0x01, 0x0a,
+	0x18, 0x45, 0x70, 0x6f, 0x63, 0x68, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x48, 0x61, 0x73, 0x68, 0x65,
+	0x73, 0x4d, 0x65, 0x74, 0x61, 0x44, 0x61, 0x74, 0x61, 0x12, 0x14, 0x0a, 0x05, 0x65, 0x70, 0x6f,
+	0x63, 0x68, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x65, 0x70, 0x6f, 0x63, 0x68, 0x12,
+	0x5d, 0x0a, 0x1b, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x5f, 0x68, 0x61, 0x73, 0x68, 0x65, 0x73, 0x5f,
+	0x62, 0x79, 0x5f, 0x73, 0x6c, 0x6f, 0x74, 0x5f, 0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x18, 0x02,
+	0x20, 0x03, 0x28, 0x0b, 0x32, 0x1f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x42, 0x6c,
+	0x6f, 0x63, 0x6b, 0x48, 0x61, 0x73, 0x68, 0x65, 0x73, 0x42, 0x79, 0x53, 0x6c, 0x6f, 0x74, 0x4e,
+	0x75, 0x6d, 0x62, 0x65, 0x72, 0x52, 0x17, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x48, 0x61, 0x73, 0x68,
+	0x65, 0x73, 0x42, 0x79, 0x53, 0x6c, 0x6f, 0x74, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x22, 0x5f,
+	0x0a, 0x17, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x48, 0x61, 0x73, 0x68, 0x65, 0x73, 0x42, 0x79, 0x53,
+	0x6c, 0x6f, 0x74, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x12, 0x1f, 0x0a, 0x0b, 0x73, 0x6c, 0x6f,
+	0x74, 0x5f, 0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a,
+	0x73, 0x6c, 0x6f, 0x74, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x12, 0x23, 0x0a, 0x0d, 0x68, 0x65,
+	0x61, 0x64, 0x65, 0x72, 0x5f, 0x68, 0x61, 0x73, 0x68, 0x65, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28,
+	0x0c, 0x52, 0x0c, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x48, 0x61, 0x73, 0x68, 0x65, 0x73, 0x42,
+	0x1f, 0x5a, 0x1d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x74, 0x68,
+	0x65, 0x51, 0x52, 0x4c, 0x2f, 0x7a, 0x6f, 0x6e, 0x64, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -598,23 +723,26 @@ func file_protos_metadata_proto_rawDescGZIP() []byte {
 	return file_protos_metadata_proto_rawDescData
 }
 
-var file_protos_metadata_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_protos_metadata_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_protos_metadata_proto_goTypes = []interface{}{
-	(*DilithiumMetaData)(nil), // 0: protos.DilithiumMetaData
-	(*SlaveMetaData)(nil),     // 1: protos.SlaveMetaData
-	(*OTSIndexMetaData)(nil),  // 2: protos.OTSIndexMetaData
-	(*BlockMetaData)(nil),     // 3: protos.BlockMetaData
-	(*EpochMetaData)(nil),     // 4: protos.EpochMetaData
-	(*SlotInfo)(nil),          // 5: protos.SlotInfo
-	(*MainChainMetaData)(nil), // 6: protos.MainChainMetaData
+	(*DilithiumMetaData)(nil),        // 0: protos.DilithiumMetaData
+	(*SlaveMetaData)(nil),            // 1: protos.SlaveMetaData
+	(*OTSIndexMetaData)(nil),         // 2: protos.OTSIndexMetaData
+	(*BlockMetaData)(nil),            // 3: protos.BlockMetaData
+	(*EpochMetaData)(nil),            // 4: protos.EpochMetaData
+	(*SlotInfo)(nil),                 // 5: protos.SlotInfo
+	(*MainChainMetaData)(nil),        // 6: protos.MainChainMetaData
+	(*EpochBlockHashesMetaData)(nil), // 7: protos.EpochBlockHashesMetaData
+	(*BlockHashesBySlotNumber)(nil),  // 8: protos.BlockHashesBySlotNumber
 }
 var file_protos_metadata_proto_depIdxs = []int32{
 	5, // 0: protos.EpochMetaData.slot_info:type_name -> protos.SlotInfo
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	8, // 1: protos.EpochBlockHashesMetaData.block_hashes_by_slot_number:type_name -> protos.BlockHashesBySlotNumber
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_protos_metadata_proto_init() }
@@ -707,6 +835,30 @@ func file_protos_metadata_proto_init() {
 				return nil
 			}
 		}
+		file_protos_metadata_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*EpochBlockHashesMetaData); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_protos_metadata_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*BlockHashesBySlotNumber); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -714,7 +866,7 @@ func file_protos_metadata_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_protos_metadata_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
