@@ -6,8 +6,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"go.etcd.io/bbolt"
+	"math"
 	"math/rand"
 	"reflect"
 )
@@ -78,22 +80,25 @@ func (e *EpochMetaData) AllotSlots(randomSeed int64, epoch uint64, prevSlotLastB
 	e.pbData.Epoch = epoch
 	e.pbData.PrevSlotLastBlockHeaderHash = prevSlotLastBlockHeaderHash
 	rand.Seed(randomSeed)
+
 	rand.Shuffle(len(e.pbData.Validators), func(i, j int) {
 		e.pbData.Validators[i], e.pbData.Validators[j] = e.pbData.Validators[j], e.pbData.Validators[i]
 	})
+
 	blocksPerEpoch := config.GetDevConfig().BlocksPerEpoch
 	e.pbData.SlotInfo = make([]*protos.SlotInfo, blocksPerEpoch)
 
 	lenValidators := uint64(len(e.Validators()))
-	maxAttestorsPerSlot := (lenValidators - 1) / blocksPerEpoch
+	maxValidatorsPerSlot := uint64(math.Ceil(float64(lenValidators) / float64(blocksPerEpoch)))
 
-	for i := uint64(0); i < maxAttestorsPerSlot; i++ {
+	for i := uint64(0); i < maxValidatorsPerSlot; i++ {
 		offset := i * blocksPerEpoch
 		for j := uint64(0); j < blocksPerEpoch && (offset + j < lenValidators); j++ {
+			e.pbData.SlotInfo[j] = &protos.SlotInfo{}
 			if i == 0 {
 				e.pbData.SlotInfo[j].SlotLeader = i + j
 			} else {
-				e.pbData.SlotInfo[offset+j].Attestors = append(e.pbData.SlotInfo[j].Attestors, offset+j)
+				e.pbData.SlotInfo[j].Attestors = append(e.pbData.SlotInfo[j].Attestors, offset + j)
 			}
 		}
 	}
@@ -118,21 +123,37 @@ func GetEpochMetaData(db *db.DB, currentBlockSlotNumber uint64, parentHeaderHash
 	epoch := currentBlockSlotNumber / blocksPerEpoch
 	parentEpoch := epoch
 
-	for ;parentEpoch == epoch; {
-		parentBlockMetaData, err := GetBlockMetaData(db, parentHeaderHash)
+	if currentBlockSlotNumber == 0 {
+		key := GetEpochMetaDataKey(0, parentHeaderHash)
+		data, err := db.Get(key)
 		if err != nil {
+			log.Error("Failed to load EpochMetaData for genesis block")
 			return nil, err
 		}
-		parentEpoch = parentBlockMetaData.SlotNumber() / blocksPerEpoch
-		prevSlotLastBlockHeaderHash = parentBlockMetaData.HeaderHash()
-		parentHeaderHash = parentBlockMetaData.ParentHeaderHash()
+		epochMetaData := NewEpochMetaData(0, nil, nil)
+		return epochMetaData, epochMetaData.DeSerialize(data)
+	} else {
+		for ; parentEpoch == epoch; {
+			parentBlockMetaData, err := GetBlockMetaData(db, parentHeaderHash)
+			if err != nil {
+				return nil, err
+			}
+			parentEpoch = parentBlockMetaData.SlotNumber() / blocksPerEpoch
+			prevSlotLastBlockHeaderHash = parentBlockMetaData.HeaderHash()
+			parentHeaderHash = parentBlockMetaData.ParentHeaderHash()
+			if parentBlockMetaData.SlotNumber() == 0 {
+				prevSlotLastBlockHeaderHash = parentBlockMetaData.ParentHeaderHash()
+				break
+			}
+		}
 	}
 
 	key := GetEpochMetaDataKey(epoch, prevSlotLastBlockHeaderHash)
 	data, err := db.Get(key)
 
 	if err != nil {
-		log.Error("Error loading EpochMetaData for key ", key, err)
+		log.Error("Error loading EpochMetaData for  ", misc.Bin2HStr(prevSlotLastBlockHeaderHash),
+			err)
 		return nil, err
 	}
 
