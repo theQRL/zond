@@ -12,6 +12,7 @@ import (
 	"github.com/theQRL/zond/keys"
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/misc"
+	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/p2p"
 	"github.com/theQRL/zond/state"
 	"reflect"
@@ -94,7 +95,6 @@ func (p *POS) TimeRemainingForNextAction() time.Duration {
 		currentTime := uint64(time.Now().Unix())
 		genesisTimestamp := p.config.Dev.Genesis.GenesisTimestamp
 		blockTiming := p.config.Dev.BlockTime
-		log.Info("return from here 2 ")
 		// TODO: move this 45 seconds into config
 		return time.Duration((genesisTimestamp + p.blockBeingAttested.SlotNumber() * blockTiming + 45) - currentTime)
 	}
@@ -119,6 +119,9 @@ running:
 			log.Info("Shutting Down POS")
 			break running
 		case <-time.After(p.TimeRemainingForNextAction()):
+			if !p.config.User.Stake.EnableStaking {
+				continue
+			}
 			if p.blockBeingAttested == nil {
 				lastBlock := p.chain.GetLastBlock()
 
@@ -145,8 +148,8 @@ running:
 					log.Error("Error getting CoinBase Address state ", err.Error())
 					continue
 				}
-				b := block.NewBlock(0, proposerD.PK(), slotNumber, lastBlock.HeaderHash(),
-					nil, nil, coinBaseState.Nonce())
+				b := block.NewBlock(0, ntp.GetNTP().Time(), proposerD.PK(), slotNumber,
+					lastBlock.HeaderHash(), nil, nil, coinBaseState.Nonce())
 
 				header := b.Header()
 				attestors, err := p.chain.GetAttestorsBySlotNumber(header.SlotNumber,
@@ -157,6 +160,7 @@ running:
 				}
 				p.blockBeingAttested = b
 				p.attestors = attestors
+				p.attestations = make([]*transactions.Attest, 0)
 				for _, dilithiumPK := range attestors {
 					strDilithiumPK := misc.Bin2HStr(dilithiumPK)
 					d, ok := p.validators[strDilithiumPK]
@@ -209,6 +213,9 @@ running:
 				p.attestations = make([]*transactions.Attest, 0)
 			}
 		case b := <- p.blockReceivedForAttestation:
+			if !p.config.User.Stake.EnableStaking {
+				continue
+			}
 			/*
 			This case happens, when the block is proposed by some outside node.
 			 */
@@ -257,6 +264,9 @@ running:
 				p.srv.BroadcastAttestationTransaction(attestTx, partialBlockSigningHash)
 			}
 		case tx := <- p.attestationReceivedForBlock:
+			if !p.config.User.Stake.EnableStaking {
+				continue
+			}
 			if p.blockBeingAttested == nil {
 				continue
 			}
