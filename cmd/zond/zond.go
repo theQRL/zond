@@ -2,6 +2,7 @@ package main
 
 import (
 	log "github.com/sirupsen/logrus"
+	"github.com/theQRL/zond/api"
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/consensus"
@@ -12,6 +13,10 @@ import (
 	"os/signal"
 )
 
+var (
+	publicAPIServer *api.PublicAPIServer
+)
+
 func ConfigCheck() bool {
 	return true
 }
@@ -20,6 +25,11 @@ func run(c *chain.Chain, db *db.DB) {
 	srv := p2p.NewServer(c)
 	go srv.Start()
 	defer srv.Stop()
+
+	if config.GetUserConfig().API.PublicAPI.Enabled {
+		publicAPIServer = api.NewPublicAPIServer(c, srv.GetRegisterAndBroadcastChan())
+		go publicAPIServer.Start()
+	}
 
 	pos := consensus.NewPOS(srv, c, db)
 
