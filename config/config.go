@@ -43,10 +43,9 @@ type StakeConfig struct {
 	DilithiumKeysFileName string
 }
 
-//type API struct {
-//	AdminAPI  *APIConfig
-//	PublicAPI *APIConfig
-//}
+type API struct {
+	PublicAPI *APIConfig
+}
 
 //type MongoProcessorConfig struct {
 //	Enabled  bool
@@ -73,17 +72,17 @@ type UserConfig struct {
 	BaseDir            string
 	ChainFileDirectory string
 
-	//	API                  *API
-	//	MongoProcessorConfig *MongoProcessorConfig
+	API                  *API
+	//MongoProcessorConfig *MongoProcessorConfig
 }
 
-//type APIConfig struct {
-//	Enabled          bool
-//	Host             string
-//	Port             uint32
-//	Threads          uint32
-//	MaxConcurrentRPC uint16
-//}
+type APIConfig struct {
+	Enabled          bool
+	Host             string
+	Port             uint32
+	Threads          uint32
+	MaxConcurrentRPC uint16
+}
 
 type DevConfig struct {
 	Genesis *GenesisConfig
@@ -165,6 +164,7 @@ func GetUserConfig() (userConf *UserConfig) {
 	node := &NodeConfig{
 		EnablePeerDiscovery: true,
 		PeerList: []string{
+			"95.179.131.134:15005",
 		},
 		BindingIP:               "0.0.0.0",
 		LocalPort:               15005,
@@ -189,27 +189,18 @@ func GetUserConfig() (userConf *UserConfig) {
 		StaleTransactionThreshold:     15,
 	}
 
-	//	adminAPI := &APIConfig{
-	//		Enabled:          false,
-	//		Host:             "127.0.0.1",
-	//		Port:             19008,
-	//		Threads:          1,
-	//		MaxConcurrentRPC: 100,
-	//	}
-	//
-	//	publicAPI := &APIConfig{
-	//		Enabled:          true,
-	//		Host:             "127.0.0.1",
-	//		Port:             19009,
-	//		Threads:          1,
-	//		MaxConcurrentRPC: 100,
-	//	}
-	//
-	//
-	//	api := &API{
-	//		AdminAPI:  adminAPI,
-	//		PublicAPI: publicAPI,
-	//	}
+	publicAPI := &APIConfig{
+		Enabled:          true,
+		Host:             "127.0.0.1",
+		Port:             19009,
+		Threads:          1,
+		MaxConcurrentRPC: 100,
+	}
+
+
+	api := &API{
+		PublicAPI: publicAPI,
+	}
 	//	mongoProcessorConfig := &MongoProcessorConfig{
 	//		Enabled:      false,
 	//		DBName:       "zond",
@@ -239,7 +230,7 @@ func GetUserConfig() (userConf *UserConfig) {
 		BaseDir:            path.Join(userCurrentDir.HomeDir, ".zond"),
 		ChainFileDirectory: "data",
 
-		//API: api,
+		API: api,
 		//MongoProcessorConfig: mongoProcessorConfig,
 	}
 
@@ -265,7 +256,7 @@ func GetDevConfig() (dev *DevConfig) {
 		SuppliedCoins:         65000000000000000,
 		GenesisDifficulty:     10000000,
 		CoinBaseAddress:       misc.HStr2Bin("0000000000000000000000000000000000000000000000000000000000000000"),
-		GenesisTimestamp:      1600257256,
+		GenesisTimestamp:      1601802726,
 	}
 	transaction := &TransactionConfig{
 		MultiOutputLimit: 100,
