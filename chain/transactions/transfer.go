@@ -264,11 +264,13 @@ func (tx *Transfer) SetAffectedAddress(stateContext *state.StateContext) error {
 	return err
 }
 
-func NewTransfer(addrsTo [][]byte, amounts []uint64, fee uint64,
-	slavesPK [][]byte, message []byte, xmssPK []byte, masterAddr []byte) *Transfer {
+func NewTransfer(networkID uint64, addrsTo [][]byte, amounts []uint64, fee uint64,
+	slavesPKs [][]byte, message []byte, nonce uint64, xmssPK []byte,
+	masterAddr []byte) *Transfer {
 	tx := &Transfer{}
 
 	tx.pbData = &protos.Transaction{}
+	tx.pbData.NetworkId = networkID
 	tx.pbData.Type = &protos.Transaction_Transfer{Transfer: &protos.Transfer{}}
 
 	if masterAddr != nil {
@@ -277,12 +279,13 @@ func NewTransfer(addrsTo [][]byte, amounts []uint64, fee uint64,
 
 	tx.pbData.Pk = xmssPK
 	tx.pbData.Fee = fee
+	tx.pbData.Nonce = nonce
 	transferPBData := tx.pbData.GetTransfer()
 	transferPBData.AddrsTo = addrsTo
 	transferPBData.Amounts = amounts
 	transferPBData.Message = message
 
-	for _, slavePK := range slavesPK {
+	for _, slavePK := range slavesPKs {
 		transferPBData.SlavePks = append(transferPBData.SlavePks, slavePK)
 	}
 
