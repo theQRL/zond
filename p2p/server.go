@@ -72,6 +72,10 @@ type Server struct {
 	messagePriority map[protos.LegacyMessage_FuncName]uint64
 }
 
+func (srv *Server) GetRegisterAndBroadcastChan() chan *messages.RegisterMessage {
+	return srv.registerAndBroadcastChan
+}
+
 func (srv *Server) SetBlockReceivedForAttestation(b chan *block.Block) {
 	srv.blockReceivedForAttestation = b
 }
