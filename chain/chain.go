@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"github.com/theQRL/zond/address"
 	"github.com/theQRL/zond/chain/block"
 	"github.com/theQRL/zond/chain/block/genesis"
 	"github.com/theQRL/zond/chain/transactions/pool"
@@ -27,6 +28,15 @@ type Chain struct {
 	txPool *pool.TransactionPool
 
 	lastBlock *block.Block
+}
+
+func (c *Chain) GetAddressState(addr []byte) (*address.AddressState, error) {
+	finalizedHeaderHash, err := c.GetFinalizedHeaderHash()
+	if err != nil {
+		return nil, err
+	}
+	return address.GetAddressState(c.state.DB(), addr, c.lastBlock.HeaderHash(),
+		finalizedHeaderHash)
 }
 
 func (c *Chain) GetMaxPossibleSlotNumber() uint64 {
