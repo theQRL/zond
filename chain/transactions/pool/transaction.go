@@ -32,7 +32,7 @@ func (t *TransactionPool) Contains(tx *TransactionInfo) bool {
 }
 
 func (t *TransactionPool) Add(tx transactions.CoreTransaction, txHash []byte,
-	blockNumber uint64, timestamp uint64) error {
+	slotNumber uint64, timestamp uint64) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -44,7 +44,7 @@ func (t *TransactionPool) Add(tx transactions.CoreTransaction, txHash []byte,
 		timestamp = t.ntp.Time()
 	}
 
-	ti := CreateTransactionInfo(tx, txHash, blockNumber, timestamp)
+	ti := CreateTransactionInfo(tx, txHash, slotNumber, timestamp)
 
 	err := t.txPool.Push(ti)
 	if err != nil {
