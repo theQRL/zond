@@ -168,7 +168,6 @@ func (p *Peer) updateCounters() {
 func (p *Peer) SendEBHReq(epoch uint64, finalizedHeaderHash []byte) error {
 	p.UpdateEpochToBeRequested(epoch)
 
-	log.Info("Sending Request for Epoch >>>>> ", p.epochToBeRequested)
 	msg := &Msg{
 		msg: &protos.LegacyMessage{
 			FuncName: protos.LegacyMessage_EBHREQ,
@@ -193,7 +192,7 @@ func (p *Peer) Send(msg *Msg) error {
 	outgoingMsg := CreateOutgoingMessage(priority, msg.msg)
 	if p.outgoingQueue.Full() {
 		log.Info("Outgoing Queue Full: Skipping Message")
-		return errors.New("Disconnecting: Outgoing Queue Full")
+		return errors.New("disconnecting: Outgoing Queue Full")
 	}
 	p.outgoingQueue.Push(outgoingMsg)
 	return p.SendNext()
@@ -668,9 +667,6 @@ func (p *Peer) HandleProtocolTransaction(msg *Msg, txData *protos.ProtocolTransa
 func (p *Peer) HandleChainState(nodeChainState *protos.NodeChainState) {
 	p.chainState = nodeChainState
 	p.chainState.Timestamp = p.ntp.Time()
-	//log.Info("Chain State updated ",
-	//	"Peer ", p.ID())
-	//log.Info("Chain State ", p.chainState.SlotNumber, " ", misc.Bin2HStr(p.chainState.HeaderHash))
 }
 
 func (p *Peer) SendFetchBlock(blockHeaderHash []byte) error {
