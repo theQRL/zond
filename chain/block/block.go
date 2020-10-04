@@ -85,6 +85,7 @@ func (b *Block) PartialBlockSigningHash() []byte {
 	// It doesn't include coinbase & attestor transaction
 
 	tmp := new(bytes.Buffer)
+	binary.Write(tmp, binary.BigEndian, b.Header().TimestampSeconds)
 	binary.Write(tmp, binary.BigEndian, b.Header().SlotNumber)
 	tmp.Write(b.Header().ParentHeaderHash)
 
@@ -108,6 +109,7 @@ func (b *Block) BlockSigningHash() []byte {
 	// It doesn't include coinbase & attestor transaction
 
 	tmp := new(bytes.Buffer)
+	binary.Write(tmp, binary.BigEndian, b.Header().TimestampSeconds)
 	binary.Write(tmp, binary.BigEndian, b.Header().SlotNumber)
 	tmp.Write(b.Header().ParentHeaderHash)
 
@@ -472,6 +474,9 @@ func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 	} else {
 		for ; epoch == parentEpoch; {
 			pathToFirstBlockOfEpoch = append(pathToFirstBlockOfEpoch, parentBlockMetaData.HeaderHash())
+			if parentBlockMetaData.SlotNumber() == 0 {
+				break
+			}
 			parentBlockMetaData, err = metadata.GetBlockMetaData(db, parentBlockMetaData.ParentHeaderHash())
 			if err != nil {
 				return nil, err
