@@ -1,14 +1,19 @@
 package wallet
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/theQRL/qrllib/goqrllib/goqrllib"
+	"github.com/theQRL/zond/api"
+	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/crypto"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"google.golang.org/protobuf/encoding/protojson"
 	"io/ioutil"
+	"net/http"
+	"strconv"
 )
 
 type Wallet struct {
@@ -31,9 +36,42 @@ func (w *Wallet) Add(height uint64, hashFunction goqrllib.EHashFunction) {
 	w.Save()
 }
 
+func (w *Wallet) reqBalance(qAddress string) (uint64, error) {
+	userConfig := config.GetUserConfig()
+	apiHostPort := fmt.Sprintf("http://%s:%d",
+		userConfig.API.PublicAPI.Host,
+		userConfig.API.PublicAPI.Port)
+	url := fmt.Sprintf("%s/api/balance/%s", apiHostPort, qAddress)
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+
+	var response api.Response
+	err = json.Unmarshal(bodyBytes, &response)
+
+	balance := response.Data.(map[string]interface{})
+	return strconv.ParseUint(balance["balance"].(string), 10, 64)
+}
+
 func (w *Wallet) List() {
 	for i, xmssInfo := range w.pbData.XmssInfo {
-		fmt.Println(fmt.Sprintf("%d\t%s", i, xmssInfo.Address))
+		balance, err := w.reqBalance(xmssInfo.Address)
+		outputBalance := fmt.Sprintf("%d", balance)
+		if err != nil {
+			outputBalance = "?"
+		}
+		fmt.Println(fmt.Sprintf("%d\t%s\t%s",
+			i, xmssInfo.Address, outputBalance))
 	}
 }
 
