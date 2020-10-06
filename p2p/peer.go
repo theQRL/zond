@@ -593,6 +593,11 @@ func (p *Peer) HandleTransaction(msg *Msg, txData *protos.Transaction) error {
 	stateContext, err := p.chain.GetStateContext()
 	if err != nil {
 		log.Error("[HandleTransaction] Error getting StateContext")
+		return nil
+	}
+	if err := tx.SetAffectedAddress(stateContext); err != nil {
+		log.Error("[HandleTransaction] Error setting affected address StateContext")
+		return nil
 	}
 	if !tx.Validate(stateContext) {
 		return nil
