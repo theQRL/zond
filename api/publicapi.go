@@ -49,14 +49,15 @@ func (p *PublicAPIServer) Start() error {
 
 	router := mux.NewRouter()
 	router.HandleFunc("/api/", p.RedirectToAPIDoc).Methods("GET")
-	router.HandleFunc("/api/GetVersion", p.GetVersion).Methods("GET")
-	router.HandleFunc("/api/GetBlockByHash", p.GetBlockByHash).Methods("GET")
-	router.HandleFunc("/api/GetLastBlock", p.GetLastBlock).Methods("GET")
-	router.HandleFunc("/api/GetAddressState", p.GetAddressState).Methods("GET")
-	router.HandleFunc("/api/GetBalance", p.GetBalance).Methods("GET")
-	router.HandleFunc("/api/GetEstimatedNetworkFee", p.GetEstimatedNetworkFee).Methods("GET")
-	router.HandleFunc("/api/BroadcastTransferTx", p.BroadcastTransferTx).Methods("POST")
-	router.HandleFunc("/api/GetHeight", p.GetHeight).Methods("GET")
+	router.HandleFunc("/api/version", p.GetVersion).Methods("GET")
+	router.HandleFunc("/api/block/{hash}", p.GetBlockByHash).Methods("GET")
+	router.HandleFunc("/api/block/last", p.GetLastBlock).Methods("GET")
+	router.HandleFunc("/api/address/{address}", p.GetAddressState).Methods("GET")
+	router.HandleFunc("/api/balance/{address}", p.GetBalance).Methods("GET")
+	router.HandleFunc("/api/fee", p.GetEstimatedNetworkFee).Methods("GET")
+	router.HandleFunc("/api/broadcast/transfer", p.BroadcastTransferTx).Methods("POST")
+	router.HandleFunc("/api/broadcast/stake", p.BroadcastStakeTx).Methods("POST")
+	router.HandleFunc("/api/height", p.GetHeight).Methods("GET")
 	//handler := cors.Default().Handler(router)
 	co := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"}, //you service is available and allowed for this base url
@@ -172,29 +173,19 @@ func (p *PublicAPIServer) GetAddressState(w http.ResponseWriter, r *http.Request
 		w.WriteHeader(429)
 		return
 	}
-	param, found := r.URL.Query()["address"]
-	if !found {
-		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			"address not found in parameter",
-			nil))
-		return
-	}
-	addressState, err := p.chain.GetAddressState(misc.Qaddress2Bin(param[0]))
+	vars := mux.Vars(r)
+	address := vars["address"]
+
+	addressState, err := p.chain.GetAddressState(misc.Qaddress2Bin(address))
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			fmt.Sprintf("Error Decoding address %s\n %s", param[0], err.Error()),
+			fmt.Sprintf("Error Decoding address %s\n %s", address, err.Error()),
 			nil))
 		return
 	}
-	a := &view.PlainAddressState{}
-	a.AddressStateFromPBData(addressState.PBData())
-	response, err := NewAddressStateResponse(a)
-	if err != nil {
-		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			fmt.Sprintf("Error in NewAddressStateResponse %s", err.Error()),
-			nil))
-		return
-	}
+	response := &view.PlainAddressState{}
+	response.AddressStateFromPBData(addressState.PBData())
+
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",
 		response))
@@ -206,17 +197,13 @@ func (p *PublicAPIServer) GetBalance(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(429)
 		return
 	}
-	param, found := r.URL.Query()["address"]
-	if !found {
-		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			"address not found in parameter",
-			nil))
-		return
-	}
-	addressState, err := p.chain.GetAddressState(misc.Qaddress2Bin(param[0]))
+	vars := mux.Vars(r)
+	address := vars["address"]
+
+	addressState, err := p.chain.GetAddressState(misc.Qaddress2Bin(address))
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			fmt.Sprintf("Error Decoding address %s\n %s", param[0], err.Error()),
+			fmt.Sprintf("Error Decoding address %s\n %s", address, err.Error()),
 			nil))
 		return
 	}
@@ -289,6 +276,12 @@ func (p *PublicAPIServer) BroadcastStakeTx(w http.ResponseWriter, r *http.Reques
 			nil))
 		return
 	}
+	if err := tx.SetAffectedAddress(sc); err != nil {
+		json.NewEncoder(w).Encode(p.prepareResponse(1,
+			"Error setting affected address into state context for transaction validation",
+			nil))
+		return
+	}
 	if !tx.Validate(sc) {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			"Transaction Validation Failed",
@@ -326,6 +319,7 @@ func (p *PublicAPIServer) BroadcastStakeTx(w http.ResponseWriter, r *http.Reques
 			nil))
 		return
 	}
+
 	response := &BroadcastTransactionResponse{
 		TransactionHash: misc.Bin2HStr(txHash),
 	}
@@ -360,6 +354,12 @@ func (p *PublicAPIServer) BroadcastTransferTx(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			"Error getting state context for transaction validation",
+			nil))
+		return
+	}
+	if err := tx.SetAffectedAddress(sc); err != nil {
+		json.NewEncoder(w).Encode(p.prepareResponse(1,
+			"Error setting affected address into state context for transaction validation",
 			nil))
 		return
 	}
