@@ -1,13 +1,19 @@
 package commands
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"github.com/theQRL/zond/api"
+	"github.com/theQRL/zond/api/view"
 	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/cli/flags"
 	"github.com/theQRL/zond/keys"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/wallet"
 	"github.com/urfave/cli/v2"
+	"io/ioutil"
+	"net/http"
 )
 
 func getTransactionSubCommands() []*cli.Command {
@@ -37,6 +43,8 @@ func getTransactionSubCommands() []*cli.Command {
 					Name: "std-out",
 					Value: true,
 				},
+				flags.BroadcastFlag,
+				flags.RemoteAddrFlag,
 				&cli.StringFlag {
 					Name: "output",
 					Value: "stake_transactions.json",
@@ -55,6 +63,8 @@ func getTransactionSubCommands() []*cli.Command {
 				fee := c.Uint64("fee")
 				output := c.String("output")
 				stdOut := c.Bool("std-out")
+				broadcastFlag := c.Bool("broadcast")
+				remoteAddr := c.String("remote-addr")
 
 				w := wallet.NewWallet(c.String("wallet-file"))
 				xmss, err := w.GetXMSSByIndex(c.Uint("xmss-index"))
@@ -89,6 +99,40 @@ func getTransactionSubCommands() []*cli.Command {
 					fmt.Println(misc.BytesToString(jsonData))
 				}
 
+				if broadcastFlag {
+					stake := view.PlainStakeTransaction{}
+					stake.TransactionFromPBData(tx.PBData(), tx.TxHash(tx.GetSigningHash()))
+
+					responseBody := new(bytes.Buffer)
+					err := json.NewEncoder(responseBody).Encode(stake)
+					if err != nil {
+						fmt.Println("Error: ", err)
+						return err
+					}
+
+					url := fmt.Sprintf("http://%s/api/broadcast/stake", remoteAddr)
+					req, err := http.NewRequest(http.MethodPost, url, responseBody)
+					if err != nil {
+						fmt.Println("Error: ", err)
+						return err
+					}
+
+					client := &http.Client{}
+					resp, err := client.Do(req)
+					if err != nil {
+						return err
+					}
+					defer resp.Body.Close()
+					bodyBytes, _ := ioutil.ReadAll(resp.Body)
+
+					var response api.Response
+					err = json.Unmarshal(bodyBytes, &response)
+
+					responseData := response.Data.(map[string]interface{})
+					if responseData["transactionHash"].(string) == misc.Bin2HStr(tx.TxHash(tx.GetSigningHash())) {
+						fmt.Println("Transaction successfully broadcasted")
+					}
+				}
 				return nil
 			},
 		},
