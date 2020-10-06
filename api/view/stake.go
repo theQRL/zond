@@ -5,15 +5,16 @@ import (
 	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
+	"strconv"
 )
 
 type PlainStakeTransaction struct {
-	NetworkID		uint64 `json:"networkID"`
+	NetworkID       uint64 `json:"networkID"`
 	MasterAddress   string `json:"masterAddress"`
-	Fee             uint64 `json:"fee"`
+	Fee             string `json:"fee"`
 	PublicKey       string `json:"publicKey"`
 	Signature       string `json:"signature"`
-	Nonce           uint64 `json:"nonce"`
+	Nonce           string `json:"nonce"`
 	TransactionHash string `json:"transactionHash"`
 	TransactionType string `json:"transactionType"`
 
@@ -26,10 +27,10 @@ func (t *PlainStakeTransaction) TransactionFromPBData(tx *protos.Transaction, tx
 	if tx.MasterAddr != nil {
 		t.MasterAddress = misc.Bin2Qaddress(tx.MasterAddr)
 	}
-	t.Fee = tx.Fee
+	t.Fee = strconv.FormatUint(tx.Fee, 10)
 	t.PublicKey = misc.Bin2HStr(tx.Pk)
 	t.Signature = misc.Bin2HStr(tx.Signature)
-	t.Nonce = tx.Nonce
+	t.Nonce = strconv.FormatUint(tx.Nonce, 10)
 	t.TransactionHash = misc.Bin2HStr(txHash)
 	t.TransactionType = "stake"
 
@@ -52,12 +53,22 @@ func (t *PlainStakeTransaction) ToStakeTransactionObject() (*transactions.Stake,
 		dilithiumPks = append(dilithiumPks, misc.HStr2Bin(dilithiumPk))
 	}
 
+	fee, err := strconv.ParseUint(t.Fee, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	nonce, err := strconv.ParseUint(t.Nonce, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
 	stakeTx := transactions.NewStake(
 		t.NetworkID,
 		dilithiumPks,
 		t.Stake,
-		t.Fee,
-		t.Nonce,
+		fee,
+		nonce,
 		xmssPK,
 		masterAddr)
 
