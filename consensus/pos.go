@@ -293,6 +293,10 @@ running:
 				log.Error("Error creating NewStateContext")
 				continue
 			}
+			if err := tx.SetAffectedAddress(sc); err != nil {
+				log.Error("Failed to set Affected Address")
+				continue
+			}
 			if !tx.Validate(sc) {
 				log.Warn("Attestor transaction validation failed")
 				continue
