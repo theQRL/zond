@@ -3,7 +3,6 @@ package metadata
 import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
-	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/protos"
@@ -12,10 +11,6 @@ import (
 
 type OTSIndexMetaData struct {
 	pbData *protos.OTSIndexMetaData
-}
-
-func (o *OTSIndexMetaData) TxHash() []byte {
-	return o.pbData.TxHash
 }
 
 func (o *OTSIndexMetaData) Address() []byte {
@@ -69,9 +64,8 @@ func (o *OTSIndexMetaData) Commit(b *bbolt.Bucket) error {
 	return b.Put(GetOTSIndexMetaDataKeyByPageNumber(o.Address(), o.PageNumber()), data)
 }
 
-func NewOTSIndexMetaData(txHash []byte, address []byte, pageNumber uint64) *OTSIndexMetaData {
+func NewOTSIndexMetaData(address []byte, pageNumber uint64) *OTSIndexMetaData {
 	pbData := &protos.OTSIndexMetaData {
-		TxHash: txHash,
 		Address: address,
 		PageNumber: pageNumber,
 	}
@@ -85,14 +79,16 @@ func NewOTSIndexMetaData(txHash []byte, address []byte, pageNumber uint64) *OTSI
 	}
 }
 
-func GetOTSIndexMetaData(db *db.DB, key []byte,
+func GetOTSIndexMetaData(db *db.DB, address []byte, otsIndex uint64,
 	headerHash []byte, finalizedHeaderHash []byte) (*OTSIndexMetaData, error) {
+	key := GetOTSIndexMetaDataKeyByOTSIndex(address, otsIndex)
 	data, err := GetDataByBucket(db, key, headerHash, finalizedHeaderHash)
 
-	// TODO: if error key not found then load with default data
+	// TODO: Check for error KeyNotFound
+	// If error key not found then load with default data
 	if err != nil {
-		log.Error("Error loading OTSIndexMetaData for key ", key, err)
-		return nil, err
+		return NewOTSIndexMetaData(address,
+			otsIndex / config.GetDevConfig().OTSBitFieldPerPage), nil
 	}
 	o := &OTSIndexMetaData{
 		pbData: &protos.OTSIndexMetaData{},

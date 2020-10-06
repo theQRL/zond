@@ -150,8 +150,8 @@ func (s *StateContext) PrepareOTSIndexMetaData(address string, otsIndex uint64) 
 		return nil
 	}
 
-	otsIndexMetaData, err := metadata.GetOTSIndexMetaData(s.db, key, s.parentBlockHeaderHash,
-		s.mainChainMetaData.FinalizedBlockHeaderHash())
+	otsIndexMetaData, err := metadata.GetOTSIndexMetaData(s.db, misc.HStr2Bin(address), otsIndex,
+		s.parentBlockHeaderHash, s.mainChainMetaData.FinalizedBlockHeaderHash())
 	s.otsIndexState[strKey] = otsIndexMetaData
 	return err
 }
