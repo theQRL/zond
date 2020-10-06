@@ -9,7 +9,6 @@ type PlainAddressState struct {
 	Address           string   `json:"address" bson:"address"`
 	Balance           uint64   `json:"balance" bson:"balance"`
 	Nonce             uint64   `json:"nonce" bson:"nonce"`
-	//OtsBitfield       []string `json:"otsBitField" bson:"otsBitField"`
 }
 
 type PlainBalance struct {
@@ -29,7 +28,4 @@ func (a *PlainAddressState) AddressStateFromPBData(a2 *protos.AddressState) {
 	a.Address = misc.Bin2Qaddress(a2.Address)
 	a.Balance = a2.Balance
 	a.Nonce = a2.Nonce
-	//for i := 0; i < int(config.GetConfig().Dev.OtsBitFieldSize); i++ {
-	//	a.OtsBitfield = append(a.OtsBitfield, base64.StdEncoding.EncodeToString(a2.OtsBitfield[i]))
-	//}
 }
