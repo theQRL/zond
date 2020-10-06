@@ -1,6 +1,10 @@
 package flags
 
-import "github.com/urfave/cli/v2"
+import (
+	"fmt"
+	"github.com/theQRL/zond/config"
+	"github.com/urfave/cli/v2"
+)
 
 // List of global flags used by CLI commands
 
@@ -31,4 +35,18 @@ var NonceFlag = &cli.Uint64Flag {
 	Name: "nonce",
 	Value: 1,
 	Required: true,
+}
+
+var BroadcastFlag = &cli.BoolFlag {
+	Name: "broadcast",
+	Value: false,
+	Required: false,
+}
+
+var RemoteAddrFlag = &cli.StringFlag {
+	Name: "remote-addr",
+	Value: fmt.Sprintf("%s:%d",
+		config.GetUserConfig().API.PublicAPI.Host,
+		config.GetUserConfig().API.PublicAPI.Port),
+	Required: false,
 }
