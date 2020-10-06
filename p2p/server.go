@@ -412,6 +412,7 @@ running:
 			srv.UpdatePeerList(addPeerToPeerList)
 		case registerAndBroadcast := <-srv.registerAndBroadcastChan:
 			srv.mr.Register(registerAndBroadcast.MsgHash, registerAndBroadcast.Msg)
+
 			out := &Msg{
 				msg: &protos.LegacyMessage {
 					FuncName: protos.LegacyMessage_MR,
@@ -419,11 +420,14 @@ running:
 						MrData: &protos.MRData {
 							Hash: misc.HStr2Bin(registerAndBroadcast.MsgHash),
 							Type: registerAndBroadcast.Msg.FuncName,
-							SlotNumber: registerAndBroadcast.Msg.GetBlock().Header.SlotNumber,
-							ParentHeaderHash: registerAndBroadcast.Msg.GetBlock().Header.ParentHeaderHash,
 						},
 					},
 				},
+			}
+			b := registerAndBroadcast.Msg.GetBlock()
+			if b != nil {
+				out.msg.GetMrData().SlotNumber = b.Header.SlotNumber
+				out.msg.GetMrData().ParentHeaderHash = b.Header.ParentHeaderHash
 			}
 			ignorePeers := make(map[*Peer]bool, 0)
 			if msgRequest, ok := srv.mr.GetRequestedHash(registerAndBroadcast.MsgHash); ok {
