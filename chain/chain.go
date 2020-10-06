@@ -44,7 +44,7 @@ func (c *Chain) GetMaxPossibleSlotNumber() uint64 {
 	currentTimestamp := ntp.GetNTP().Time()
 	genesisTimestamp := d.Genesis.GenesisTimestamp
 
-	return (currentTimestamp - genesisTimestamp) / d.BlocksPerEpoch
+	return (currentTimestamp - genesisTimestamp) / d.BlockTime
 }
 
 func (c *Chain) GetTransactionPool() *pool.TransactionPool {
