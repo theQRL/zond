@@ -341,7 +341,8 @@ main:
 	return numberOfRequests, nextIndexForRequest, nil
 }
 
-func (d *Downloader) BlockDownloader(targetSlotNumbers []*HashesAndPeerInfo) {
+func (d *Downloader) BlockDownloader(targetSlotNumbers []*HashesAndPeerInfo,
+	lastBlockHeaderToDownload []byte, peerGroup []*Peer) {
 	d.blockDownloaderRunning = true
 	defer func () {
 		d.blockDownloaderRunning = false
@@ -356,6 +357,10 @@ func (d *Downloader) BlockDownloader(targetSlotNumbers []*HashesAndPeerInfo) {
 		log.Error("Error while Requesting for block",
 			"Block #", targetSlotNumbers[nextIndexForRequest].slotNumber,
 			"Error", err.Error())
+	}
+	if numberOfRequests == 0 {
+		d.isSyncingFinished(false, lastBlockHeaderToDownload, peerGroup)
+		return
 	}
 	targetSlotNumbersLen := len(targetSlotNumbers)
 	for {
@@ -627,5 +632,5 @@ func (d *Downloader) Initialize(peerGroup []*Peer,
 	}
 
 	go d.Consumer(lastBlockHeaderToDownload, peerGroup)
-	go d.BlockDownloader(targetSlotNumbers)
+	go d.BlockDownloader(targetSlotNumbers, lastBlockHeaderToDownload, peerGroup)
 }
