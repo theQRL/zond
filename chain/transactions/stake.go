@@ -49,13 +49,13 @@ func (tx *Stake) validateData(stateContext *state.StateContext) bool {
 	txHash := tx.TxHash(tx.GetSigningHash())
 
 	if tx.Fee() < 0 {
-		log.Warn("Stake [%s] Invalid Fee = %d", misc.Bin2HStr(txHash), tx.Fee)
+		log.Warn(fmt.Sprintf("Stake [%s] Invalid Fee = %d", misc.Bin2HStr(txHash), tx.Fee()))
 		return false
 	}
 
 	addressState, err := stateContext.GetAddressState(misc.Bin2HStr(tx.AddrFrom()))
 	if err != nil {
-		log.Warn("Stake [%s] Address %s missing into state context", tx.AddrFrom())
+		log.Warn(fmt.Sprintf("[Stake] Address %s missing into state context", tx.AddrFrom()))
 		return false
 	}
 
@@ -173,11 +173,24 @@ func (tx *Stake) ApplyStateChanges(stateContext *state.StateContext) error {
 }
 
 func (tx *Stake) SetAffectedAddress(stateContext *state.StateContext) error {
+	// Pre-load dilithium metadata, so that the stake flag value can be validated
+	for _, dilithiumPK := range tx.DilithiumPKs() {
+		_ = stateContext.PrepareDilithiumMetaData(misc.Bin2HStr(dilithiumPK))
+	}
+
 	err := stateContext.PrepareAddressState(misc.Bin2HStr(tx.AddrFrom()))
 	if err != nil {
 		return err
 	}
-	err = stateContext.PrepareAddressState(misc.Bin2HStr(misc.PK2BinAddress(tx.PK())))
+
+	addrFromPK := misc.Bin2HStr(misc.PK2BinAddress(tx.PK()))
+
+	err = stateContext.PrepareOTSIndexMetaData(addrFromPK, tx.OTSIndex())
+	if err != nil {
+		return err
+	}
+
+	err = stateContext.PrepareAddressState(addrFromPK)
 	return err
 }
 
