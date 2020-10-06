@@ -78,7 +78,7 @@ func (tx *CoinBase) validateData(stateContext *state.StateContext) bool {
 	coinBaseAddress := config.GetDevConfig().Genesis.CoinBaseAddress
 	addressState, err := stateContext.GetAddressState(misc.Bin2HStr(coinBaseAddress))
 	if err != nil {
-		log.Warn("Transfer [%s] Address %s missing into state context", coinBaseAddress)
+		log.Warn("CoinBase [%s] Address %s missing into state context", coinBaseAddress)
 		return false
 	}
 
