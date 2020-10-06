@@ -237,12 +237,6 @@ func (tx *Transfer) SetAffectedAddress(stateContext *state.StateContext) error {
 	if err != nil {
 		return err
 	}
-	addrFromPK := misc.PK2BinAddress(tx.PK())
-	err = stateContext.PrepareAddressState(misc.Bin2HStr(addrFromPK))
-	if err != nil {
-		return err
-	}
-
 	for _, address := range tx.AddrsTo() {
 		err = stateContext.PrepareAddressState(misc.Bin2HStr(address))
 		if err != nil {
@@ -257,10 +251,14 @@ func (tx *Transfer) SetAffectedAddress(stateContext *state.StateContext) error {
 		}
 	}
 
-	if err := stateContext.PrepareOTSIndexMetaData(misc.Bin2HStr(addrFromPK), tx.OTSIndex()); err != nil {
+	addrFromPK := misc.Bin2HStr(misc.PK2BinAddress(tx.PK()))
+
+	err = stateContext.PrepareOTSIndexMetaData(addrFromPK, tx.OTSIndex())
+	if err != nil {
 		return err
 	}
 
+	err = stateContext.PrepareAddressState(addrFromPK)
 	return err
 }
 
