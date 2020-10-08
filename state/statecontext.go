@@ -20,7 +20,6 @@ type StateContext struct {
 	slaveState     map[string]*metadata.SlaveMetaData
 	otsIndexState  map[string]*metadata.OTSIndexMetaData
 
-
 	slotNumber uint64
 	blockProposer []byte
 	parentBlockHeaderHash []byte
@@ -29,10 +28,16 @@ type StateContext struct {
 	blockSigningHash []byte
 
 	validatorsToXMSSAddress map[string][]byte
+	attestorsFlag map[string]bool  // Flag just to mark if attestor has been processed, need not to be stored in state
+	blockProposerFlag bool  // Flag just to mark once block propose has been processed, need not to be stored in state
 
 	epochMetaData *metadata.EpochMetaData
 	epochBlockHashes *metadata.EpochBlockHashes
 	mainChainMetaData *metadata.MainChainMetaData
+}
+
+func (s *StateContext) GetEpochMetaData() *metadata.EpochMetaData {
+	return s.epochMetaData
 }
 
 func (s *StateContext) GetSlotNumber() uint64 {
@@ -55,6 +60,40 @@ func (s *StateContext) ValidatorsToXMSSAddress() map[string][]byte {
 	return s.validatorsToXMSSAddress
 }
 
+func (s *StateContext) ProcessAttestorsFlag(attestorDilithiumPK []byte) error {
+	if s.slotNumber == 0 {
+		return nil
+	}
+	strAttestorDilithiumPK := misc.Bin2HStr(attestorDilithiumPK)
+	result, ok := s.attestorsFlag[strAttestorDilithiumPK]
+	if !ok {
+		return errors.New("attestor is not assigned to attest at this slot number")
+	}
+
+	if result {
+		return errors.New("attestor already attested for this slot number")
+	}
+
+	s.attestorsFlag[strAttestorDilithiumPK] = true
+	return nil
+}
+
+func (s *StateContext) ProcessBlockProposerFlag(blockProposerDilithiumPK []byte) error {
+	if s.slotNumber == 0 {
+		return nil
+	}
+	slotInfo := s.epochMetaData.SlotInfo()[s.slotNumber % config.GetDevConfig().BlocksPerEpoch]
+	if !reflect.DeepEqual(slotInfo.SlotLeader, blockProposerDilithiumPK) {
+		return errors.New("unexpected block proposer")
+	}
+	if s.blockProposerFlag {
+		return errors.New("block proposer has already been processed")
+	}
+
+	s.blockProposerFlag = true
+	return nil
+}
+
 func (s *StateContext) PrepareAddressState(addr string) error {
 	strKey := misc.Bin2HStr(address.GetAddressStateKey(misc.HStr2Bin(addr)))
 	_, ok := s.addressesState[strKey]
@@ -64,6 +103,9 @@ func (s *StateContext) PrepareAddressState(addr string) error {
 
 	addressState, err := address.GetAddressState(s.db, misc.HStr2Bin(addr),
 		s.parentBlockHeaderHash, s.mainChainMetaData.FinalizedBlockHeaderHash())
+	if addressState == nil {
+		return err
+	}
 	s.addressesState[strKey] = addressState
 
 	return err
@@ -92,6 +134,9 @@ func (s *StateContext) PrepareDilithiumMetaData(dilithiumPK string) error {
 
 	dilithiumMetaData, err := metadata.GetDilithiumMetaData(s.db, misc.HStr2Bin(dilithiumPK),
 		s.parentBlockHeaderHash, s.mainChainMetaData.FinalizedBlockHeaderHash())
+	if dilithiumMetaData == nil {
+		return err
+	}
 	s.dilithiumState[strKey] = dilithiumMetaData
 	return err
 }
@@ -100,7 +145,7 @@ func (s *StateContext) AddDilithiumMetaData(dilithiumPK string, dilithiumMetaDat
 	strKey := misc.Bin2HStr(metadata.GetDilithiumMetaDataKey(misc.HStr2Bin(dilithiumPK)))
 	_, ok := s.dilithiumState[strKey]
 	if ok {
-		return errors.New("DilithiumPK already exists")
+		return errors.New("dilithiumPK already exists")
 	}
 	s.dilithiumState[strKey] = dilithiumMetaData
 	return nil
@@ -121,6 +166,9 @@ func (s *StateContext) PrepareSlaveMetaData(masterAddr string, slavePK string) e
 
 	slaveMetaData, err := metadata.GetSlaveMetaData(s.db, misc.HStr2Bin(masterAddr), misc.HStr2Bin(slavePK),
 		s.parentBlockHeaderHash, s.mainChainMetaData.FinalizedBlockHeaderHash())
+	if slaveMetaData == nil {
+		return err
+	}
 	s.slaveState[strKey] = slaveMetaData
 	return err
 }
@@ -152,6 +200,9 @@ func (s *StateContext) PrepareOTSIndexMetaData(address string, otsIndex uint64) 
 
 	otsIndexMetaData, err := metadata.GetOTSIndexMetaData(s.db, misc.HStr2Bin(address), otsIndex,
 		s.parentBlockHeaderHash, s.mainChainMetaData.FinalizedBlockHeaderHash())
+	if otsIndexMetaData == nil {
+		return err
+	}
 	s.otsIndexState[strKey] = otsIndexMetaData
 	return err
 }
@@ -294,6 +345,14 @@ func NewStateContext(db *db.DB, slotNumber uint64, blockProposer []byte,
 		epochBlockHashes = metadata.NewEpochBlockHashes(epoch)
 	}
 
+	attestorsFlag := make(map[string]bool)
+	if slotNumber > 0 {
+		slotInfo := epochMetaData.SlotInfo()[slotNumber%config.GetDevConfig().BlocksPerEpoch]
+		for _, attestorsIndex := range slotInfo.Attestors {
+			attestorsFlag[misc.Bin2HStr(epochMetaData.Validators()[attestorsIndex])] = false
+		}
+	}
+
 	return &StateContext {
 		db:             db,
 		addressesState: make(map[string]*address.AddressState),
@@ -308,6 +367,8 @@ func NewStateContext(db *db.DB, slotNumber uint64, blockProposer []byte,
 		partialBlockSigningHash: partialBlockSigningHash,
 		blockSigningHash: blockSigningHash,
 		validatorsToXMSSAddress: make(map[string][]byte),
+		attestorsFlag: attestorsFlag,
+		blockProposerFlag: false,
 
 		epochMetaData: epochMetaData,
 		epochBlockHashes: epochBlockHashes,
