@@ -71,7 +71,8 @@ func NewOTSIndexMetaData(address []byte, pageNumber uint64) *OTSIndexMetaData {
 	}
 
 	for i := 0; i < int(config.GetDevConfig().OTSBitFieldPerPage); i++ {
-		pbData.Bitfield[i] = make([]byte, 8)
+		bitfield := make([]byte, 8)
+		pbData.Bitfield = append(pbData.Bitfield, bitfield)
 	}
 
 	return &OTSIndexMetaData {
