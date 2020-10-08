@@ -179,6 +179,7 @@ func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error 
 	blockProposerDilithiumPK := b.ProtocolTransactions()[0].GetPk()
 
 	epochMetaData := metadata.NewEpochMetaData(0, b.ParentHeaderHash(), make([][]byte, 0))
+
 	stateContext, err := state.NewStateContext(db, blockHeader.SlotNumber, blockProposerDilithiumPK,
 		blockHeader.ParentHeaderHash, blockHeaderHash, b.PartialBlockSigningHash(),
 		b.BlockSigningHash(), epochMetaData)
@@ -193,6 +194,7 @@ func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error 
 	if err != nil {
 		return err
 	}
+
 	// Loading States for related address, Dilithium PK, slaves etc.
 	for _, pbData := range b.Transactions() {
 		tx := transactions.ProtoToTransaction(pbData)
@@ -218,7 +220,7 @@ func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error 
 		}
 	}
 
-	// Validating Protocol Transactionss
+	// Validating Protocol Transactions
 	for _, pbData := range b.ProtocolTransactions() {
 		tx := transactions.ProtoToProtocolTransaction(pbData)
 		if err := tx.SetAffectedAddress(stateContext); err != nil {
@@ -305,8 +307,8 @@ func (b *Block) Commit(db *db.DB, finalizedHeaderHash []byte, isFinalizedState b
 		log.Error("Failed to Calculate Epoch MetaData")
 		return err
 	}
-	blockProposerDilithiumPK := b.ProtocolTransactions()[0].GetPk()
 
+	blockProposerDilithiumPK := b.ProtocolTransactions()[0].GetPk()
 	stateContext, err := state.NewStateContext(db, blockHeader.SlotNumber, blockProposerDilithiumPK,
 		blockHeader.ParentHeaderHash, blockHeaderHash, b.PartialBlockSigningHash(),
 		b.BlockSigningHash(), epochMetaData)
