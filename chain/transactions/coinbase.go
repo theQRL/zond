@@ -88,6 +88,12 @@ func (tx *CoinBase) validateData(stateContext *state.StateContext) bool {
 		return false
 	}
 
+	if err := stateContext.ProcessBlockProposerFlag(tx.PK()); err != nil {
+		log.Error("Failed to process block proposer ", misc.Bin2HStr(tx.PK()))
+		log.Error("Reason: ", err.Error())
+		return false
+	}
+
 	// TODO: provide total number of attestors for this check
 	//balance := addressState.Balance()
 	//if balance < tx.TotalAmounts() {

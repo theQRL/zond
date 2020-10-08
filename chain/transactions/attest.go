@@ -38,6 +38,12 @@ func (tx *Attest) validateData(stateContext *state.StateContext) bool {
 	if !dilithiumMetaData.Stake() {
 		return false
 	}
+
+	if err := stateContext.ProcessAttestorsFlag(tx.PK()); err != nil {
+		log.Error("Failed to Process Attest transaction for attestor ", misc.Bin2HStr(tx.PK()))
+		log.Error("Reason: ", err.Error())
+		return false
+	}
 	return true
 }
 
