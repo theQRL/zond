@@ -34,6 +34,14 @@ func (e *EpochMetaData) Validators() [][]byte {
 	return e.pbData.Validators
 }
 
+func (e *EpochMetaData) TotalStakeAmountFound() uint64 {
+	return e.pbData.PrevEpochStakeData.TotalStakeAmountFound
+}
+
+func (e *EpochMetaData) TotalStakeAmountAlloted() uint64 {
+	return e.pbData.PrevEpochStakeData.TotalStakeAmountAlloted
+}
+
 func (e *EpochMetaData) Serialize() ([]byte, error) {
 	return proto.Marshal(e.pbData)
 }
@@ -48,6 +56,15 @@ func (e *EpochMetaData) Commit(b *bbolt.Bucket) error {
 		return err
 	}
 	return b.Put(GetEpochMetaDataKey(e.Epoch(), e.PrevSlotLastBlockHeaderHash()), data)
+}
+
+func (e *EpochMetaData) UpdatePrevEpochStakeData(totalStakeAmountFound uint64, totalStakeAmountAlloted uint64) {
+	e.pbData.PrevEpochStakeData.TotalStakeAmountFound = totalStakeAmountFound
+	e.pbData.PrevEpochStakeData.TotalStakeAmountAlloted = totalStakeAmountAlloted
+}
+
+func (e *EpochMetaData) AddTotalStakeAmountFound(amount uint64) {
+	e.pbData.PrevEpochStakeData.TotalStakeAmountFound += amount
 }
 
 func (e *EpochMetaData) AddValidators(dilithiumPKs [][]byte) {
@@ -110,6 +127,10 @@ func NewEpochMetaData(epoch uint64, prevSlotLastBlockHeaderHash []byte,
 		Epoch: epoch,
 		PrevSlotLastBlockHeaderHash: prevSlotLastBlockHeaderHash,
 		Validators: validators,
+		PrevEpochStakeData: &protos.EpochStakeData{
+			TotalStakeAmountFound: 0,
+			TotalStakeAmountAlloted: 0,
+		},
 	}
 	return &EpochMetaData {
 		pbData: pbData,
@@ -133,7 +154,7 @@ func GetEpochMetaData(db *db.DB, currentBlockSlotNumber uint64, parentHeaderHash
 		epochMetaData := NewEpochMetaData(0, nil, nil)
 		return epochMetaData, epochMetaData.DeSerialize(data)
 	} else {
-		for ; parentEpoch == epoch; {
+		for ; parentEpoch == epoch ; {
 			parentBlockMetaData, err := GetBlockMetaData(db, parentHeaderHash)
 			if err != nil {
 				return nil, err
