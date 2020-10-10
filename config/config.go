@@ -129,6 +129,8 @@ type DevConfig struct {
 	BlockTimeSeriesSize uint32
 
 	RecordTransactionHashes bool // True will enable recording of transaction hashes into address state
+
+	MinStakeAmount uint64
 }
 
 type TransactionConfig struct {
@@ -307,5 +309,6 @@ func GetDevConfig() (dev *DevConfig) {
 		RecordTransactionHashes: false,
 	}
 	dev.MaxBytesOut = dev.MaxReceivableBytes - dev.ReservedQuota
+	dev.MinStakeAmount = 10000 * dev.ShorPerQuanta
 	return dev
 }
