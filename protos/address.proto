@@ -10,5 +10,6 @@ package protos;
 message AddressState {
     bytes address = 1;
     uint64 balance = 2;
-    uint64 nonce = 3;
+    uint64 stake_balance = 3;  // Balance used for staking
+    uint64 nonce = 4;
 }
