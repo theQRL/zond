@@ -158,7 +158,8 @@ func (b *Block) SignByProposer(d *dilithium.Dilithium) {
 	b.ProtocolTransactions()[0] = coinbaseTx.PBData()
 }
 
-func (b *Block) ProcessEpochMetaData(epochMetaData *metadata.EpochMetaData) error {
+func (b *Block) ProcessEpochMetaData(epochMetaData *metadata.EpochMetaData,
+	validatorsStakeAmount map[string]uint64) error {
 	for _, pbData := range b.Transactions() {
 		switch pbData.Type.(type) {
 		case *protos.Transaction_Stake:
@@ -168,6 +169,14 @@ func (b *Block) ProcessEpochMetaData(epochMetaData *metadata.EpochMetaData) erro
 				return err
 			}
 		}
+	}
+	for _, pbData := range b.ProtocolTransactions() {
+		strPK := misc.Bin2HStr(pbData.Pk)
+		amount, ok := validatorsStakeAmount[strPK]
+		if !ok {
+			return errors.New(fmt.Sprintf("balance not loaded for the validator %s", strPK))
+		}
+		epochMetaData.AddTotalStakeAmountFound(amount)
 	}
 	return nil
 }
@@ -212,11 +221,21 @@ func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error 
 		}
 	}
 
+	validatorsStakeAmount := make(map[string]uint64)
+
 	// Applying State Changes by Transactions
 	for _, pbData := range b.Transactions() {
 		tx := transactions.ProtoToTransaction(pbData)
 		if err := tx.ApplyStateChanges(stateContext); err != nil {
 			return err
+		}
+		switch pbData.Type.(type) {
+		case *protos.Transaction_Stake:
+			for _, dilithiumPK := range pbData.GetStake().DilithiumPks {
+				strDilithiumPK := misc.Bin2HStr(dilithiumPK)
+				dilithiumMetaData := stateContext.GetDilithiumState(strDilithiumPK)
+				validatorsStakeAmount[strDilithiumPK] = dilithiumMetaData.Balance()
+			}
 		}
 	}
 
@@ -245,7 +264,7 @@ func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error 
 		}
 	}
 
-	err = b.ProcessEpochMetaData(epochMetaData)
+	err = b.ProcessEpochMetaData(epochMetaData, validatorsStakeAmount)
 	if err != nil {
 		log.Error("Failed to Process Epoch MetaData")
 		return err
@@ -505,12 +524,31 @@ func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 		return nil, err
 	}
 
+	validatorsStakeAmount := make(map[string]uint64)
+	totalStakeAmountAlloted := uint64(0)
+	mainChainMetaData, err := metadata.GetMainChainMetaData(db)
+	if err != nil {
+		log.Error("[CalculateEpochMetaData] Failed to get MainChainMetaData")
+		return nil, err
+	}
+	for _, dilithiumPK := range epochMetaData.Validators() {
+		// TODO: Get Dilithium Public Key Balance
+		dilithiumMetaData, err := metadata.GetDilithiumMetaData(db, dilithiumPK,
+		pathToFirstBlockOfEpoch[0], mainChainMetaData.FinalizedBlockHeaderHash())
+		if err != nil {
+			log.Error("[CalculateEpochMetaData] Failed to get DilithiumMetaData")
+			return nil, err
+		}
+		validatorsStakeAmount[misc.Bin2HStr(dilithiumPK)] = dilithiumMetaData.Balance()
+	}
+	epochMetaData.UpdatePrevEpochStakeData(0,
+		totalStakeAmountAlloted)
 	for i := lenPathToFirstBlockOfEpoch - 1; i >= 0; i-- {
 		b, err := GetBlock(db, pathToFirstBlockOfEpoch[i])
 		if err != nil {
 			return nil, err
 		}
-		err = b.ProcessEpochMetaData(epochMetaData)
+		err = b.ProcessEpochMetaData(epochMetaData, validatorsStakeAmount)
 		if err != nil {
 			return nil, err
 		}
