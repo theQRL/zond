@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/crypto"
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/protos"
@@ -72,6 +73,34 @@ func (tx *Stake) validateData(stateContext *state.StateContext) bool {
 			"balance", balance,
 			"fee", tx.Fee())
 		return false
+	}
+
+	if tx.Stake() {
+		requiredBalance := tx.Fee() + uint64(len(tx.DilithiumPKs())) * config.GetDevConfig().MinStakeAmount
+		if balance < requiredBalance {
+			log.Warn("Insufficient balance ",
+				"txhash ", misc.Bin2HStr(txHash),
+				"balance ", balance,
+				"required balance ", requiredBalance)
+			return false
+		}
+	} else {
+		requiredStakeBalance := uint64(0)
+		for _, dilithiumPK := range tx.DilithiumPKs() {
+			strDilithiumPK := misc.Bin2HStr(dilithiumPK)
+			dilithiumMetadata := stateContext.GetDilithiumState(strDilithiumPK)
+			if dilithiumMetadata == nil {
+				log.Error("DilithiumMetaData not found to for de-staking ", strDilithiumPK)
+				return false
+			}
+			requiredStakeBalance += dilithiumMetadata.Balance()
+		}
+		if addressState.StakeBalance() < requiredStakeBalance {
+			log.Error("Stake Balance is lower than the required stake balance ",
+				"Stake Balance ", addressState.StakeBalance(),
+				"Required Stake Balance ", requiredStakeBalance)
+			return false
+		}
 	}
 
 	lenDilithiumPKs := len(tx.DilithiumPKs())
@@ -154,6 +183,12 @@ func (tx *Stake) ApplyStateChanges(stateContext *state.StateContext) error {
 	}
 	addrState.SubtractBalance(tx.Fee())
 
+	if tx.Stake() {
+		addrState.LockStakeBalance(config.GetDevConfig().MinStakeAmount * uint64(len(tx.DilithiumPKs())))
+	} else {
+		addrState.ReleaseStakeBalance(config.GetDevConfig().MinStakeAmount * uint64(len(tx.DilithiumPKs())))
+	}
+
 	for _, dilithiumPK := range tx.DilithiumPKs() {
 		strDilithiumPK := misc.Bin2HStr(dilithiumPK)
 
@@ -167,6 +202,16 @@ func (tx *Stake) ApplyStateChanges(stateContext *state.StateContext) error {
 			}
 		}
 		dilithiumState.SetStake(tx.Stake())
+		if tx.Stake() {
+			balance := config.GetDevConfig().MinStakeAmount
+			addrState.LockStakeBalance(balance)
+			dilithiumState.AddBalance(balance)
+		} else {
+			// TODO: Release of stake balance must happen after certain epoch
+			balance := dilithiumState.Balance()
+			dilithiumState.SubtractBalance(balance)
+			addrState.ReleaseStakeBalance(balance)
+		}
 	}
 
 	return nil
