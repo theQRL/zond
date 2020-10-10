@@ -31,7 +31,7 @@ func (d *DilithiumMetaData) Stake() bool {
 	return d.pbData.Stake
 }
 
-func (d DilithiumMetaData) Balance() uint64 {
+func (d *DilithiumMetaData) Balance() uint64 {
 	return d.Balance()
 }
 
