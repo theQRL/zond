@@ -34,6 +34,10 @@ func (a *AddressState) Balance() uint64 {
 	return a.pbData.Balance
 }
 
+func (a *AddressState) StakeBalance() uint64 {
+	return a.pbData.StakeBalance
+}
+
 func (a *AddressState) SetBalance(balance uint64) {
 	a.pbData.Balance = balance
 }
@@ -44,6 +48,16 @@ func (a *AddressState) AddBalance(balance uint64) {
 
 func (a *AddressState) SubtractBalance(balance uint64) {
 	a.pbData.Balance -= balance
+}
+
+func (a *AddressState) LockStakeBalance(balance uint64) {
+	a.pbData.Balance -= balance
+	a.pbData.StakeBalance += balance
+}
+
+func (a *AddressState) ReleaseStakeBalance(balance uint64) {
+	a.pbData.StakeBalance -= balance
+	a.pbData.Balance += balance
 }
 
 func (a *AddressState) IncreaseNonce() {
