@@ -31,6 +31,10 @@ func (d *DilithiumMetaData) Stake() bool {
 	return d.pbData.Stake
 }
 
+func (d *DilithiumMetaData) Balance() uint64 {
+	return d.Balance()
+}
+
 func (d *DilithiumMetaData) SetTxHash(txHash []byte) {
 	d.pbData.TxHash = txHash
 }
@@ -41,6 +45,14 @@ func (d *DilithiumMetaData) SetAddress(address []byte) {
 
 func (d *DilithiumMetaData) SetStake(stake bool) {
 	d.pbData.Stake = stake
+}
+
+func (d *DilithiumMetaData) AddBalance(balance uint64) {
+	d.pbData.Balance += balance
+}
+
+func (d *DilithiumMetaData) SubtractBalance(balance uint64) {
+	d.pbData.Balance -= balance
 }
 
 func (d *DilithiumMetaData) Serialize() ([]byte, error) {

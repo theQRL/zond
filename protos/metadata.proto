@@ -14,6 +14,8 @@ message DilithiumMetaData {
     bytes address = 3;
 
     bool stake = 4;
+
+    uint64 balance = 5;  // Balance allocated for staking
 }
 
 message SlaveMetaData {
@@ -46,6 +48,13 @@ message EpochMetaData {
     bytes prev_slot_last_block_header_hash = 2;
     repeated SlotInfo slot_info = 3;
     repeated bytes validators = 4;
+
+    EpochStakeData prev_epoch_stake_data = 5;
+}
+
+message EpochStakeData {
+    uint64 total_stake_amount_found = 1;
+    uint64 total_stake_amount_alloted = 2;
 }
 
 message SlotInfo {
