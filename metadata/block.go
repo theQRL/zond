@@ -52,6 +52,10 @@ func (bm *BlockMetaData) AddChildHeaderHash(headerHash []byte) {
 		headerHash)
 }
 
+func (bm *BlockMetaData) UpdateFinalizedChildHeaderHash(finalizedChildHeaderHash []byte) {
+	bm.pbData.FinalizedChildHeaderHash = finalizedChildHeaderHash
+}
+
 func (bm *BlockMetaData) Commit(b *bbolt.Bucket) error {
 	data, err := bm.Serialize()
 	if err != nil {
