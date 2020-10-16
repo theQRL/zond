@@ -269,6 +269,11 @@ func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error 
 		log.Error("Failed to Process Epoch MetaData")
 		return err
 	}
+
+	// For Genesis Block total stake found and alloted must be same
+	epochMetaData.UpdatePrevEpochStakeData(epochMetaData.TotalStakeAmountFound(),
+		epochMetaData.TotalStakeAmountFound())
+
 	var randomSeed int64
 	h := md5.New()
 	h.Write(b.ParentHeaderHash())
@@ -362,8 +367,8 @@ func (b *Block) Commit(db *db.DB, finalizedHeaderHash []byte, isFinalizedState b
 	if err != nil {
 		return err
 	}
-	// Loading States for related address, Dilithium PK, slaves etc.
 
+	// Loading States for related address, Dilithium PK, slaves etc.
 	for _, pbData := range b.Transactions() {
 		tx := transactions.ProtoToTransaction(pbData)
 		if err := tx.SetAffectedAddress(stateContext); err != nil {
@@ -378,35 +383,25 @@ func (b *Block) Commit(db *db.DB, finalizedHeaderHash []byte, isFinalizedState b
 		}
 	}
 
-	// Validating Transactions
+	// Validate & Apply State Changes by Transactions
 	for _, pbData := range b.Transactions() {
 		tx := transactions.ProtoToTransaction(pbData)
 		if !tx.Validate(stateContext) {
 			return errors.New(fmt.Sprintf("Transaction Validation failed %s",
 				tx.TxHash(tx.Signature())))
 		}
+		if err := tx.ApplyStateChanges(stateContext); err != nil {
+			return err
+		}
 	}
 
-	// Validating Protocol Transactions
+	// Validate & Apply Protocol State Changes by Protocol Transactions
 	for _, pbData := range b.ProtocolTransactions() {
 		tx := transactions.ProtoToProtocolTransaction(pbData)
 		if !tx.Validate(stateContext) {
 			return errors.New(fmt.Sprintf("Protocol Transaction Validation failed %s",
 				tx.TxHash(tx.Signature())))
 		}
-	}
-
-	// Applying State Changes by Transactions
-	for _, pbData := range b.Transactions() {
-		tx := transactions.ProtoToTransaction(pbData)
-		if err := tx.ApplyStateChanges(stateContext); err != nil {
-			return err
-		}
-	}
-
-	// Applying Protocol State Changes by Transactions
-	for _, pbData := range b.ProtocolTransactions() {
-		tx := transactions.ProtoToProtocolTransaction(pbData)
 		if err := tx.ApplyStateChanges(stateContext); err != nil {
 			return err
 		}
@@ -417,6 +412,23 @@ func (b *Block) Commit(db *db.DB, finalizedHeaderHash []byte, isFinalizedState b
 	2. Ensure Number of validators should never be less than 2x of blocks per epoch
 	3. De-stake must not be allowed if number of validators reduces to less than 2x of blocks per epoch
 	*/
+
+	/*
+	1. Load MainChainState
+	2. Check if finalized block epoch and current block epoch difference is >= 2
+	3. If condition 2 is true, then check if finality achieved
+	4. Check must only be done on the first block of the epoch
+	 */
+
+	blocksPerEpoch := config.GetDevConfig().BlocksPerEpoch
+	parentEpoch := parentBlockMetaData.SlotNumber() / blocksPerEpoch
+	epoch := b.SlotNumber() / blocksPerEpoch
+
+	if parentEpoch != epoch {
+		b.UpdateFinalizedEpoch(db, stateContext)
+	}
+
+
 	bytesBlock, err := b.Serialize()
 	if err != nil {
 		return err
@@ -462,19 +474,68 @@ func NewBlock(networkId uint64, timestamp uint64, proposerAddress []byte, slotNu
 	return b
 }
 
+func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext) error {
+	currentEpochMetaData := stateContext.GetEpochMetaData()
+	// Ignore Finalization if TotalStakeAmountFound is less than the 2/3rd of TotalStakeAmountAlloted
+	if currentEpochMetaData.TotalStakeAmountFound() * 3 < currentEpochMetaData.TotalStakeAmountAlloted() * 2 {
+		return nil
+	}
+
+	blocksPerEpoch := config.GetDevConfig().BlocksPerEpoch
+	currentEpoch := b.Epoch()
+	finalizedBlockEpoch := stateContext.GetMainChainMetaData().FinalizedBlockSlotNumber() / blocksPerEpoch
+
+	if currentEpoch - finalizedBlockEpoch <= 2 {
+		return nil
+	}
+
+	bm, err := metadata.GetBlockMetaData(db, b.ParentHeaderHash())
+	if err != nil {
+		log.Error("[UpdateFinalizedEpoch] Failed to GetBlockMetaData")
+		return err
+	}
+
+	for ;; {
+		newBM, err := metadata.GetBlockMetaData(db, bm.ParentHeaderHash())
+		if err != nil {
+			log.Error("[UpdateFinalizedEpoch] Failed to GetBlockMetaData")
+			return err
+		}
+		if bm.Epoch() != newBM.Epoch() {
+			break
+		}
+		bm = newBM
+	}
+
+	epochMetaData, err := metadata.GetEpochMetaData(db, bm.SlotNumber(), bm.ParentHeaderHash())
+	if err != nil {
+		log.Error("[UpdateFinalizedEpoch] Failed to load EpochMetaData for ", bm.Epoch() - 1)
+		return err
+	}
+	if epochMetaData.TotalStakeAmountFound() * 3 < epochMetaData.TotalStakeAmountAlloted() * 2 {
+		return nil
+	}
+
+	headerHash := bm.ParentHeaderHash()
+	blockMetaDataPathForFinalization := make([]*metadata.BlockMetaData, 0)
+	for ;; {
+		bm, err := metadata.GetBlockMetaData(db, headerHash)
+		if err != nil {
+			log.Error("[UpdateFinalizedEpoch] Failed To Load GetBlockMetaData for ", misc.Bin2HStr(headerHash))
+			return err
+		}
+		if reflect.DeepEqual(bm.HeaderHash(), stateContext.GetMainChainMetaData().FinalizedBlockHeaderHash()) {
+			break
+		}
+		blockMetaDataPathForFinalization = append(blockMetaDataPathForFinalization, bm)
+		headerHash = bm.ParentHeaderHash()
+	}
+
+	return stateContext.Finalize(blockMetaDataPathForFinalization)
+}
+
 func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 	parentHeaderHash []byte, parentSlotNumber uint64) (*metadata.EpochMetaData, error) {
-
-	//if slotNumber == 0 {
-	//	key := metadata.GetEpochMetaDataKey(0, []byte(""))
-	//	data, err := db.Get(key)
-	//	if err != nil {
-	//		log.Error("Failed to load EpochMetaData for genesis block")
-	//		return nil, err
-	//	}
-	//	epochMetaData := metadata.NewEpochMetaData(0, nil, nil)
-	//	return epochMetaData, epochMetaData.DeSerialize(data)
-	//}
 
 	blocksPerEpoch := config.GetDevConfig().BlocksPerEpoch
 	parentBlockMetaData, err := metadata.GetBlockMetaData(db, parentHeaderHash)
@@ -493,7 +554,7 @@ func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 	if parentBlockMetaData.SlotNumber() == 0 {
 		pathToFirstBlockOfEpoch = append(pathToFirstBlockOfEpoch, parentBlockMetaData.HeaderHash())
 	} else {
-		for ; epoch == parentEpoch; {
+		for ;epoch == parentEpoch; {
 			pathToFirstBlockOfEpoch = append(pathToFirstBlockOfEpoch, parentBlockMetaData.HeaderHash())
 			if parentBlockMetaData.SlotNumber() == 0 {
 				break

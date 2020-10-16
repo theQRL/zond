@@ -44,6 +44,10 @@ func (s *StateContext) GetSlotNumber() uint64 {
 	return s.slotNumber
 }
 
+func (s *StateContext) GetMainChainMetaData() *metadata.MainChainMetaData {
+	return s.mainChainMetaData
+}
+
 func (s *StateContext) PartialBlockSigningHash() []byte {
 	return s.partialBlockSigningHash
 }
@@ -326,6 +330,57 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 		}
 
 		return nil
+	})
+}
+
+func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.BlockMetaData) error {
+	bm := blockMetaDataPathForFinalization[len(blockMetaDataPathForFinalization) - 1]
+	finalizedBlockHeaderHash := bm.HeaderHash()
+	finalizedSlotNumber := bm.SlotNumber()
+	s.mainChainMetaData.UpdateFinalizedBlockData(finalizedBlockHeaderHash, finalizedSlotNumber)
+
+	parentBlockMetaData, err := metadata.GetBlockMetaData(s.db, bm.ParentHeaderHash())
+	if err != nil {
+		log.Error("[Finalize] Failed to load ParentBlockMetaData ",
+			misc.Bin2HStr(bm.ParentHeaderHash()))
+		return err
+	}
+
+	return s.db.DB().Update(func(tx *bbolt.Tx) error {
+		var err error
+		mainBucket := tx.Bucket([]byte("DB"))
+		for i := len(blockMetaDataPathForFinalization) - 1; i >= 0; i-- {
+			bm := blockMetaDataPathForFinalization[i]
+			blockBucket := tx.Bucket(metadata.GetBlockBucketName(bm.HeaderHash()))
+			c := blockBucket.Cursor()
+			for k, v := c.First(); k != nil; k, v = c.Next() {
+				err = mainBucket.Put(k, v)
+				if err != nil {
+					log.Error("[Finalize] Finalization failed for key = ", k,
+						"value ", v)
+					return err
+				}
+			}
+
+			if !reflect.DeepEqual(parentBlockMetaData.HeaderHash(), bm.ParentHeaderHash()) {
+				log.Error("[Finalize] Unexpected error parent block header hash not matching")
+				log.Error("Expected ParentBlockHeaderHash ",
+					misc.Bin2HStr(bm.ParentHeaderHash()))
+				log.Error("ParentBlockHeaderHash found ",
+					misc.Bin2HStr(parentBlockMetaData.HeaderHash()))
+				return errors.New("unexpected error parent block header hash not matching")
+			}
+
+			parentBlockMetaData.UpdateFinalizedChildHeaderHash(bm.HeaderHash())
+			err := parentBlockMetaData.Commit(mainBucket)
+			if err != nil {
+				log.Error("[Finalize] Failed to Commit ParentBlockMetaData ",
+					misc.Bin2HStr(parentBlockMetaData.HeaderHash()))
+				return err
+			}
+			parentBlockMetaData = bm
+		}
+		return s.mainChainMetaData.Commit(mainBucket)
 	})
 }
 
