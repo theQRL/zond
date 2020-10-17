@@ -495,6 +495,11 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 		return err
 	}
 
+	// Skip finalization if epoch is 0
+	if bm.Epoch() == 0 {
+		return nil
+	}
+
 	for ;; {
 		newBM, err := metadata.GetBlockMetaData(db, bm.ParentHeaderHash())
 		if err != nil {
@@ -505,6 +510,11 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 			break
 		}
 		bm = newBM
+	}
+
+	// Skip finalization if second last epoch is 0
+	if bm.Epoch() == 0 {
+		return nil
 	}
 
 	epochMetaData, err := metadata.GetEpochMetaData(db, bm.SlotNumber(), bm.ParentHeaderHash())
