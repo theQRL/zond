@@ -32,7 +32,7 @@ func (d *DilithiumMetaData) Stake() bool {
 }
 
 func (d *DilithiumMetaData) Balance() uint64 {
-	return d.Balance()
+	return d.pbData.Balance
 }
 
 func (d *DilithiumMetaData) SetTxHash(txHash []byte) {
