@@ -163,7 +163,9 @@ func GetEpochMetaData(db *db.DB, currentBlockSlotNumber uint64, parentHeaderHash
 			prevSlotLastBlockHeaderHash = parentBlockMetaData.HeaderHash()
 			parentHeaderHash = parentBlockMetaData.ParentHeaderHash()
 			if parentBlockMetaData.SlotNumber() == 0 {
-				prevSlotLastBlockHeaderHash = parentBlockMetaData.ParentHeaderHash()
+				if currentBlockSlotNumber / blocksPerEpoch == 0 {
+					prevSlotLastBlockHeaderHash = parentBlockMetaData.ParentHeaderHash()
+				}
 				break
 			}
 		}
