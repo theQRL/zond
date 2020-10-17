@@ -87,7 +87,8 @@ func (s *StateContext) ProcessBlockProposerFlag(blockProposerDilithiumPK []byte)
 		return nil
 	}
 	slotInfo := s.epochMetaData.SlotInfo()[s.slotNumber % config.GetDevConfig().BlocksPerEpoch]
-	if !reflect.DeepEqual(slotInfo.SlotLeader, blockProposerDilithiumPK) {
+	slotLeader := s.epochMetaData.Validators()[slotInfo.SlotLeader]
+	if !reflect.DeepEqual(slotLeader, blockProposerDilithiumPK) {
 		return errors.New("unexpected block proposer")
 	}
 	if s.blockProposerFlag {
@@ -379,6 +380,7 @@ func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.Blo
 				return err
 			}
 			parentBlockMetaData = bm
+			log.Info("Finalized Block #%s", bm.SlotNumber())
 		}
 		return s.mainChainMetaData.Commit(mainBucket)
 	})
