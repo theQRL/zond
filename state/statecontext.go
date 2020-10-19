@@ -335,7 +335,7 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 }
 
 func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.BlockMetaData) error {
-	bm := blockMetaDataPathForFinalization[len(blockMetaDataPathForFinalization) - 1]
+	bm := blockMetaDataPathForFinalization[0]
 	finalizedBlockHeaderHash := bm.HeaderHash()
 	finalizedSlotNumber := bm.SlotNumber()
 	s.mainChainMetaData.UpdateFinalizedBlockData(finalizedBlockHeaderHash, finalizedSlotNumber)
@@ -380,7 +380,7 @@ func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.Blo
 				return err
 			}
 			parentBlockMetaData = bm
-			log.Info("Finalized Block #%s", bm.SlotNumber())
+			log.Info("Finalized Block #", bm.SlotNumber())
 		}
 		return s.mainChainMetaData.Commit(mainBucket)
 	})
