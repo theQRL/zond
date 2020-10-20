@@ -485,7 +485,7 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 	currentEpoch := b.Epoch()
 	finalizedBlockEpoch := stateContext.GetMainChainMetaData().FinalizedBlockSlotNumber() / blocksPerEpoch
 
-	if currentEpoch - finalizedBlockEpoch <= 2 {
+	if currentEpoch - finalizedBlockEpoch <= 3 {
 		return nil
 	}
 
