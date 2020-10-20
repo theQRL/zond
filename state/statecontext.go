@@ -335,11 +335,7 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 }
 
 func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.BlockMetaData) error {
-	bm := blockMetaDataPathForFinalization[0]
-	finalizedBlockHeaderHash := bm.HeaderHash()
-	finalizedSlotNumber := bm.SlotNumber()
-	s.mainChainMetaData.UpdateFinalizedBlockData(finalizedBlockHeaderHash, finalizedSlotNumber)
-
+	bm := blockMetaDataPathForFinalization[len(blockMetaDataPathForFinalization) - 1]
 	parentBlockMetaData, err := metadata.GetBlockMetaData(s.db, bm.ParentHeaderHash())
 	if err != nil {
 		log.Error("[Finalize] Failed to load ParentBlockMetaData ",
@@ -382,6 +378,11 @@ func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.Blo
 			parentBlockMetaData = bm
 			log.Info("Finalized Block #", bm.SlotNumber())
 		}
+
+		bm = blockMetaDataPathForFinalization[0]
+		finalizedBlockHeaderHash := bm.HeaderHash()
+		finalizedSlotNumber := bm.SlotNumber()
+		s.mainChainMetaData.UpdateFinalizedBlockData(finalizedBlockHeaderHash, finalizedSlotNumber)
 		return s.mainChainMetaData.Commit(mainBucket)
 	})
 }
