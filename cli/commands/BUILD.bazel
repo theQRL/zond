@@ -11,6 +11,8 @@ go_library(
     importpath = "github.com/theQRL/zond/cli/commands",
     visibility = ["//visibility:public"],
     deps = [
+        "//api:go_default_library",
+        "//api/view:go_default_library",
         "//chain/block/genesis:go_default_library",
         "//chain/transactions:go_default_library",
         "//cli/flags:go_default_library",

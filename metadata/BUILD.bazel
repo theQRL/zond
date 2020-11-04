@@ -6,6 +6,7 @@ go_library(
         "block.go",
         "dilithium.go",
         "epoch.go",
+        "epochblockhashes.go",
         "mainchain.go",
         "metadata.go",
         "otsindex.go",
