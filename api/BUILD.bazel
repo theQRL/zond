@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "publicapi.go",
+        "ratelimiter.go",
+        "response.go",
+    ],
+    importpath = "github.com/theQRL/zond/api",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/view:go_default_library",
+        "//chain:go_default_library",
+        "//config:go_default_library",
+        "//misc:go_default_library",
+        "//ntp:go_default_library",
+        "//p2p/messages:go_default_library",
+        "//protos:go_default_library",
+        "@com_github_gorilla_mux//:go_default_library",
+        "@com_github_rs_cors//:go_default_library",
+        "@org_golang_x_time//rate:go_default_library",
+    ],
+)

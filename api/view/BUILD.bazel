@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "addressstate.go",
+        "block.go",
+        "stake.go",
+        "transfer.go",
+    ],
+    importpath = "github.com/theQRL/zond/api/view",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//chain/transactions:go_default_library",
+        "//misc:go_default_library",
+        "//protos:go_default_library",
+    ],
+)
