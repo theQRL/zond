@@ -6,25 +6,15 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/address"
 	"github.com/theQRL/zond/chain/block"
+	"github.com/theQRL/zond/chain/block/genesis/devnet"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/protos"
 	"go.etcd.io/bbolt"
-	"io/ioutil"
-	"path"
-	"runtime"
 )
 
 func LoadPreState() (*protos.PreState, error) {
-	_, filename, _, _ := runtime.Caller(0)
-	directory := path.Dir(filename) // Current Package path
-	yamlData, err := ioutil.ReadFile(path.Join(directory, "prestate.yml"))
-
-	if err != nil {
-		return nil, err
-	}
-
-	jsonData, err := yaml.YAMLToJSON(yamlData)
+	jsonData, err := yaml.YAMLToJSON(devnet.DevnetGenesisData["prestate.yml"])
 	if err != nil {
 		return nil, err
 	}
@@ -70,15 +60,7 @@ func ProcessPreState(preState *protos.PreState, b *block.Block, db *db.DB) error
 }
 
 func ProcessGenesisBlock(db *db.DB) error {
-	_, filename, _, _ := runtime.Caller(0)
-	directory := path.Dir(filename) // Current Package path
-	yamlData, err := ioutil.ReadFile(path.Join(directory, "genesis.yml"))
-
-	if err != nil {
-		return err
-	}
-
-	jsonData, err := yaml.YAMLToJSON(yamlData)
+	jsonData, err := yaml.YAMLToJSON(devnet.DevnetGenesisData["genesis.yml"])
 	if err != nil {
 		return err
 	}
