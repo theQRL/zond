@@ -9,6 +9,7 @@ import (
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/p2p"
 	"github.com/theQRL/zond/state"
+	"io"
 	"os"
 	"os/signal"
 )
@@ -52,18 +53,34 @@ func CreateDirectoryIfNotExists(dir string) error {
 	return nil
 }
 
-func main() {
-	if !ConfigCheck() {
-		log.Error("Invalid Config")
-		return
+func SetLogOutput() error {
+	logFile, err := os.OpenFile(config.GetUserConfig().GetLogFileName(),
+		os.O_WRONLY | os.O_CREATE, 0755)
+	if err != nil {
+		return err
 	}
+	log.SetOutput(io.MultiWriter(os.Stdout, logFile))
+	return nil
+}
 
+func main() {
 	userConfig := config.GetUserConfig()
 	devConfig := config.GetDevConfig()
 
 	err := CreateDirectoryIfNotExists(userConfig.DataDir())
 	if err != nil {
 		log.Error("Error creating data directory ", err.Error())
+		return
+	}
+
+	err = SetLogOutput()
+	if err != nil {
+		log.Error("Error in Set Log Output ", err.Error())
+		return
+	}
+
+	if !ConfigCheck() {
+		log.Error("Invalid Config")
 		return
 	}
 
