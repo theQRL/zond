@@ -50,3 +50,13 @@ var RemoteAddrFlag = &cli.StringFlag {
 		config.GetUserConfig().API.PublicAPI.Port),
 	Required: false,
 }
+
+var TransactionFeeFlag = &cli.Uint64Flag {
+	Name: "fee",
+	Value: 0,
+}
+
+var TransactionStdOut = &cli.BoolFlag {
+	Name: "std-out",
+	Value: true,
+}
