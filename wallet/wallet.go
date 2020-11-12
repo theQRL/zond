@@ -71,7 +71,7 @@ func (w *Wallet) List() {
 			outputBalance = "?"
 		}
 		fmt.Println(fmt.Sprintf("%d\t%s\t%s",
-			i, xmssInfo.Address, outputBalance))
+			i + 1, xmssInfo.Address, outputBalance))
 	}
 }
 
