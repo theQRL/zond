@@ -212,20 +212,15 @@ func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error 
 		}
 	}
 
-	// Validating Transactions
+	validatorsStakeAmount := make(map[string]uint64)
+
+	// Validating & Applying Transactions
 	for _, pbData := range b.Transactions() {
 		tx := transactions.ProtoToTransaction(pbData)
 		if !tx.Validate(stateContext) {
 			return errors.New(fmt.Sprintf("Transaction Validation failed %s",
 				tx.TxHash(tx.Signature())))
 		}
-	}
-
-	validatorsStakeAmount := make(map[string]uint64)
-
-	// Applying State Changes by Transactions
-	for _, pbData := range b.Transactions() {
-		tx := transactions.ProtoToTransaction(pbData)
 		if err := tx.ApplyStateChanges(stateContext); err != nil {
 			return err
 		}
@@ -247,18 +242,13 @@ func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error 
 		}
 	}
 
-	// Validating Protocol Transactions
+	// Validating & Applying Protocol Transactions
 	for _, pbData := range b.ProtocolTransactions() {
 		tx := transactions.ProtoToProtocolTransaction(pbData)
 		if !tx.Validate(stateContext) {
 			return errors.New(fmt.Sprintf("Protocol Transaction Validation failed %s",
 				tx.TxHash(tx.Signature())))
 		}
-	}
-
-	// Applying Protocol State Changes by Transactions
-	for _, pbData := range b.ProtocolTransactions() {
-		tx := transactions.ProtoToProtocolTransaction(pbData)
 		if err := tx.ApplyStateChanges(stateContext); err != nil {
 			return err
 		}
