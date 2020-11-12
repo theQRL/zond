@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"github.com/ghodss/yaml"
 	"github.com/theQRL/zond/chain/block"
-	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/config"
-	"github.com/theQRL/zond/crypto"
 	"github.com/theQRL/zond/crypto/dilithium"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
@@ -14,24 +12,10 @@ import (
 	"os"
 )
 
-func GeneratePreState(networkID uint64, dilithiumGroup []*protos.DilithiumGroup,
-	xmss *crypto.XMSS, outputFile string) error {
+func GeneratePreState(transactions []*protos.Transaction, outputFile string) error {
 	preState := &protos.PreState{}
 
-	for _, group := range dilithiumGroup {
-		var dilithiumPKs [][]byte
-		for _, di := range group.DilithiumInfo {
-			dilithiumPKs = append(dilithiumPKs, misc.HStr2Bin(di.PK))
-		}
-		// The signing of new stake transaction might not be required
-		// TODO: Parameterize Fee and Nonce
-		tx := transactions.NewStake(networkID, dilithiumPKs,
-			true, 0, 1, xmss.PK(), nil)
-		tx.Sign(xmss, tx.GetSigningHash())
-
-		preState.Transactions = append(preState.Transactions, tx.PBData())
-	}
-
+	preState.Transactions = transactions
 	devConf := config.GetDevConfig()
 
 	coinBaseAddressBalance := &protos.AddressBalance {
@@ -40,7 +24,7 @@ func GeneratePreState(networkID uint64, dilithiumGroup []*protos.DilithiumGroup,
 	}
 
 	xmssAddressBalance := &protos.AddressBalance {
-		Address: xmss.Address(),
+		Address: devConf.Genesis.FoundationXMSSAddress,
 		Balance: devConf.Genesis.SuppliedCoins,
 	}
 
@@ -73,30 +57,27 @@ func GeneratePreState(networkID uint64, dilithiumGroup []*protos.DilithiumGroup,
 }
 
 func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
-	dilithiumGroup []*protos.DilithiumGroup, xmss *crypto.XMSS,
-	genesisFilename string, preStateFilename string) error {
+	dilithiumGroup []*protos.DilithiumGroup, genesisFilename string,
+	preStateFilename string) error {
 	/*
 	TODO: Select Network ID before generating genesis.yml
 	This network id must be set in CoinBase Transaction and
 	must be validated against transactions into the block.
 	 */
 
-	if err := GeneratePreState(networkID, dilithiumGroup, xmss, preStateFilename); err != nil {
-		return err
-	}
+	//if err := GeneratePreState(networkID, dilithiumGroup, xmss, preStateFilename); err != nil {
+	//	return err
+	//}
 
 	c := config.GetDevConfig()
 
-	//reader := bufio.NewReader(os.Stdin)
-	//hexSeed, _ := reader.ReadString('\n')
-	//binSeed := misc.HStr2Bin(hexSeed)
-	//xmss := crypto.FromExtendedSeed(binSeed)
-
 	tl := misc.NewTransactionList(stakeTransactionsFile)
-
 	transactions := tl.GetTransactions()
 
-	// TODO: Generate pre-state.yml
+	if err := GeneratePreState(transactions, preStateFilename); err != nil {
+		return err
+	}
+
 	dilithiumInfos := dilithiumGroup[0].DilithiumInfo
 	b := block.NewBlock(networkID, c.Genesis.GenesisTimestamp, misc.HStr2Bin(dilithiumInfos[0].PK),
 		0,  c.Genesis.GenesisPrevHeaderHash, transactions, nil, 0)
