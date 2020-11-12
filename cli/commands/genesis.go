@@ -4,7 +4,6 @@ import (
 	"github.com/theQRL/zond/chain/block/genesis"
 	"github.com/theQRL/zond/cli/flags"
 	"github.com/theQRL/zond/keys"
-	"github.com/theQRL/zond/wallet"
 	"github.com/urfave/cli/v2"
 )
 
@@ -23,9 +22,6 @@ func getGenesisSubCommands() []*cli.Command {
 					Name: "validators-dilithium-keys",
 					Value: "dilithium_keys",
 				},
-				flags.WalletFile,
-				flags.XMSSIndexFlag,
-				flags.OTSKeyIndexFlag,
 				&cli.StringFlag {
 					Name: "genesisFilename",
 					Value: "genesis.yml",  // TODO: Move this to Dev Config
@@ -36,19 +32,10 @@ func getGenesisSubCommands() []*cli.Command {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				w := wallet.NewWallet(c.String("wallet-file"))
-
-				xmss, err := w.GetXMSSByIndex(c.Uint("xmss-index"))
-				if err != nil {
-					return err
-				}
-				xmss.SetOTSIndex(c.Uint("ots-key-index"))
-
 				d := keys.NewDilithiumKeys(c.String("validators-dilithium-keys"))
 				return genesis.GenerateGenesis(c.Uint64("network-id"),
 					c.String("stake-txs-filename"),
 					d.GetDilithiumGroup(),
-					xmss,
 					c.String("genesisFilename"),
 					c.String("preStateFilename"))
 			},
