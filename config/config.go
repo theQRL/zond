@@ -143,6 +143,7 @@ type GenesisConfig struct {
 	SuppliedCoins         uint64
 	GenesisDifficulty     uint64
 	CoinBaseAddress       []byte
+	FoundationXMSSAddress []byte
 	GenesisTimestamp      uint64
 }
 
@@ -166,7 +167,6 @@ func GetUserConfig() (userConf *UserConfig) {
 	node := &NodeConfig{
 		EnablePeerDiscovery: true,
 		PeerList: []string{
-			"95.179.131.134:15005",
 		},
 		BindingIP:               "0.0.0.0",
 		LocalPort:               15005,
@@ -214,7 +214,7 @@ func GetUserConfig() (userConf *UserConfig) {
 	//	}
 	userCurrentDir, _ := user.Current() // TODO: Handle error
 	stake := &StakeConfig{
-		EnableStaking: false,
+		EnableStaking: true,
 		DilithiumKeysFileName: path.Join(path.Join(userCurrentDir.HomeDir,
 			".zond"), "dilithium_keys"),
 	}
@@ -258,7 +258,8 @@ func GetDevConfig() (dev *DevConfig) {
 		SuppliedCoins:         65000000000000000,
 		GenesisDifficulty:     10000000,
 		CoinBaseAddress:       misc.HStr2Bin("0000000000000000000000000000000000000000000000000000000000000000"),
-		GenesisTimestamp:      1601802726,
+		FoundationXMSSAddress: misc.HStr2Bin("0005003a4d7fa2f8a30dec94363a45a412833eb1c2fc0a490333f10f4e8acb012552d1f11b15a1"),
+		GenesisTimestamp:      1605185955,
 	}
 	transaction := &TransactionConfig{
 		MultiOutputLimit: 100,
