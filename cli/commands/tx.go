@@ -56,6 +56,7 @@ func getTransactionSubCommands() []*cli.Command {
 			Flags: []cli.Flag {
 				flags.WalletFile,
 				flags.XMSSIndexFlag,
+				flags.OTSKeyIndexFlag,
 				flags.NetworkIDFlag,
 				&cli.StringFlag {
 					Name: "dilithium-file",
@@ -97,6 +98,8 @@ func getTransactionSubCommands() []*cli.Command {
 				if err != nil {
 					return err
 				}
+				xmss.SetOTSIndex(c.Uint(flags.OTSKeyIndexFlag.Name))
+
 				dilithiumKeys := keys.NewDilithiumKeys(dilithiumFile)
 				dilithiumGroup, err := dilithiumKeys.GetDilithiumGroupByIndex(dilithiumGroupIndex)
 				if err != nil {
@@ -142,6 +145,7 @@ func getTransactionSubCommands() []*cli.Command {
 			Flags: []cli.Flag {
 				flags.WalletFile,
 				flags.XMSSIndexFlag,
+				flags.OTSKeyIndexFlag,
 				flags.NetworkIDFlag,
 				flags.NonceFlag,
 				flags.TransactionStdOut,
@@ -163,6 +167,8 @@ func getTransactionSubCommands() []*cli.Command {
 				if err != nil {
 					return err
 				}
+				xmss.SetOTSIndex(c.Uint(flags.OTSKeyIndexFlag.Name))
+
 				addressTo := c.String("address-to")
 				stdOut := c.Bool(flags.TransactionStdOut.Name)
 				broadcastFlag := c.Bool(flags.BroadcastFlag.Name)
