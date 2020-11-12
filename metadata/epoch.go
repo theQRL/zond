@@ -107,12 +107,11 @@ func (e *EpochMetaData) AllotSlots(randomSeed int64, epoch uint64, prevSlotLastB
 
 	lenValidators := uint64(len(e.Validators()))
 	maxValidatorsPerSlot := uint64(math.Ceil(float64(lenValidators) / float64(blocksPerEpoch)))
-
 	for i := uint64(0); i < maxValidatorsPerSlot; i++ {
 		offset := i * blocksPerEpoch
 		for j := uint64(0); j < blocksPerEpoch && (offset + j < lenValidators); j++ {
-			e.pbData.SlotInfo[j] = &protos.SlotInfo{}
 			if i == 0 {
+				e.pbData.SlotInfo[j] = &protos.SlotInfo{}
 				e.pbData.SlotInfo[j].SlotLeader = i + j
 			} else {
 				e.pbData.SlotInfo[j].Attestors = append(e.pbData.SlotInfo[j].Attestors, offset + j)
