@@ -65,6 +65,7 @@ type Server struct {
 	delPeer                     chan *peerDrop
 	registerAndBroadcastChan    chan *messages.RegisterMessage
 	blockReceivedForAttestation chan *block.Block
+	attestationReceivedForBlock chan *transactions.Attest
 
 	filter          *bloom.BloomFilter
 	mr              *MessageReceipt
@@ -76,8 +77,12 @@ func (srv *Server) GetRegisterAndBroadcastChan() chan *messages.RegisterMessage 
 	return srv.registerAndBroadcastChan
 }
 
-func (srv *Server) SetBlockReceivedForAttestation(b chan *block.Block) {
-	srv.blockReceivedForAttestation = b
+func (srv *Server) GetBlockReceivedForAttestation() chan *block.Block {
+	return srv.blockReceivedForAttestation
+}
+
+func (srv *Server) GetAttestationReceivedForBlock() chan *transactions.Attest {
+	return srv.attestationReceivedForBlock
 }
 
 func (srv *Server) BroadcastBlock(block *block.Block) {
@@ -317,6 +322,8 @@ running:
 				srv.mr,
 				srv.mrDataConn,
 				srv.registerAndBroadcastChan,
+				srv.blockReceivedForAttestation,
+				srv.attestationReceivedForBlock,
 				srv.addPeerToPeerList,
 				srv.blockAndPeerChan,
 				srv.messagePriority)
@@ -352,12 +359,39 @@ running:
 			srv.downloader.RemovePeer(peer)
 
 		case mrDataConn := <-srv.mrDataConn:
-			// TODO: Process Message Recpt
+			// TODO: Process Message Receipt
 			// Need to get connection too
 			mrData := mrDataConn.mrData
 			msgHash := misc.Bin2HStr(mrData.Hash)
 			switch mrData.Type {
 			case protos.LegacyMessage_BA:
+				/*
+				1. Verify if Block Received for attestation is valid
+				2. Broadcast the block
+				3. Attest the block if Staking is Enabled on this node
+				 */
+				_, err := srv.chain.GetBlock(mrData.ParentHeaderHash)
+				if err != nil {
+					log.Info("[BlockForAttestation] Missing Parent Block ",
+						" #", mrData.SlotNumber,
+						" Partial Block Signing Hash ", misc.Bin2HStr(mrData.Hash),
+						" Parent Block ", misc.Bin2HStr(mrData.ParentHeaderHash))
+					break
+				}
+
+				if srv.mr.contains(mrData.Hash, mrData.Type) {
+					break
+				}
+
+				srv.mr.addPeer(mrData, mrDataConn.peer)
+
+				value, _ := srv.mr.GetRequestedHash(msgHash)
+				if value.GetRequested() {
+					break
+				}
+
+				go srv.RequestFullMessage(mrData)
+
 				//TODO: Logic to be written
 				//srv.blockReceivedForAttestation
 			case protos.LegacyMessage_BK:
@@ -371,7 +405,7 @@ running:
 
 				_, err := srv.chain.GetBlock(mrData.ParentHeaderHash)
 				if err != nil {
-					log.Info("Missing Parent Block ",
+					log.Info("[BlockReceived] Missing Parent Block ",
 						" #", mrData.SlotNumber,
 						" Block ", misc.Bin2HStr(mrData.Hash),
 						" Parent Block ", misc.Bin2HStr(mrData.ParentHeaderHash))
@@ -546,6 +580,8 @@ func NewServer(chain *chain.Chain) *Server {
 		addPeer: make(chan *conn),
 		delPeer: make(chan *peerDrop),
 		registerAndBroadcastChan: make(chan *messages.RegisterMessage, 100),
+		blockReceivedForAttestation: make(chan *block.Block),
+		attestationReceivedForBlock: make(chan *transactions.Attest),
 
 		messagePriority: make(map[protos.LegacyMessage_FuncName]uint64),
 	}
