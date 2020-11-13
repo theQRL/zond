@@ -385,8 +385,8 @@ running:
 
 				srv.mr.addPeer(mrData, mrDataConn.peer)
 
-				value, _ := srv.mr.GetRequestedHash(msgHash)
-				if value.GetRequested() {
+				value, ok := srv.mr.GetRequestedHash(msgHash)
+				if ok && value.GetRequested() {
 					break
 				}
 
@@ -418,8 +418,8 @@ running:
 
 				srv.mr.addPeer(mrData, mrDataConn.peer)
 
-				value, _ := srv.mr.GetRequestedHash(msgHash)
-				if value.GetRequested() {
+				value, ok := srv.mr.GetRequestedHash(msgHash)
+				if ok && value.GetRequested() {
 					break
 				}
 
