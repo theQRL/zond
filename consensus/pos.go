@@ -258,6 +258,7 @@ running:
 			p.blockBeingAttested = b
 			log.Info("Block #", b.SlotNumber(), " received for attestation")
 			partialBlockSigningHash := b.PartialBlockSigningHash()
+			blockProposer := b.ProtocolTransactions()[0].GetPk()
 			for _, dilithiumPK := range attestors {
 				strDilithiumPK := misc.Bin2HStr(dilithiumPK)
 				d, ok := p.validators[strDilithiumPK]
@@ -268,7 +269,11 @@ running:
 				if err != nil {
 					log.Error("Error while Attesting ", err.Error())
 				}
-				p.srv.BroadcastAttestationTransaction(attestTx, partialBlockSigningHash)
+				p.srv.BroadcastAttestationTransaction(attestTx,
+					b.SlotNumber(),
+					blockProposer,
+					b.ParentHeaderHash(),
+					partialBlockSigningHash)
 			}
 		case tx := <- p.attestationReceivedForBlock:
 			if !p.config.User.Stake.EnableStaking {

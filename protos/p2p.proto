@@ -110,8 +110,7 @@ message PBData {
     Block block = 1;
 }
 
-message SYNCData
-{
+message SYNCData {
     string state = 1;
 }
 
@@ -129,7 +128,10 @@ message NodeChainState {
 
 message ProtocolTransactionData {
     ProtocolTransaction tx = 1;
-    bytes partial_block_signing_hash = 2;
+    uint64 slot_number = 2;
+    bytes block_proposer = 3;
+    bytes parent_header_hash = 4;
+    bytes partial_block_signing_hash = 5;
 }
 
 message EpochBlockHashesRequest {

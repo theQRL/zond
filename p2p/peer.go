@@ -690,12 +690,18 @@ func (p *Peer) HandleAttestTransaction(msg *Msg, txData *protos.ProtocolTransact
 		return nil
 	}
 
-	stateContext, err := p.chain.GetStateContext()
+	stateContext, err := p.chain.GetStateContext2(txData.SlotNumber,
+		txData.BlockProposer,
+		txData.ParentHeaderHash,
+		txData.PartialBlockSigningHash)
 	if err != nil {
 		log.Error("[HandleAttestTransaction] Error getting StateContext")
 		return err
 	}
 	stateContext.SetPartialBlockSigningHash(txData.PartialBlockSigningHash)
+	if err := tx.SetAffectedAddress(stateContext); err != nil {
+		log.Error("[HandleAttestTransaction] Failed to load ")
+	}
 	if !tx.Validate(stateContext) {
 		log.Error("[HandleAttestTransaction] Attest Transaction Validation Failed")
 		return nil
