@@ -309,7 +309,7 @@ func (p *Peer) monitorChainState() {
 	p.wg.Add(1)
 	defer p.wg.Done()
 	for {
-		log.Info("Monitor Chain State running for ", "Peer", p.ID())
+		log.Debug("Monitor Chain State running for ", p.ID())
 		select {
 		case <-time.After(30 * time.Second):
 			currentTime := p.ntp.Time()
@@ -320,10 +320,10 @@ func (p *Peer) monitorChainState() {
 				delta -= int64(p.connectionTime)
 			}
 			if delta > int64(p.config.User.ChainStateTimeout) {
-				log.Warn("Disconnecting Peer due to Ping Timeout",
-					"delta", delta,
-					"currentTime", currentTime,
-					"peer", p.ID())
+				log.Warn("Disconnecting Peer due to Ping Timeout ",
+					"delta ", delta,
+					"currentTime ", currentTime,
+					"peer ", p.ID())
 				p.Disconnect()
 				return
 			}
@@ -360,7 +360,7 @@ func (p *Peer) monitorChainState() {
 			}
 
 			if p.chainState == nil {
-				log.Info("Ignoring MonitorState check as peer chain state is nil")
+				log.Debug("Ignoring MonitorState check as peer chain state is nil for ", p.ID())
 				continue
 			}
 		case <-p.exitMonitorChainState:
@@ -552,7 +552,8 @@ func (p *Peer) handle(msg *Msg) error {
 func (p *Peer) HandleBlock(pbBlock *protos.Block) {
 	// TODO: Validate Message
 	b := block.BlockFromPBData(pbBlock)
-	log.Info("Received Block from ip:port block_number block_headerhash")
+	log.Info("Received Block from ", p.ID()," #", b.SlotNumber(), " ",
+		misc.Bin2HStr(b.HeaderHash()))
 
 	if !p.chain.AddBlock(b) {
 		log.Warn("Failed To Add Block")

@@ -191,12 +191,10 @@ func (srv *Server) ConnectPeer(peer string) error {
 	c, err := net.DialTimeout("tcp", peer, 10 * time.Second)
 
 	if err != nil {
-		log.Warn("Error while connecting to Peer ",
-			"IP:PORT", peer)
+		log.Warn("Error while connecting to Peer ", peer)
 		return err
 	}
-	log.Info("Connected to peer ",
-		"IP:PORT ", peer)
+	log.Info("Connected to peer ", peer)
 	srv.addPeer <- &conn{c, false}
 
 	return nil
@@ -207,8 +205,7 @@ func (srv *Server) ConnectPeers() error {
 	defer srv.loopWG.Done()
 
 	for _, peer := range srv.config.User.Node.PeerList {
-		log.Info("Connecting peer",
-			"IP:PORT", peer)
+		log.Info("Connecting peer ", peer)
 		srv.ConnectPeer(peer)
 		// TODO: Update last connection time
 	}
