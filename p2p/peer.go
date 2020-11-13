@@ -540,8 +540,8 @@ func (p *Peer) handle(msg *Msg) error {
 		p.bytesSent -= uint64(p2pAckData.BytesProcessed)
 		if p.bytesSent < 0 {
 			log.Warn("Disconnecting Peer due to negative bytes sent",
-				"bytesSent", p.bytesSent,
-				"BytesProcessed", p2pAckData.BytesProcessed)
+				" bytesSent ", p.bytesSent,
+				" BytesProcessed ", p2pAckData.BytesProcessed)
 			return errors.New("peer protocol error")
 		}
 		return p.SendNext()
