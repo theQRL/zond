@@ -459,6 +459,10 @@ running:
 			if b != nil {
 				out.msg.GetMrData().SlotNumber = b.Header.SlotNumber
 				out.msg.GetMrData().ParentHeaderHash = b.Header.ParentHeaderHash
+			} else {
+				ba := registerAndBroadcast.Msg.GetBlockForAttestation()
+				out.msg.GetMrData().SlotNumber = ba.Block.Header.SlotNumber
+				out.msg.GetMrData().ParentHeaderHash = ba.Block.Header.ParentHeaderHash
 			}
 			ignorePeers := make(map[*Peer]bool, 0)
 			if msgRequest, ok := srv.mr.GetRequestedHash(registerAndBroadcast.MsgHash); ok {
