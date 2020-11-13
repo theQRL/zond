@@ -109,8 +109,7 @@ func newPeer(conn *net.Conn, inbound bool, chain *chain.Chain,
 		outgoingQueue:               &PriorityQueue{},
 	}
 	p.id = p.conn.RemoteAddr().String()
-	log.Info("New Peer connected",
-		"Peer Addr", p.conn.RemoteAddr().String())
+	log.Info("New Peer connected ", p.conn.RemoteAddr().String())
 	return p
 }
 
@@ -443,8 +442,8 @@ func (p *Peer) handle(msg *Msg) error {
 		}
 
 	case protos.LegacyMessage_BA:
-		b := msg.msg.GetBlock()
-		p.HandleBlockForAttestation(b)
+		ba := msg.msg.GetBlockForAttestation()
+		p.HandleBlockForAttestation(ba.Block, ba.Signature)
 
 	case protos.LegacyMessage_BK:
 		b := msg.msg.GetBlock()
@@ -564,7 +563,7 @@ func (p *Peer) handle(msg *Msg) error {
 	return nil
 }
 
-func (p *Peer) HandleBlockForAttestation(pbBlock *protos.Block) {
+func (p *Peer) HandleBlockForAttestation(pbBlock *protos.Block, signature []byte) {
 	b := block.BlockFromPBData(pbBlock)
 	if !p.mr.IsRequested(b.PartialBlockSigningHash(), p) {
 		log.Error("Unrequested Block Received for Attestation from ", p.ID(),
@@ -584,7 +583,7 @@ func (p *Peer) HandleBlockForAttestation(pbBlock *protos.Block) {
 			Data: &protos.LegacyMessage_BlockForAttestation{
 				BlockForAttestation: &protos.BlockForAttestation{
 					Block: b.PBData(),
-					Signature: b.PartialBlockSigningHash(),
+					Signature: signature,
 				},
 			},
 		},
