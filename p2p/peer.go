@@ -695,6 +695,7 @@ func (p *Peer) HandleAttestTransaction(msg *Msg, txData *protos.ProtocolTransact
 		log.Error("[HandleAttestTransaction] Error getting StateContext")
 		return err
 	}
+	stateContext.SetPartialBlockSigningHash(txData.PartialBlockSigningHash)
 	if !tx.Validate(stateContext) {
 		log.Error("[HandleAttestTransaction] Attest Transaction Validation Failed")
 		return nil
