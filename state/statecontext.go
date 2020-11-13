@@ -52,6 +52,10 @@ func (s *StateContext) PartialBlockSigningHash() []byte {
 	return s.partialBlockSigningHash
 }
 
+func (s *StateContext) SetPartialBlockSigningHash(p []byte) {
+	s.partialBlockSigningHash = p
+}
+
 func (s *StateContext) BlockSigningHash() []byte {
 	return s.blockSigningHash
 }
