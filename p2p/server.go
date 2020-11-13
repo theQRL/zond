@@ -115,13 +115,17 @@ func (srv *Server) BroadcastBlockForAttestation(block *block.Block, signature []
 }
 
 func (srv *Server) BroadcastAttestationTransaction(attestTx *transactions.Attest,
-	partialBlockSigningHash []byte) {
+	slotNumber uint64, blockProposer []byte,
+	parentHeaderHash []byte, partialBlockSigningHash []byte) {
 	msg := &messages.RegisterMessage{
 		Msg: &protos.LegacyMessage{
 			FuncName: protos.LegacyMessage_AT,
 			Data: &protos.LegacyMessage_AtData{
 				AtData: &protos.ProtocolTransactionData{
 					Tx: attestTx.PBData(),
+					SlotNumber: slotNumber,
+					BlockProposer: blockProposer,
+					ParentHeaderHash: parentHeaderHash,
 					PartialBlockSigningHash: partialBlockSigningHash,
 				},
 			},

@@ -320,6 +320,22 @@ func (c *Chain) GetStateContext() (*state.StateContext, error) {
 		epochMetaData)
 }
 
+func (c *Chain) GetStateContext2(slotNumber uint64, blockProposer []byte,
+	parentHeaderHash []byte, partialBlockSigningHash []byte) (*state.StateContext, error) {
+	lastBlock := c.lastBlock
+
+	epochMetaData, err := metadata.GetEpochMetaData(c.state.DB(),
+		lastBlock.SlotNumber(), lastBlock.ParentHeaderHash())
+	if err != nil {
+		return nil, err
+	}
+
+	return state.NewStateContext(c.state.DB(), slotNumber, blockProposer,
+		parentHeaderHash, nil,
+		partialBlockSigningHash, nil,
+		epochMetaData)
+}
+
 func NewChain(s *state.State) *Chain {
 	return &Chain {
 		config: config.GetConfig(),
