@@ -504,12 +504,10 @@ func (srv *Server) RequestFullMessage(mrData *protos.MRData) {
 			}
 			return
 		}
-
 		requestedHash, ok := srv.mr.GetRequestedHash(msgHash)
 		if !ok {
 			return
 		}
-
 		peer := requestedHash.GetPeer()
 		if peer == nil {
 			return
@@ -597,6 +595,7 @@ func NewServer(chain *chain.Chain) *Server {
 	srv.messagePriority[protos.LegacyMessage_MR] = 2
 	srv.messagePriority[protos.LegacyMessage_SFM] = 1
 
+	srv.messagePriority[protos.LegacyMessage_BA] = 1
 	srv.messagePriority[protos.LegacyMessage_BK] = 1
 	srv.messagePriority[protos.LegacyMessage_FB] = 0
 	srv.messagePriority[protos.LegacyMessage_PB] = 0
