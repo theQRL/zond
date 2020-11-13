@@ -61,6 +61,8 @@ type Peer struct {
 	blockAndPeerChan         chan *BlockAndPeer
 	mrDataConn               chan *MRDataConn
 	registerAndBroadcastChan chan *messages.RegisterMessage
+	blockReceivedForAttestation chan *block.Block
+	attestationReceivedForBlock chan *transactions.Attest
 	ebhRespInfo              *EBHRespInfo // TODO: Add Lock before reading / writing
 
 	inCounter           uint64
@@ -76,26 +78,35 @@ type Peer struct {
 	isPLShared bool // Flag to mark once peer list has been received by the peer
 }
 
-func newPeer(conn *net.Conn, inbound bool, chain *chain.Chain, filter *bloom.BloomFilter, mr *MessageReceipt, mrDataConn chan *MRDataConn, registerAndBroadcastChan chan *messages.RegisterMessage, addPeerToPeerList chan *protos.PLData, blockAndPeerChan chan *BlockAndPeer, messagePriority map[protos.LegacyMessage_FuncName]uint64) *Peer {
+func newPeer(conn *net.Conn, inbound bool, chain *chain.Chain,
+	filter *bloom.BloomFilter, mr *MessageReceipt, mrDataConn chan *MRDataConn,
+	registerAndBroadcastChan chan *messages.RegisterMessage,
+	blockReceivedForAttestation chan *block.Block,
+	attestationReceivedForBlock chan *transactions.Attest,
+	addPeerToPeerList chan *protos.PLData,
+	blockAndPeerChan chan *BlockAndPeer,
+	messagePriority map[protos.LegacyMessage_FuncName]uint64) *Peer {
 	p := &Peer{
-		conn:                     *conn,
-		inbound:                  inbound,
-		chain:                    chain,
-		disconnected:             false,
-		disconnectReason:         make(chan struct{}),
-		exitMonitorChainState:    make(chan struct{}),
-		txPool:                   chain.GetTransactionPool(),
-		filter:                   filter,
-		mr:                       mr,
-		config:                   config.GetConfig(),
-		ntp:                      ntp.GetNTP(),
-		mrDataConn:               mrDataConn,
-		registerAndBroadcastChan: registerAndBroadcastChan,
-		addPeerToPeerList:        addPeerToPeerList,
-		blockAndPeerChan:         blockAndPeerChan,
-		connectionTime:           ntp.GetNTP().Time(),
-		messagePriority:          messagePriority,
-		outgoingQueue:            &PriorityQueue{},
+		conn:                        *conn,
+		inbound:                     inbound,
+		chain:                       chain,
+		disconnected:                false,
+		disconnectReason:            make(chan struct{}),
+		exitMonitorChainState:       make(chan struct{}),
+		txPool:                      chain.GetTransactionPool(),
+		filter:                      filter,
+		mr:                          mr,
+		config:                      config.GetConfig(),
+		ntp:                         ntp.GetNTP(),
+		mrDataConn:                  mrDataConn,
+		registerAndBroadcastChan:    registerAndBroadcastChan,
+		blockReceivedForAttestation: blockReceivedForAttestation,
+		attestationReceivedForBlock: attestationReceivedForBlock,
+		addPeerToPeerList:           addPeerToPeerList,
+		blockAndPeerChan:            blockAndPeerChan,
+		connectionTime:              ntp.GetNTP().Time(),
+		messagePriority:             messagePriority,
+		outgoingQueue:               &PriorityQueue{},
 	}
 	p.id = p.conn.RemoteAddr().String()
 	log.Info("New Peer connected",
@@ -431,6 +442,10 @@ func (p *Peer) handle(msg *Msg) error {
 			p.Send(out)
 		}
 
+	case protos.LegacyMessage_BA:
+		b := msg.msg.GetBlock()
+		p.HandleBlockForAttestation(b)
+
 	case protos.LegacyMessage_BK:
 		b := msg.msg.GetBlock()
 		p.HandleBlock(b)
@@ -527,8 +542,8 @@ func (p *Peer) handle(msg *Msg) error {
 		p.HandleTransaction(msg, msg.msg.GetTtData())
 	case protos.LegacyMessage_ST:  // Slave Transaction
 		p.HandleTransaction(msg, msg.msg.GetStData())
-	case protos.LegacyMessage_AT:  // Slave Transaction
-		p.HandleProtocolTransaction(msg, msg.msg.GetAtData())
+	case protos.LegacyMessage_AT:  // Attest Transaction
+		p.HandleAttestTransaction(msg, msg.msg.GetAtData())
 	case protos.LegacyMessage_SYNC:
 		log.Warn("SYNC has not been Implemented <<<< --- ")
 	case protos.LegacyMessage_CHAINSTATE:
@@ -549,9 +564,46 @@ func (p *Peer) handle(msg *Msg) error {
 	return nil
 }
 
+func (p *Peer) HandleBlockForAttestation(pbBlock *protos.Block) {
+	b := block.BlockFromPBData(pbBlock)
+	if !p.mr.IsRequested(b.PartialBlockSigningHash(), p) {
+		log.Error("Unrequested Block Received for Attestation from ", p.ID(),
+			" #", b.SlotNumber(),
+			" PartialBlockSigningHash ", misc.Bin2HStr(b.PartialBlockSigningHash()))
+		return
+	}
+	log.Info("Received Block for Attestation from ", p.ID(),
+		" #", b.SlotNumber(),
+		" PartialBlockSigningHash ", misc.Bin2HStr(b.PartialBlockSigningHash()))
+
+	// TODO: Add Block Validation
+
+	msg := &messages.RegisterMessage{
+		Msg: &protos.LegacyMessage{
+			FuncName: protos.LegacyMessage_BA,
+			Data: &protos.LegacyMessage_BlockForAttestation{
+				BlockForAttestation: &protos.BlockForAttestation{
+					Block: b.PBData(),
+					Signature: b.PartialBlockSigningHash(),
+				},
+			},
+		},
+		MsgHash: misc.Bin2HStr(b.PartialBlockSigningHash()),
+	}
+	p.registerAndBroadcastChan <-msg
+
+	p.blockReceivedForAttestation <-b
+
+}
+
 func (p *Peer) HandleBlock(pbBlock *protos.Block) {
 	// TODO: Validate Message
 	b := block.BlockFromPBData(pbBlock)
+	if !p.mr.IsRequested(b.HeaderHash(), p) {
+		log.Error("Unrequested Block Received from ", p.ID()," #", b.SlotNumber(), " ",
+			misc.Bin2HStr(b.HeaderHash()))
+		return
+	}
 	log.Info("Received Block from ", p.ID()," #", b.SlotNumber(), " ",
 		misc.Bin2HStr(b.HeaderHash()))
 
@@ -562,14 +614,14 @@ func (p *Peer) HandleBlock(pbBlock *protos.Block) {
 
 	msg := &protos.LegacyMessage {
 		Data: &protos.LegacyMessage_Block{
-			Block:b.PBData(),
+			Block: b.PBData(),
 		},
 		FuncName: protos.LegacyMessage_BK,
 	}
 
 	registerMessage := &messages.RegisterMessage{
-		MsgHash:misc.Bin2HStr(b.HeaderHash()),
-		Msg:msg,
+		MsgHash: misc.Bin2HStr(b.HeaderHash()),
+		Msg: msg,
 	}
 
 	select {
@@ -584,7 +636,7 @@ func (p *Peer) HandleTransaction(msg *Msg, txData *protos.Transaction) error {
 	tx := transactions.ProtoToTransaction(txData)
 	txHash := tx.TxHash(tx.GetSigningHash())
 
-	if !p.mr.IsRequested(txHash, p, nil, nil) {
+	if !p.mr.IsRequested(txHash, p) {
 		log.Warn("Received Unrequested txn",
 			"Peer", p.ID(),
 			"Tx Hash", misc.Bin2HStr(txHash))
@@ -627,12 +679,12 @@ func (p *Peer) HandleTransaction(msg *Msg, txData *protos.Transaction) error {
 	return nil
 }
 
-func (p *Peer) HandleProtocolTransaction(msg *Msg, txData *protos.ProtocolTransactionData) error {
+func (p *Peer) HandleAttestTransaction(msg *Msg, txData *protos.ProtocolTransactionData) error {
 	pbData := txData.Tx
 	tx := transactions.ProtoToProtocolTransaction(pbData)
 	txHash := tx.TxHash(tx.GetSigningHash(txData.PartialBlockSigningHash))
 
-	if !p.mr.IsRequested(txHash, p, nil, nil) {
+	if !p.mr.IsRequested(txHash, p) {
 		log.Warn("Received Unrequested txn",
 			"Peer", p.ID(),
 			"Tx Hash", misc.Bin2HStr(txHash))
@@ -641,18 +693,15 @@ func (p *Peer) HandleProtocolTransaction(msg *Msg, txData *protos.ProtocolTransa
 
 	stateContext, err := p.chain.GetStateContext()
 	if err != nil {
-		log.Error("[HandleTransaction] Error getting StateContext")
-	}
-	if !tx.Validate(stateContext) {
-		return nil
-	}
-	err = p.txPool.Add(tx, txHash, p.chain.GetLastBlock().SlotNumber(), p.ntp.Time())
-	if err != nil {
-		log.Error("Error while adding TransferTxn into TxPool",
-			"TxHash", txHash,
-			"Error", err.Error())
+		log.Error("[HandleAttestTransaction] Error getting StateContext")
 		return err
 	}
+	if !tx.Validate(stateContext) {
+		log.Error("[HandleAttestTransaction] Attest Transaction Validation Failed")
+		return nil
+	}
+	p.attestationReceivedForBlock <- tx.(*transactions.Attest)
+
 	msg2 := &protos.LegacyMessage {
 		FuncName: msg.msg.FuncName,
 		Data: msg.msg.Data,
@@ -664,7 +713,7 @@ func (p *Peer) HandleProtocolTransaction(msg *Msg, txData *protos.ProtocolTransa
 	select {
 	case p.registerAndBroadcastChan <- registerMessage:
 	case <-time.After(10 * time.Second):
-		log.Warn("[TX] RegisterAndBroadcastChan Timeout",
+		log.Warn("[AT] RegisterAndBroadcastChan Timeout",
 			"Peer", p.ID())
 	}
 	return nil

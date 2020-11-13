@@ -357,6 +357,9 @@ func NewPOS(srv *p2p.Server, chain *chain.Chain, db *db.DB) *POS {
 		db: db,
 		validators: make(map[string] *dilithium.Dilithium),
 		exit: make(chan struct{}),
+
+		blockReceivedForAttestation: srv.GetBlockReceivedForAttestation(),
+		attestationReceivedForBlock: srv.GetAttestationReceivedForBlock(),
 	}
 
 	dk := keys.NewDilithiumKeys(pos.config.User.Stake.DilithiumKeysFileName)
