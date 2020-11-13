@@ -126,8 +126,10 @@ func (srv *Server) BroadcastAttestationTransaction(attestTx *transactions.Attest
 				},
 			},
 		},
-		MsgHash: misc.Bin2HStr(attestTx.TxHash(partialBlockSigningHash)),
+		MsgHash: misc.Bin2HStr(attestTx.TxHash(attestTx.GetSigningHash(partialBlockSigningHash))),
 	}
+	log.Info("[BroadcastAttestationTransaction] Broadcasting Attestation Txn ",
+		msg.MsgHash)
 	srv.registerAndBroadcastChan <-msg
 }
 
