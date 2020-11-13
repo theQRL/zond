@@ -426,11 +426,6 @@ func (b *Block) Commit(db *db.DB, finalizedHeaderHash []byte, isFinalizedState b
 	return stateContext.Commit(GetBlockStorageKey(blockHeaderHash), bytesBlock, isFinalizedState)
 }
 
-func (b *Block) Revert() bool {
-
-	return true
-}
-
 func NewBlock(networkId uint64, timestamp uint64, proposerAddress []byte, slotNumber uint64,
 	parentHeaderHash []byte, txs []*protos.Transaction, protocolTxs []*protos.ProtocolTransaction,
 	lastCoinBaseNonce uint64) *Block {
