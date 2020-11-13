@@ -507,8 +507,8 @@ func (p *Peer) handle(msg *Msg) error {
 		fbData := msg.msg.GetFbData()
 		blockHeaderHash := fbData.BlockHeaderHash
 		log.Info("Fetch Block Request",
-			"BlockHeaderHash", misc.Bin2HStr(blockHeaderHash),
-			"Peer", p.conn.RemoteAddr().String())
+			" BlockHeaderHash ", misc.Bin2HStr(blockHeaderHash),
+			" Peer ", p.conn.RemoteAddr().String())
 
 		b, err := p.chain.GetBlock(blockHeaderHash)
 		if err != nil {
@@ -636,9 +636,9 @@ func (p *Peer) HandleTransaction(msg *Msg, txData *protos.Transaction) error {
 	txHash := tx.TxHash(tx.GetSigningHash())
 
 	if !p.mr.IsRequested(txHash, p) {
-		log.Warn("Received Unrequested txn",
-			"Peer", p.ID(),
-			"Tx Hash", misc.Bin2HStr(txHash))
+		log.Warn("[HandleTransaction] Received Unrequested txn ",
+			" Peer", p.ID(),
+			" Tx Hash", misc.Bin2HStr(txHash))
 		return nil
 	}
 
@@ -684,9 +684,9 @@ func (p *Peer) HandleAttestTransaction(msg *Msg, txData *protos.ProtocolTransact
 	txHash := tx.TxHash(tx.GetSigningHash(txData.PartialBlockSigningHash))
 
 	if !p.mr.IsRequested(txHash, p) {
-		log.Warn("Received Unrequested txn",
-			"Peer", p.ID(),
-			"Tx Hash", misc.Bin2HStr(txHash))
+		log.Warn("[HandleAttestTransaction] Received Unrequested txn",
+			" Peer", p.ID(),
+			" Tx Hash", misc.Bin2HStr(txHash))
 		return nil
 	}
 
