@@ -2,11 +2,9 @@ package p2p
 
 import (
 	"github.com/deckarep/golang-set"
-	"github.com/theQRL/zond/chain/block"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
-	"reflect"
 	"sync"
 )
 
@@ -68,8 +66,7 @@ func (mr *MessageReceipt) addPeer(mrData *protos.MRData, peer *Peer) {
 	}
 }
 
-func (mr *MessageReceipt) IsRequested(msgHashBytes []byte, peer *Peer,
-	block *block.Block, blockProposerAddress []byte) bool {
+func (mr *MessageReceipt) IsRequested(msgHashBytes []byte, peer *Peer) bool {
 	mr.lock.Lock()
 	defer mr.lock.Unlock()
 
@@ -80,31 +77,8 @@ func (mr *MessageReceipt) IsRequested(msgHashBytes []byte, peer *Peer,
 		}
 	}
 
-	if block != nil {
-		if mr.blockParams(msgHash, block, blockProposerAddress) {
-			return true
-		}
-	}
-
 	mr.removePeerFromRequestedHash(msgHash, peer)
 	return false
-}
-
-func (mr *MessageReceipt) blockParams(msgHash string, block *block.Block, blockProposerAddress []byte) bool {
-	requestedHash, ok := mr.requestedHash[msgHash]
-	if !ok {
-		return false
-	}
-
-	if !reflect.DeepEqual(blockProposerAddress, requestedHash.mrData.BlockProposer) {
-		return false
-	}
-
-	if !reflect.DeepEqual(block.ParentHeaderHash(), requestedHash.mrData.ParentHeaderHash) {
-		return false
-	}
-
-	return true
 }
 
 func (mr *MessageReceipt) removePeerFromRequestedHash(msgHash string, peer *Peer) {
