@@ -93,10 +93,12 @@ func (p *POS) TimeRemainingForNextAction() time.Duration {
 		// then max wait time to collect attestor txn
 		// before broadcasting the block
 		currentTime := uint64(time.Now().Unix())
+		slotNumber := p.blockBeingAttested.SlotNumber()
 		genesisTimestamp := p.config.Dev.Genesis.GenesisTimestamp
 		blockTiming := p.config.Dev.BlockTime
 		// TODO: move this 45 seconds into config
-		return time.Duration((genesisTimestamp + p.blockBeingAttested.SlotNumber() * blockTiming + 45) - currentTime)
+		return time.Duration(
+			(genesisTimestamp + slotNumber * blockTiming + 45) - currentTime) * time.Second
 	}
 }
 
@@ -148,6 +150,7 @@ running:
 					log.Error("Error getting CoinBase Address state ", err.Error())
 					continue
 				}
+				log.Info("Minting Block #", slotNumber)
 				b := block.NewBlock(0, ntp.GetNTP().Time(), proposerD.PK(), slotNumber,
 					lastBlock.HeaderHash(), nil, nil, coinBaseState.Nonce())
 
@@ -197,6 +200,7 @@ running:
 				2. Optimization needed PartialBlockSigningHash is called two times
 				 */
 				partialBlockSigningHash := b.PartialBlockSigningHash()
+				log.Info("Broadcasting Block #", slotNumber, " for attestation")
 				p.srv.BroadcastBlockForAttestation(b, proposerD.Sign(partialBlockSigningHash))
 
 			} else {
@@ -205,8 +209,14 @@ running:
 				// If yes then add block to the chain and
 				// broadcast the block
 				if len(p.blockBeingAttested.ProtocolTransactions()) > 1 {
+					log.Info("Number of Attestations Received ",
+						len(p.blockBeingAttested.ProtocolTransactions()) - 1,
+						" for Block #", p.blockBeingAttested.SlotNumber())
 					p.chain.AddBlock(p.blockBeingAttested)
 					p.srv.BroadcastBlock(p.blockBeingAttested)
+				} else {
+					log.Info("Insufficient attestation for Block #",
+						p.blockBeingAttested.SlotNumber())
 				}
 
 				p.blockBeingAttested = nil
@@ -226,15 +236,11 @@ running:
 				Don't accept Block for attestation after certain threshold
 			*/
 
-			if p.blockBeingAttested == nil {
-				continue
-			}
-
 			if !reflect.DeepEqual(b.ParentHeaderHash(), p.chain.GetLastBlock().HeaderHash()) {
 				continue
 			}
 
-			if p.blockBeingAttested.SlotNumber() == b.SlotNumber() {
+			if p.blockBeingAttested != nil && p.blockBeingAttested.SlotNumber() == b.SlotNumber() {
 				continue
 			}
 			header := b.Header()
@@ -250,6 +256,7 @@ running:
 				continue
 			}
 			p.blockBeingAttested = b
+			log.Info("Block #", b.SlotNumber(), " received for attestation")
 			partialBlockSigningHash := b.PartialBlockSigningHash()
 			for _, dilithiumPK := range attestors {
 				strDilithiumPK := misc.Bin2HStr(dilithiumPK)
