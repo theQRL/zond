@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"github.com/deckarep/golang-set"
+	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
@@ -50,6 +51,7 @@ func (mr *MessageReceipt) addPeer(mrData *protos.MRData, peer *Peer) {
 	msgType := mrData.Type
 	msgHash := misc.Bin2HStr(mrData.Hash)
 	if !mr.allowedTypes.Contains(msgType) {
+		log.Error("Message Type ", msgType, " not found in allowed types")
 		return
 	}
 
@@ -163,6 +165,7 @@ func (mr *MessageReceipt) Register(msgHash string, msg *protos.LegacyMessage) {
 func CreateMR() (mr *MessageReceipt) {
 
 	allowedTypes := mapset.NewSet()
+	allowedTypes.Add(protos.LegacyMessage_BA)
 	allowedTypes.Add(protos.LegacyMessage_BK)
 	allowedTypes.Add(protos.LegacyMessage_TT)
 	allowedTypes.Add(protos.LegacyMessage_ST)
@@ -176,6 +179,7 @@ func CreateMR() (mr *MessageReceipt) {
 		protos.LegacyMessage_MR: "mrData",  // Message Receipt Data
 		protos.LegacyMessage_SFM: "mrData", // Message Response Data
 
+		protos.LegacyMessage_BA: "baData",  // Block For Attestation
 		protos.LegacyMessage_BK: "block",
 		protos.LegacyMessage_FB: "fbData",  // Fetch Block Data
 		protos.LegacyMessage_PB: "pbData",  // Push Block Data
