@@ -401,14 +401,7 @@ running:
 				//TODO: Logic to be written
 				//srv.blockReceivedForAttestation
 			case protos.LegacyMessage_BK:
-				// TODO: Replace this with current slot number
-				if mrData.SlotNumber > srv.chain.Height() + uint64(srv.config.Dev.MaxMarginBlockNumber) {
-					log.Debug("Skipping block #%s as beyond lead limit",
-						"Block #", mrData.SlotNumber)
-					break
-				}
 				// TODO: Add to skip slot number beyond the Finalized slot Number
-
 				_, err := srv.chain.GetBlock(mrData.ParentHeaderHash)
 				if err != nil {
 					log.Info("[BlockReceived] Missing Parent Block ",
