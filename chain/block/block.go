@@ -470,7 +470,7 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 	currentEpoch := b.Epoch()
 	finalizedBlockEpoch := stateContext.GetMainChainMetaData().FinalizedBlockSlotNumber() / blocksPerEpoch
 
-	if currentEpoch - finalizedBlockEpoch <= 3 {
+	if currentEpoch - finalizedBlockEpoch < 3 {
 		return nil
 	}
 
@@ -509,6 +509,18 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 	}
 	if epochMetaData.TotalStakeAmountFound() * 3 < epochMetaData.TotalStakeAmountAlloted() * 2 {
 		return nil
+	}
+
+	for ;; {
+		newBM, err := metadata.GetBlockMetaData(db, bm.ParentHeaderHash())
+		if err != nil {
+			log.Error("[UpdateFinalizedEpoch] Failed to GetBlockMetaData")
+			return err
+		}
+		if bm.Epoch() != newBM.Epoch() {
+			break
+		}
+		bm = newBM
 	}
 
 	headerHash := bm.ParentHeaderHash()
