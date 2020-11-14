@@ -294,11 +294,12 @@ running:
 				log.Error("Error getting epochMetaData")
 				continue
 			}
+			partialBlockSigningHash := p.blockBeingAttested.PartialBlockSigningHash()
 			sc, err := state.NewStateContext(p.db, p.blockBeingAttested.SlotNumber(),
 				p.blockBeingAttested.ProtocolTransactions()[0].Pk,
 				p.blockBeingAttested.ParentHeaderHash(),
 				p.blockBeingAttested.HeaderHash(),
-				p.blockBeingAttested.PartialBlockSigningHash(),
+				partialBlockSigningHash,
 				nil,
 				epochMetaData)
 			if err != nil {
@@ -327,6 +328,9 @@ running:
 			}
 
 			p.attestations = append(p.attestations, tx)
+			log.Info("Received Attest Transaction ",
+				misc.Bin2HStr(tx.TxHash(tx.GetSigningHash(partialBlockSigningHash))),
+				" for block #", p.blockBeingAttested.SlotNumber())
 
 			// Add received attestation into block
 			p.blockBeingAttested.AddAttestTx(tx)
