@@ -401,8 +401,26 @@ running:
 				//TODO: Logic to be written
 				//srv.blockReceivedForAttestation
 			case protos.LegacyMessage_BK:
-				// TODO: Add to skip slot number beyond the Finalized slot Number
-				_, err := srv.chain.GetBlock(mrData.ParentHeaderHash)
+				finalizedHeaderHash, err := srv.chain.GetFinalizedHeaderHash()
+				if err != nil {
+					log.Error("No Finalized Header Hash ", err)
+				}
+				if finalizedHeaderHash != nil {
+					finalizedBlock, err := srv.chain.GetBlock(finalizedHeaderHash)
+					if err != nil {
+						log.Error("Failed to get finalized block ",
+							misc.Bin2HStr(finalizedHeaderHash))
+						break
+					}
+					// skip slot number beyond the Finalized slot Number
+					if finalizedBlock.SlotNumber() >= mrData.SlotNumber {
+						log.Warn("[BlockReceived] Block #", mrData.SlotNumber,
+							" is beyond finalized block #", finalizedBlock.SlotNumber())
+						break
+					}
+				}
+				
+				_, err = srv.chain.GetBlock(mrData.ParentHeaderHash)
 				if err != nil {
 					log.Info("[BlockReceived] Missing Parent Block ",
 						" #", mrData.SlotNumber,
