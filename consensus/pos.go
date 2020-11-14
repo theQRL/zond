@@ -77,7 +77,12 @@ func (p *POS) Start()  {
 }
 
 func (p *POS) TimeRemainingForNextAction() time.Duration {
-	if p.blockBeingAttested == nil {
+	isThisNodeProposer := false
+	if p.blockBeingAttested != nil {
+		proposerDilithiumPK := misc.Bin2HStr(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
+		_, isThisNodeProposer = p.validators[proposerDilithiumPK]
+	}
+	if p.blockBeingAttested == nil || !isThisNodeProposer {
 		// Wait time to propose the block
 		currentTime := uint64(time.Now().Unix())
 		genesisTimestamp := p.config.Dev.Genesis.GenesisTimestamp
