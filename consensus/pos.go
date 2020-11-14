@@ -212,6 +212,13 @@ running:
 					log.Info("Number of Attestations Received ",
 						len(p.blockBeingAttested.ProtocolTransactions()) - 1,
 						" for Block #", p.blockBeingAttested.SlotNumber())
+					dilithiumPK := misc.Bin2HStr(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
+					proposerD, ok := p.validators[dilithiumPK]
+					if !ok {
+						log.Error("Failed to load dilithium wallet for ", dilithiumPK)
+						continue
+					}
+					p.blockBeingAttested.SignByProposer(proposerD)
 					p.chain.AddBlock(p.blockBeingAttested)
 					p.srv.BroadcastBlock(p.blockBeingAttested)
 				} else {
