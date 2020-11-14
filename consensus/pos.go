@@ -129,6 +129,14 @@ running:
 			if !p.config.User.Stake.EnableStaking {
 				continue
 			}
+			isThisNodeProposer := false
+			if p.blockBeingAttested != nil {
+				proposerDilithiumPK := misc.Bin2HStr(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
+				_, isThisNodeProposer = p.validators[proposerDilithiumPK]
+				if !isThisNodeProposer {
+					p.blockBeingAttested = nil
+				}
+			}
 			if p.blockBeingAttested == nil {
 				lastBlock := p.chain.GetLastBlock()
 
