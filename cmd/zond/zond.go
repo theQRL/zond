@@ -1,17 +1,20 @@
 package main
 
 import (
+	"github.com/mattn/go-colorable"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/api"
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/consensus"
 	"github.com/theQRL/zond/db"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/p2p"
 	"github.com/theQRL/zond/state"
-	"io"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"os"
 	"os/signal"
+	"time"
 )
 
 var (
@@ -54,12 +57,28 @@ func CreateDirectoryIfNotExists(dir string) error {
 }
 
 func SetLogOutput() error {
-	logFile, err := os.OpenFile(config.GetUserConfig().GetLogFileName(),
-		os.O_WRONLY | os.O_CREATE, 0755)
+	rotateFileHook, err := misc.NewRotateFileHook(misc.RotateFileConfig{
+		Filename: config.GetUserConfig().GetLogFileName(),
+		MaxSize: 50,
+		MaxBackups: 3,
+		MaxAge: 28,
+		Formatter: &log.JSONFormatter{
+			TimestampFormat: time.RFC3339,
+		},
+	})
 	if err != nil {
+		log.Fatalf("Failed to initialize file rotate hook: %v", err)
 		return err
 	}
-	log.SetOutput(io.MultiWriter(os.Stdout, logFile))
+
+	log.SetOutput(colorable.NewColorableStdout())
+	formatter := new(prefixed.TextFormatter)
+	formatter.TimestampFormat = "2006-01-02 15:04:05"
+	formatter.FullTimestamp = true
+	formatter.DisableColors = false
+	log.SetFormatter(formatter)
+
+	log.AddHook(rotateFileHook)
 	return nil
 }
 
