@@ -419,7 +419,7 @@ running:
 						break
 					}
 				}
-				
+
 				_, err = srv.chain.GetBlock(mrData.ParentHeaderHash)
 				if err != nil {
 					log.Info("[BlockReceived] Missing Parent Block ",
