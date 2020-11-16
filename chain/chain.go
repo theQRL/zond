@@ -317,8 +317,11 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 	}
 
 	if parentBlock.SlotNumber() == mainChainMetaData.FinalizedBlockSlotNumber() {
-		if !reflect.DeepEqual(parentBlock.Header(), mainChainMetaData.FinalizedBlockHeaderHash()) {
-			log.Error("[AddBlock] ParentBlock is not the part of the finalized chain")
+		parentHeaderHash := parentBlock.HeaderHash()
+		if !reflect.DeepEqual(parentHeaderHash, mainChainMetaData.FinalizedBlockHeaderHash()) {
+			log.Error("[AddBlock] ParentBlock is not the part of the finalized chain",
+				" Expected hash ", misc.Bin2HStr(mainChainMetaData.FinalizedBlockHeaderHash()),
+				" Found hash ", misc.Bin2HStr(parentHeaderHash))
 			return false
 		}
 	}
