@@ -2,9 +2,11 @@ package pool
 
 import (
 	"errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/chain/block"
 	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/config"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"sync"
 )
@@ -51,6 +53,7 @@ func (t *TransactionPool) Add(tx transactions.TransactionInterface, txHash []byt
 		return err
 	}
 
+	log.Info("Added Transaction ", misc.Bin2HStr(txHash), " to pool")
 	return nil
 }
 
