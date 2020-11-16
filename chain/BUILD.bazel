@@ -9,6 +9,7 @@ go_library(
         "//address:go_default_library",
         "//chain/block:go_default_library",
         "//chain/block/genesis:go_default_library",
+        "//chain/transactions:go_default_library",
         "//chain/transactions/pool:go_default_library",
         "//config:go_default_library",
         "//metadata:go_default_library",
