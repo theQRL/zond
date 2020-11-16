@@ -68,10 +68,9 @@ func (db *DB) GetFromBucket(key []byte, bucket []byte) ([]byte, error) {
 
 	err := db.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucket)
-		//if b == nil {
-		//	log.Error("Bucket is nil, Bucket ", string(bucket))
-		//	return errors.New("bucket is nil")
-		//}
+		if b == nil {
+			return errors.New("bucket not found")
+		}
 		value = b.Get(key)
 		if value == nil {
 			return errors.New("key not found")
