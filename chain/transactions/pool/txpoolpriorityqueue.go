@@ -61,7 +61,7 @@ func (pq *PriorityQueue) Pop() *TransactionInfo {
 	return transactionInfo
 }
 
-func (pq *PriorityQueue) Remove(tx transactions.CoreTransaction, txHash []byte) bool {
+func (pq *PriorityQueue) Remove(tx transactions.TransactionInterface, txHash []byte) bool {
 	if pq != nil {
 		for index, ti := range *pq {
 			if reflect.DeepEqual(ti.TxHash(), txHash) {
@@ -84,12 +84,6 @@ func (pq *PriorityQueue) RemoveTxInBlock(block *block.Block) {
 	for _, protoTX := range block.Transactions() {
 		tx := transactions.ProtoToTransaction(protoTX)
 		pq.Remove(tx, tx.TxHash(tx.GetSigningHash()))
-	}
-
-	for _, protoTX := range block.ProtocolTransactions()[1:] {
-		// Attest Transaction only
-		tx := transactions.ProtoToProtocolTransaction(protoTX)
-		pq.Remove(tx, tx.TxHash(tx.GetSigningHash(block.PartialBlockSigningHash())))
 	}
 }
 
