@@ -31,7 +31,7 @@ func (t *TransactionPool) Contains(tx *TransactionInfo) bool {
 	return t.txPool.Contains(tx)
 }
 
-func (t *TransactionPool) Add(tx transactions.CoreTransaction, txHash []byte,
+func (t *TransactionPool) Add(tx transactions.TransactionInterface, txHash []byte,
 	slotNumber uint64, timestamp uint64) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -61,7 +61,7 @@ func (t *TransactionPool) Pop() *TransactionInfo {
 	return t.txPool.Pop()
 }
 
-func (t *TransactionPool) Remove(tx transactions.CoreTransaction, txHash []byte) bool {
+func (t *TransactionPool) Remove(tx transactions.TransactionInterface, txHash []byte) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -86,16 +86,6 @@ func (t *TransactionPool) AddTxFromBlock(block *block.Block, currentBlockHeight 
 			return err
 		}
 	}
-
-	for _, protoTX := range block.ProtocolTransactions()[1:] {
-		// Attest Transaction only
-		tx := transactions.ProtoToProtocolTransaction(protoTX)
-		err := t.Add(tx, tx.TxHash(tx.GetSigningHash(block.PartialBlockSigningHash())), currentBlockHeight, t.ntp.Time())
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
