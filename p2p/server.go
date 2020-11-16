@@ -560,8 +560,8 @@ func (srv *Server) WritePeerList() error {
 func (srv *Server) BlockReceived(peer *Peer, b *block.Block) {
 	headerHash := misc.Bin2HStr(b.HeaderHash())
 	log.Info(">>> Received Block",
-		"Block Number", b.SlotNumber(),
-		"HeaderHash", headerHash)
+		" #", b.SlotNumber(),
+		" HeaderHash ", headerHash)
 
 	// TODO: Trigger Syncing/Block downloader
 	select {
