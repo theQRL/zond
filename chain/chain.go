@@ -7,6 +7,7 @@ import (
 	"github.com/theQRL/zond/address"
 	"github.com/theQRL/zond/chain/block"
 	"github.com/theQRL/zond/chain/block/genesis"
+	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/chain/transactions/pool"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/metadata"
@@ -281,6 +282,21 @@ func (c *Chain) GetEpochHeaderHashes(epoch uint64) (*protos.EpochBlockHashesMeta
 		return metadata.NewEpochBlockHashes(epoch).PBData(), nil
 	}
 	return epochBlockHashes.PBData(), nil
+}
+
+func (c *Chain) ValidateTransaction(tx *transactions.Transaction) error {
+	sc, err := c.GetStateContext()
+	if err != nil {
+		return err
+	}
+
+	if err := tx.SetAffectedAddress(sc); err != nil {
+		return err
+	}
+	if !tx.Validate(sc) {
+		return errors.New("transaction validation failed")
+	}
+	return nil
 }
 
 func (c *Chain) AddBlock(b *block.Block) bool {
