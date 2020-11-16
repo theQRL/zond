@@ -378,7 +378,7 @@ running:
 				 */
 				_, err := srv.chain.GetBlock(mrData.ParentHeaderHash)
 				if err != nil {
-					log.Info("[BlockForAttestation] Missing Parent Block ",
+					log.Info("[BlockForAttestation] Missing Parent Block",
 						" #", mrData.SlotNumber,
 						" Partial Block Signing Hash ", misc.Bin2HStr(mrData.Hash),
 						" Parent Block ", misc.Bin2HStr(mrData.ParentHeaderHash))
