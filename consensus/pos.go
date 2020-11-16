@@ -250,21 +250,10 @@ running:
 					log.Info("Insufficient attestation for Block #",
 						p.blockBeingAttested.SlotNumber())
 					txPool := p.chain.GetTransactionPool()
-					parentBlock, err := p.chain.GetBlock(p.blockBeingAttested.ParentHeaderHash())
+					err := txPool.AddTxFromBlock(p.blockBeingAttested, p.chain.Height())
 					if err != nil {
-						log.Error("Failed to get parent block")
-					}
-					if parentBlock != nil {
-						for _, txPBData := range p.blockBeingAttested.Transactions() {
-							tx := transactions.ProtoToTransaction(txPBData)
-							txHash := tx.TxHash(tx.GetSigningHash())
-							err := txPool.Add(tx, txHash,
-								parentBlock.SlotNumber(), parentBlock.Timestamp())
-							if err != nil {
-								log.Error("Failed to add transaction back to the pool ",
-									misc.Bin2HStr(txHash))
-							}
-						}
+						log.Error("Failed to add transaction from block to pool ",
+							err.Error())
 					}
 				}
 
