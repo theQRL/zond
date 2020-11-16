@@ -661,6 +661,7 @@ func (p *Peer) HandleTransaction(msg *Msg, txData *protos.Transaction) error {
 			"Error", err.Error())
 		return err
 	}
+	log.Info("Added Transaction ", misc.Bin2HStr(txHash), " to pool")
 	msg2 := &protos.LegacyMessage {
 		FuncName: msg.msg.FuncName,
 		Data: msg.msg.Data,
