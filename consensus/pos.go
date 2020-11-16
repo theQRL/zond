@@ -168,13 +168,23 @@ running:
 				txPool := p.chain.GetTransactionPool()
 				txs := make([]*protos.Transaction, 0)
 				// TODO: Replace hardcoded 100 with some max block size
-				for i := 0; i < 100 ; i++ {
+				for i := 0; i < 100 ; {
 					txInfo := txPool.Pop()
 					if txInfo == nil {
 						break
 					}
-					txPBData := txInfo.Transaction().PBData()
+					txInterface := txInfo.Transaction()
+					txPBData := txInterface.PBData()
+					tx := txInterface.(*transactions.Transaction)
+					strTxHash := misc.Bin2HStr(tx.TxHash(tx.GetSigningHash()))
+					if p.chain.ValidateTransaction(tx) != nil {
+						log.Error("Transaction validation failed for ",
+							strTxHash)
+						continue
+					}
 					txs = append(txs, txPBData)
+					log.Info("Added transaction ", strTxHash, " into block #", slotNumber)
+					i++
 				}
 				b := block.NewBlock(0, ntp.GetNTP().Time(), proposerD.PK(), slotNumber,
 					lastBlock.HeaderHash(), txs, nil, coinBaseState.Nonce())
