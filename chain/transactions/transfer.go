@@ -288,9 +288,9 @@ func NewTransfer(networkID uint64, addrsTo [][]byte, amounts []uint64, fee uint6
 	}
 
 	// TODO: Pass StateContext
-	if !tx.Validate(nil) {
-		return nil
-	}
+	//if !tx.Validate(nil) {
+	//	return nil
+	//}
 
 	return tx
 }
