@@ -290,6 +290,23 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 		log.Error("[AddBlock] Failed to Get MainChainMetaData ", err.Error())
 		return false
 	}
+	parentBlock, err := c.GetBlock(b.ParentHeaderHash())
+	if err != nil {
+		log.Error("[AddBlock] Failed to Get ParentBlock ", err.Error())
+		return false
+	}
+	if parentBlock.SlotNumber() < mainChainMetaData.FinalizedBlockSlotNumber() {
+		log.Error("[AddBlock] ParentBlock slot number is less than finalized block slot number")
+		return false
+	}
+
+	if parentBlock.SlotNumber() == mainChainMetaData.FinalizedBlockSlotNumber() {
+		if !reflect.DeepEqual(parentBlock.Header(), mainChainMetaData.FinalizedBlockHeaderHash()) {
+			log.Error("[AddBlock] ParentBlock is not the part of the finalized chain")
+			return false
+		}
+	}
+
 	err = b.Commit(c.state.DB(), mainChainMetaData.FinalizedBlockHeaderHash(), false)
 	if err != nil {
 		log.Error(fmt.Sprintf("Failed to commit block #%d %s | Error %s", b.SlotNumber(),
