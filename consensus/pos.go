@@ -14,6 +14,7 @@ import (
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/p2p"
+	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 	"reflect"
 	"sync"
@@ -164,8 +165,19 @@ running:
 					continue
 				}
 				log.Info("Minting Block #", slotNumber)
+				txPool := p.chain.GetTransactionPool()
+				txs := make([]*protos.Transaction, 0)
+				// TODO: Replace hardcoded 100 with some max block size
+				for i := 0; i < 100 ; i++ {
+					txInfo := txPool.Pop()
+					if txInfo == nil {
+						break
+					}
+					tx := txInfo.Transaction().(*transactions.Transaction)
+					txs = append(txs, tx.PBData())
+				}
 				b := block.NewBlock(0, ntp.GetNTP().Time(), proposerD.PK(), slotNumber,
-					lastBlock.HeaderHash(), nil, nil, coinBaseState.Nonce())
+					lastBlock.HeaderHash(), txs, nil, coinBaseState.Nonce())
 
 				header := b.Header()
 				attestors, err := p.chain.GetAttestorsBySlotNumber(header.SlotNumber,
@@ -237,6 +249,23 @@ running:
 				} else {
 					log.Info("Insufficient attestation for Block #",
 						p.blockBeingAttested.SlotNumber())
+					txPool := p.chain.GetTransactionPool()
+					parentBlock, err := p.chain.GetBlock(p.blockBeingAttested.ParentHeaderHash())
+					if err != nil {
+						log.Error("Failed to get parent block")
+					}
+					if parentBlock != nil {
+						for _, txPBData := range p.blockBeingAttested.Transactions() {
+							tx := transactions.ProtoToTransaction(txPBData)
+							txHash := tx.TxHash(tx.GetSigningHash())
+							err := txPool.Add(tx, txHash,
+								parentBlock.SlotNumber(), parentBlock.Timestamp())
+							if err != nil {
+								log.Error("Failed to add transaction back to the pool ",
+									misc.Bin2HStr(txHash))
+							}
+						}
+					}
 				}
 
 				p.blockBeingAttested = nil
