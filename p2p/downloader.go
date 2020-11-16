@@ -269,7 +269,7 @@ func (d *Downloader) Consumer(lastBlockHeaderToDownload []byte, peerGroup []*Pee
 				}
 				log.Info("Trying To Add Block",
 					" #", b.SlotNumber(),
-					" headerhash", misc.Bin2HStr(b.HeaderHash()))
+					" headerhash ", misc.Bin2HStr(b.HeaderHash()))
 				delete(pendingBlocks, strHeaderHash)
 				d.requestTracker.RemoveFirstElementFromSequence()
 				d.requestTracker.RemoveRequestKey(strHeaderHash)
@@ -303,7 +303,7 @@ func (d *Downloader) Consumer(lastBlockHeaderToDownload []byte, peerGroup []*Pee
 
 func (d *Downloader) RequestForBlock(targetSlotNumbers []*HashesAndPeerInfo,
 	nextIndexForRequest int, numberOfRequests int) (int, int, error) {
-	log.Info("Requesting For Block")
+	log.Info("Requesting For Blocks")
 
 main:
 	for ; nextIndexForRequest < len(targetSlotNumbers) ; nextIndexForRequest++ {
@@ -444,7 +444,9 @@ func NewDownloader(c *chain.Chain) (d *Downloader) {
 func (d *Downloader) Exit() {
 	log.Debug("Shutting Down Downloader")
 	// TODO: Check if done is already closed
-	close(d.done)
+	if d.isSyncing {
+		close(d.done)
+	}
 	close(d.exitDownloadMonitor)
 	d.wg.Wait()
 }
