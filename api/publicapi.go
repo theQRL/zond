@@ -124,14 +124,15 @@ func (p *PublicAPIServer) GetBlockByHash(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(429)
 		return
 	}
-	param, found := r.URL.Query()["hash"]
+	vars := mux.Vars(r)
+	hash, found := vars["hash"]
 	if !found {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			"headerHash not found in parameter",
+			"block hash not provided",
 			nil))
 		return
 	}
-	headerHash, err := hex.DecodeString(param[0])
+	headerHash, err := hex.DecodeString(hash)
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			fmt.Sprintf("Error Decoding headerHash\n %s", err.Error()),
@@ -141,7 +142,7 @@ func (p *PublicAPIServer) GetBlockByHash(w http.ResponseWriter, r *http.Request)
 	b, err := p.chain.GetBlock(headerHash)
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			fmt.Sprintf("Error in GetBlock for headerHash %s\n %s", param[0], err.Error()),
+			fmt.Sprintf("Error in GetBlock for headerHash %s\n %s", hash, err.Error()),
 			nil))
 		return
 	}
