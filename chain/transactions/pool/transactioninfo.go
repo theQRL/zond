@@ -6,7 +6,7 @@ import (
 )
 
 type TransactionInfo struct {
-	tx          transactions.CoreTransaction
+	tx          transactions.TransactionInterface
 	txHash      []byte
 	blockNumber uint64
 	timestamp   uint64
@@ -14,7 +14,7 @@ type TransactionInfo struct {
 	priority    uint64
 }
 
-func (t *TransactionInfo) Transaction() transactions.CoreTransaction {
+func (t *TransactionInfo) Transaction() transactions.TransactionInterface {
 	return t.tx
 }
 
@@ -30,22 +30,7 @@ func (t *TransactionInfo) TxHash() []byte {
 	return t.txHash
 }
 
-func (t *TransactionInfo) IsProtocolTx(tx transactions.CoreTransaction) bool {
-	switch tx.(type) {
-	case *transactions.ProtocolTransaction:
-		return true
-	default:
-		return false
-	}
-}
-
-func (t *TransactionInfo) CheckOTSExist(tx2 transactions.CoreTransaction) bool {
-	if t.IsProtocolTx(t.tx) {
-		return false
-	}
-	if t.IsProtocolTx(tx2) {
-		return false
-	}
+func (t *TransactionInfo) CheckOTSExist(tx2 transactions.TransactionInterface) bool {
 	newTx1 := t.tx.(*transactions.Transaction)
 	newTx2 := tx2.(*transactions.Transaction)
 	return newTx1.OTSIndex() == newTx2.OTSIndex()
@@ -69,7 +54,7 @@ func (t *TransactionInfo) UpdateBlockNumber(currentBlockHeight uint64) {
 	t.blockNumber = currentBlockHeight
 }
 
-func CreateTransactionInfo(tx transactions.CoreTransaction, txHash []byte,
+func CreateTransactionInfo(tx transactions.TransactionInterface, txHash []byte,
 	blockNumber uint64, timestamp uint64) *TransactionInfo {
 	t := &TransactionInfo{}
 	t.tx = tx

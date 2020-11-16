@@ -16,8 +16,6 @@ import (
 )
 
 type CoreTransaction interface {
-	PBData() *protos.Transaction
-
 	Size() int
 
 	Type()
