@@ -173,8 +173,8 @@ running:
 					if txInfo == nil {
 						break
 					}
-					tx := txInfo.Transaction().(*transactions.Transaction)
-					txs = append(txs, tx.PBData())
+					txPBData := txInfo.Transaction().PBData()
+					txs = append(txs, txPBData)
 				}
 				b := block.NewBlock(0, ntp.GetNTP().Time(), proposerD.PK(), slotNumber,
 					lastBlock.HeaderHash(), txs, nil, coinBaseState.Nonce())
