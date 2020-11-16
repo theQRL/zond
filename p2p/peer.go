@@ -732,8 +732,8 @@ func (p *Peer) HandleChainState(nodeChainState *protos.NodeChainState) {
 
 func (p *Peer) SendFetchBlock(blockHeaderHash []byte) error {
 	log.Info("Fetching",
-		"Block ", misc.Bin2HStr(blockHeaderHash),
-		"Peer", p.conn.RemoteAddr().String())
+		" Block ", misc.Bin2HStr(blockHeaderHash),
+		" Peer ", p.conn.RemoteAddr().String())
 	out := &Msg{}
 	fbData := &protos.FBData{
 		BlockHeaderHash: blockHeaderHash,
