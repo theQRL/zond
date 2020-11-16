@@ -124,7 +124,7 @@ func (p *PublicAPIServer) GetBlockByHash(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(429)
 		return
 	}
-	param, found := r.URL.Query()["headerHash"]
+	param, found := r.URL.Query()["hash"]
 	if !found {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			"headerHash not found in parameter",
