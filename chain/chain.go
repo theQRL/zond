@@ -333,8 +333,24 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 		return false
 	}
 
-	if reflect.DeepEqual(c.lastBlock.HeaderHash(), b.ParentHeaderHash()) {
+	// Reload MainChainMetaData from db
+	mainChainMetaData, err = metadata.GetMainChainMetaData(c.state.DB())
+	if err != nil {
+		log.Error("Failed to Get MainChainMetaData ", err.Error())
+		return true
+	}
+
+	if reflect.DeepEqual(mainChainMetaData.LastBlockHeaderHash(), b.HeaderHash()) {
 		c.lastBlock = b
+	} else if !reflect.DeepEqual(mainChainMetaData.LastBlockHeaderHash(),
+		c.lastBlock.HeaderHash()) {
+		lastBlock, err := c.GetBlock(mainChainMetaData.LastBlockHeaderHash())
+		if err != nil {
+			log.Error("Failed to Get Block for LastBlockHeaderHash ",
+				misc.Bin2HStr(mainChainMetaData.LastBlockHeaderHash()))
+			return true
+		}
+		c.lastBlock = lastBlock
 	}
 
 	log.Info(fmt.Sprintf("Added Block #%d %s", b.SlotNumber(), misc.Bin2HStr(b.HeaderHash())))

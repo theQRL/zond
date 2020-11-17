@@ -278,6 +278,20 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 		log.Error("Unable to marshal total stake amount")
 		return err
 	}
+
+	lastBlockMetaData, err := metadata.GetBlockMetaData(s.db, s.mainChainMetaData.LastBlockHeaderHash())
+	if err != nil {
+		log.Error("Failed to load last block meta data ",
+			misc.Bin2HStr(s.mainChainMetaData.LastBlockHeaderHash()))
+		return err
+	}
+	lastBlockTotalStakeAmount := big.NewInt(0)
+	err = lastBlockTotalStakeAmount.UnmarshalText(lastBlockMetaData.TotalStakeAmount())
+	if err != nil {
+		log.Error("Unable to Unmarshal Text for lastblockmetadata total stake amount ",
+			misc.Bin2HStr(s.mainChainMetaData.LastBlockHeaderHash()))
+		return err
+	}
 	blockMetaData := metadata.NewBlockMetaData(s.parentBlockHeaderHash, s.blockHeaderHash,
 		s.slotNumber, bytesTotalStakeAmount)
 	return s.db.DB().Update(func(tx *bbolt.Tx) error {
@@ -326,7 +340,8 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 				return err
 			}
 		}
-		if reflect.DeepEqual(s.parentBlockHeaderHash, s.mainChainMetaData.LastBlockHeaderHash()) {
+
+		if totalStakeAmount.Cmp(lastBlockTotalStakeAmount) == 1 {
 			// Update Main Chain Last Block Data
 			s.mainChainMetaData.UpdateLastBlockData(s.blockHeaderHash, s.slotNumber)
 			if err := s.mainChainMetaData.Commit(b); err != nil {
