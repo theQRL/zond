@@ -121,7 +121,7 @@ message P2PAcknowledgement {
 message NodeChainState {
     uint64 slot_number = 1;
     bytes header_hash = 2;
-    uint64 cumulative_stake = 3;
+    bytes total_stake_amount = 3;
     string version = 4;
     uint64 timestamp = 5;
 }
