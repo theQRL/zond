@@ -35,6 +35,10 @@ func (bm *BlockMetaData) SlotNumber() uint64 {
 	return bm.pbData.SlotNumber
 }
 
+func (bm *BlockMetaData) TotalStakeAmount() []byte {
+	return bm.pbData.TotalStakeAmount
+}
+
 func (bm *BlockMetaData) Epoch() uint64 {
 	return bm.pbData.SlotNumber / config.GetDevConfig().BlocksPerEpoch
 }
@@ -64,11 +68,13 @@ func (bm *BlockMetaData) Commit(b *bbolt.Bucket) error {
 	return b.Put(GetBlockMetaDataKey(bm.HeaderHash()), data)
 }
 
-func NewBlockMetaData(parentHeaderHash []byte, headerHash []byte, slotNumber uint64) *BlockMetaData {
+func NewBlockMetaData(parentHeaderHash []byte, headerHash []byte,
+	slotNumber uint64, totalStakeAmount []byte) *BlockMetaData {
 	pbData := &protos.BlockMetaData {
 		ParentHeaderHash: parentHeaderHash,
 		HeaderHash: headerHash,
 		SlotNumber: slotNumber,
+		TotalStakeAmount: totalStakeAmount,
 	}
 	return &BlockMetaData {
 		pbData: pbData,

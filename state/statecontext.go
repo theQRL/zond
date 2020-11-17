@@ -10,6 +10,7 @@ import (
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/misc"
 	"go.etcd.io/bbolt"
+	"math/big"
 	"reflect"
 )
 
@@ -26,6 +27,7 @@ type StateContext struct {
 	blockHeaderHash []byte
 	partialBlockSigningHash []byte
 	blockSigningHash []byte
+	currentBlockTotalStakeAmount uint64
 
 	validatorsToXMSSAddress map[string][]byte
 	attestorsFlag map[string]bool  // Flag just to mark if attestor has been processed, need not to be stored in state
@@ -68,6 +70,15 @@ func (s *StateContext) ValidatorsToXMSSAddress() map[string][]byte {
 	return s.validatorsToXMSSAddress
 }
 
+func (s *StateContext) processValidatorStakeAmount(dilithiumPK string) error {
+	slotLeaderDilithiumMetaData, ok := s.dilithiumState[dilithiumPK]
+	if !ok {
+		return errors.New(fmt.Sprintf("validator dilithium state not found for %s", dilithiumPK))
+	}
+	s.currentBlockTotalStakeAmount += slotLeaderDilithiumMetaData.Balance()
+	return nil
+}
+
 func (s *StateContext) ProcessAttestorsFlag(attestorDilithiumPK []byte) error {
 	if s.slotNumber == 0 {
 		return nil
@@ -82,6 +93,10 @@ func (s *StateContext) ProcessAttestorsFlag(attestorDilithiumPK []byte) error {
 		return errors.New("attestor already attested for this slot number")
 	}
 
+	err := s.processValidatorStakeAmount(strAttestorDilithiumPK)
+	if err != nil {
+		return err
+	}
 	s.attestorsFlag[strAttestorDilithiumPK] = true
 	return nil
 }
@@ -99,6 +114,10 @@ func (s *StateContext) ProcessBlockProposerFlag(blockProposerDilithiumPK []byte)
 		return errors.New("block proposer has already been processed")
 	}
 
+	err := s.processValidatorStakeAmount(misc.Bin2HStr(blockProposerDilithiumPK))
+	if err != nil {
+		return err
+	}
 	s.blockProposerFlag = true
 	return nil
 }
@@ -234,7 +253,6 @@ func (s *StateContext) GetOTSIndexState(address string, otsIndex uint64) *metada
 }
 
 func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinalizedState bool) error {
-	blockMetaData := metadata.NewBlockMetaData(s.parentBlockHeaderHash, s.blockHeaderHash, s.slotNumber)
 	var parentBlockMetaData *metadata.BlockMetaData
 	var err error
 	if s.slotNumber != 0 {
@@ -245,6 +263,23 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 		}
 		parentBlockMetaData.AddChildHeaderHash(s.blockHeaderHash)
 	}
+
+	totalStakeAmount := big.NewInt(0)
+	err = totalStakeAmount.UnmarshalText(parentBlockMetaData.TotalStakeAmount())
+	if err != nil {
+		log.Error("Unable to unmarshal total stake amount of parent block metadata")
+		return err
+	}
+	currentBlockStakeAmount := big.NewInt(0)
+	currentBlockStakeAmount.SetUint64(s.currentBlockTotalStakeAmount)
+	totalStakeAmount.Add(totalStakeAmount, currentBlockStakeAmount)
+	bytesTotalStakeAmount, err := totalStakeAmount.MarshalText()
+	if err != nil {
+		log.Error("Unable to marshal total stake amount")
+		return err
+	}
+	blockMetaData := metadata.NewBlockMetaData(s.parentBlockHeaderHash, s.blockHeaderHash,
+		s.slotNumber, bytesTotalStakeAmount)
 	return s.db.DB().Update(func(tx *bbolt.Tx) error {
 		var err error
 		b := tx.Bucket([]byte("DB"))
