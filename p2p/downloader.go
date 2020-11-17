@@ -8,6 +8,7 @@ import (
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/protos"
+	"math/big"
 	"sort"
 	"sync"
 	"time"
@@ -480,6 +481,12 @@ func (d *Downloader) DownloadMonitor() {
 			addedPeers := make(map[string]uint64)  // Temporary variable to ensure
 												   // duplicate peers are not added
 			peerGroup := make([]*Peer, 0)
+			totalStakeAmount, err := d.chain.GetTotalStakeAmount()
+			if err != nil {
+				log.Error("[DownloadMonitor] Failed to GetTotalStakeAmount ",
+					err.Error())
+				continue
+			}
 			for _, p := range d.peersList {
 				// check if peer already exists
 				if _, ok := addedPeers[p.ID()]; ok {
@@ -487,6 +494,18 @@ func (d *Downloader) DownloadMonitor() {
 				}
 				peerChainState := p.ChainState()
 				if peerChainState == nil {
+					continue
+				}
+				peerTotalStakeAmount := big.NewInt(0)
+				err := peerTotalStakeAmount.UnmarshalText(peerChainState.TotalStakeAmount)
+				if err != nil {
+					log.Error("[DownloadMonitor] Failed to unmarshal TotalStakeAmount for ",
+						" Peer ", p.ID())
+					continue
+				}
+				// Ignore peer as current total stake amount of the chain
+				// is higher than the peer's chain
+				if totalStakeAmount.Cmp(peerTotalStakeAmount) == 1 {
 					continue
 				}
 
