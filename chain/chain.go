@@ -15,6 +15,7 @@ import (
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
+	"math/big"
 	"reflect"
 	"sync"
 )
@@ -54,6 +55,30 @@ func (c *Chain) GetTransactionPool() *pool.TransactionPool {
 
 func (c *Chain) GetLastBlock() *block.Block {
 	return c.lastBlock
+}
+
+func (c *Chain) GetTotalStakeAmount() (*big.Int, error) {
+	mainChainMetaData, err := metadata.GetMainChainMetaData(c.state.DB())
+	if err != nil {
+		log.Error("[GetTotalStakeAmount] Failed to get MainChainMetaData ", err.Error())
+		return nil, err
+	}
+	if mainChainMetaData.LastBlockHeaderHash() == nil {
+		log.Error("[GetTotalStakeAmount] MainChainMetaData LastBlockHeaderHash is nil")
+		return nil, err
+	}
+	lastBlockMetaData, err := c.GetBlockMetaData(mainChainMetaData.LastBlockHeaderHash())
+	if err != nil {
+		log.Error("[GetTotalStakeAmount] Failed to load LastBlockMetaData ", err.Error())
+		return nil, err
+	}
+	totalStakeAmount := big.NewInt(0)
+	err = totalStakeAmount.UnmarshalText(lastBlockMetaData.TotalStakeAmount())
+	if err != nil {
+		log.Error("[GetTotalStakeAmount] Failed to unmarshal TotalStakeAmount ", err.Error())
+		return nil, err
+	}
+	return totalStakeAmount, nil
 }
 
 func (c *Chain) GetFinalizedHeaderHash() ([]byte, error) {
