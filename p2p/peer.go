@@ -121,15 +121,15 @@ func (p *Peer) ChainState() *protos.NodeChainState {
 	return p.chainState
 }
 
-func (p *Peer) GetCumulativeStake() uint64 {
+func (p *Peer) GetTotalStakeAmount() []byte {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	if p.chainState == nil {
-		return 0
+		return nil
 	}
 
-	return p.chainState.CumulativeStake
+	return p.chainState.TotalStakeAmount
 }
 
 func (p *Peer) GetEpochToBeRequested() uint64 {
@@ -339,7 +339,7 @@ func (p *Peer) monitorChainState() {
 			}
 
 			lastBlock := p.chain.GetLastBlock()
-			_, err := p.chain.GetBlockMetaData(lastBlock.HeaderHash())
+			lastBlockMetaData, err := p.chain.GetBlockMetaData(lastBlock.HeaderHash())
 			if err != nil {
 				log.Warn("Ping Failed Disconnecting",
 					"Peer", p.conn.RemoteAddr().String())
@@ -347,11 +347,11 @@ func (p *Peer) monitorChainState() {
 				return
 			}
 			chainStateData := &protos.NodeChainState{
-				SlotNumber:      lastBlock.SlotNumber(),
-				HeaderHash:      lastBlock.HeaderHash(),
-				//CumulativeStake: blockMetaData.TotalStake(),
-				Version:         p.config.Dev.Version,
-				Timestamp:       p.ntp.Time(),
+				SlotNumber:       lastBlock.SlotNumber(),
+				HeaderHash:       lastBlock.HeaderHash(),
+				TotalStakeAmount: lastBlockMetaData.TotalStakeAmount(),
+				Version:          p.config.Dev.Version,
+				Timestamp:        p.ntp.Time(),
 			}
 			out := &Msg{}
 			out.msg = &protos.LegacyMessage{
