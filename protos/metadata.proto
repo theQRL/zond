@@ -81,3 +81,14 @@ message BlockHashesBySlotNumber {
     uint64 slot_number = 1;
     repeated bytes header_hashes = 2;
 }
+
+message PeerInfo {
+    string ip = 1;
+    uint32 port = 2;
+    uint64 timestamp = 3;
+}
+
+message PeerData {
+    repeated PeerInfo connected_peers = 1;
+    repeated PeerInfo disconnected_peers = 2;
+}
