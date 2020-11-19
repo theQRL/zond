@@ -228,6 +228,7 @@ func (srv *Server) ConnectPeers() error {
 		// TODO: Update last connection time
 	}
 
+	peerList := make([]string, 0)
 	for {
 		select {
 		case <-time.After(15*time.Second):
@@ -238,23 +239,20 @@ func (srv *Server) ConnectPeers() error {
 			}
 
 			maxConnectionTry := 10
-			peerList := make([]string, 0)
 
 			count := 0
 
-			for _, p := range srv.peerData.DisconnectedPeers() {
-
-				if count > maxConnectionTry {
-					break
+			if len(peerList) == 0 {
+				for _, p := range srv.peerData.DisconnectedPeers() {
+					if connCount, ok := srv.ipCount[p.IP()]; ok {
+						// Ignore skipping connection to addresses
+						// when there is no connection with any peer
+						if !(srv.inboundCount == 0 && connCount == 0) {
+							continue
+						}
+					}
+					peerList = append(peerList, p.IPPort())
 				}
-
-				if _, ok := srv.ipCount[p.IP()]; ok {
-					continue
-				}
-
-				count += 1
-				peerList = append(peerList, p.IPPort())
-				//p.LastConnectionTimestamp = srv.ntp.Time()
 			}
 			srv.peerInfoLock.Unlock()
 
@@ -262,13 +260,19 @@ func (srv *Server) ConnectPeers() error {
 				if !srv.running {
 					break
 				}
+				if count >= maxConnectionTry {
+					break
+				}
 				fmt.Println("Trying to Connect",
 					"Peer", ipPort)
 				err := srv.ConnectPeer(ipPort)
+				count += 1
 				if err != nil {
 					log.Info("Failed to connect to ", ipPort)
+					continue
 				}
 			}
+			peerList = peerList[count:]
 
 		case <-srv.connectPeersExit:
 			return nil
