@@ -1,8 +1,8 @@
 package metadata
 
 import (
-	"github.com/theQRL/zond/bazel-zond/external/go_sdk/src/net"
 	"github.com/theQRL/zond/protos"
+	"net"
 )
 
 type PeerInfo struct {
