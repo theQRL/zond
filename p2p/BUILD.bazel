@@ -19,6 +19,7 @@ go_library(
         "//chain/transactions:go_default_library",
         "//chain/transactions/pool:go_default_library",
         "//config:go_default_library",
+        "//metadata:go_default_library",
         "//misc:go_default_library",
         "//ntp:go_default_library",
         "//p2p/messages:go_default_library",
