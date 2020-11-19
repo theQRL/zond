@@ -84,7 +84,7 @@ message BlockHashesBySlotNumber {
 
 message PeerInfo {
     string ip = 1;
-    uint32 port = 2;
+    string port = 2;
     uint64 timestamp = 3;
 }
 
