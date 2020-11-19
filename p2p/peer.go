@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
+	"github.com/theQRL/zond/bazel-zond/external/go_sdk/src/strconv"
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/chain/block"
 	"github.com/theQRL/zond/chain/transactions"
@@ -57,13 +58,13 @@ type Peer struct {
 	ntp                   ntp.NTPInterface
 	chainState            *protos.NodeChainState
 	//nodeHeaderHashWithTimestamp *NodeHeaderHashWithTimestamp
-	addPeerToPeerList        chan *PeerIPWithPLData
-	blockAndPeerChan         chan *BlockAndPeer
-	mrDataConn               chan *MRDataConn
-	registerAndBroadcastChan chan *messages.RegisterMessage
+	addPeerToPeerList           chan *PeerIPWithPLData
+	blockAndPeerChan            chan *BlockAndPeer
+	mrDataConn                  chan *MRDataConn
+	registerAndBroadcastChan    chan *messages.RegisterMessage
 	blockReceivedForAttestation chan *block.Block
 	attestationReceivedForBlock chan *transactions.Attest
-	ebhRespInfo              *EBHRespInfo // TODO: Add Lock before reading / writing
+	ebhRespInfo                 *EBHRespInfo // TODO: Add Lock before reading / writing
 
 	inCounter           uint64
 	outCounter          uint64
@@ -76,6 +77,8 @@ type Peer struct {
 	epochToBeRequested uint64 // Used by downloader to keep track of EBH request
 
 	isPLShared bool // Flag to mark once peer list has been received by the peer
+	ip         string
+	publicPort string
 }
 
 func newPeer(conn *net.Conn, inbound bool, chain *chain.Chain,
@@ -109,12 +112,18 @@ func newPeer(conn *net.Conn, inbound bool, chain *chain.Chain,
 		outgoingQueue:               &PriorityQueue{},
 	}
 	p.id = p.conn.RemoteAddr().String()
+	ip, _, _ := net.SplitHostPort(p.id)
+	p.ip = ip
 	log.Info("New Peer connected ", p.conn.RemoteAddr().String())
 	return p
 }
 
 func (p *Peer) ID() string {
 	return p.id
+}
+
+func (p *Peer) IP() string {
+	return p.ip
 }
 
 func (p *Peer) ChainState() *protos.NodeChainState {
@@ -423,6 +432,7 @@ func (p *Peer) handle(msg *Msg) error {
 			log.Error("Failed to SplitHostPort for ", p.ID())
 			return nil
 		}
+		p.publicPort = strconv.FormatUint(uint64(msg.msg.GetPlData().PublicPort), 10)
 		p.isPLShared = true
 		p.addPeerToPeerList <- &PeerIPWithPLData{peerIP, msg.msg.GetPlData()}
 

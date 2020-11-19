@@ -353,6 +353,14 @@ running:
 			}
 			ip, _, _ := net.SplitHostPort(pd.conn.RemoteAddr().String())
 			srv.ipCount[ip] -= 1
+			if pd.isPLShared {
+				err := srv.peerData.AddDisconnectedPeers(pd.IP(), pd.publicPort)
+				if err != nil {
+					log.Error("Failed to add peer into disconnected peers",
+						" ", pd.IP(), ":", pd.publicPort,
+						" Reason: ", err.Error())
+				}
+			}
 			srv.peerInfoLock.Unlock()
 
 			srv.downloader.RemovePeer(peer)
