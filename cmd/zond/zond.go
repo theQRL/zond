@@ -25,8 +25,12 @@ func ConfigCheck() bool {
 	return true
 }
 
-func run(c *chain.Chain, db *db.DB) {
-	srv := p2p.NewServer(c)
+func run(c *chain.Chain, db *db.DB) error {
+	srv, err := p2p.NewServer(c)
+	if err != nil {
+		log.Error("Failed to initialize server")
+		return err
+	}
 	go srv.Start()
 	defer srv.Stop()
 
@@ -43,6 +47,8 @@ func run(c *chain.Chain, db *db.DB) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
+
+	return nil
 }
 
 func CreateDirectoryIfNotExists(dir string) error {
@@ -114,7 +120,10 @@ func main() {
 		return
 	}
 	log.Info("Main Chain Loaded Successfully")
-	run(c, s.DB())
+	err = run(c, s.DB())
+	if err != nil {
+		log.Error("Initialization Error ", err.Error())
+	}
 
 	/*
 	1. Peer Tries to Connect 10 peer ips 10 with a delay of 10 seconds until max peer limit is reached
