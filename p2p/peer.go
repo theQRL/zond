@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"github.com/theQRL/zond/bazel-zond/external/go_sdk/src/strconv"
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/chain/block"
 	"github.com/theQRL/zond/chain/transactions"
@@ -18,6 +17,7 @@ import (
 	"io"
 	"net"
 	"reflect"
+	"strconv"
 	"sync"
 	"time"
 )
