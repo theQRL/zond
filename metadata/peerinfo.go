@@ -1,7 +1,7 @@
 package metadata
 
 import (
-	"fmt"
+	"github.com/theQRL/zond/bazel-zond/external/go_sdk/src/net"
 	"github.com/theQRL/zond/protos"
 )
 
@@ -13,7 +13,7 @@ func (p *PeerInfo) IP() string {
 	return p.pbData.Ip
 }
 
-func (p *PeerInfo) Port() uint32 {
+func (p *PeerInfo) Port() string {
 	return p.pbData.Port
 }
 
@@ -22,14 +22,14 @@ func (p *PeerInfo) Timestamp() uint64 {
 }
 
 func (p *PeerInfo) IPPort() string {
-	return fmt.Sprintf("%s:%d", p.IP(), p.Port())
+	return net.JoinHostPort(p.IP(), p.Port())
 }
 
 func (p *PeerInfo) IsSame(p1 *PeerInfo) bool {
 	return p.IP() == p1.IP() && p.Port() == p1.Port()
 }
 
-func NewPeerInfo(ip string, port uint32, timestamp uint64) *PeerInfo {
+func NewPeerInfo(ip string, port string, timestamp uint64) *PeerInfo {
 	return &PeerInfo{
 		pbData: &protos.PeerInfo{
 			Ip: ip,

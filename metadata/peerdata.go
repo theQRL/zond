@@ -27,7 +27,7 @@ func (p *PeerData) DisconnectedPeers() []*PeerInfo {
 	return p.disconnectedPeers
 }
 
-func (p *PeerData) FindIndex(peerInfo *PeerInfo,
+func (p *PeerData) findIndex(peerInfo *PeerInfo,
 	peerList []*PeerInfo) int {
 	for i, pI := range peerList {
 		if peerInfo.IsSame(pI) {
@@ -37,8 +37,25 @@ func (p *PeerData) FindIndex(peerInfo *PeerInfo,
 	return -1
 }
 
+func (p *PeerData) IsPeerInList(ip string, port string) bool {
+	/*
+	Check if Peer IP and Port is already added either
+	into connected peer list or disconnected peer list
+	 */
+	peerInfo := NewPeerInfo(ip, port, 0)
+	index := p.findIndex(peerInfo, p.connectedPeers)
+	if index != -1 {
+		return true
+	}
+	index = p.findIndex(peerInfo, p.disconnectedPeers)
+	if index != -1 {
+		return true
+	}
+	return false
+}
+
 func (p *PeerData) removeConnectedPeers(peerInfo *PeerInfo) {
-	index := p.FindIndex(peerInfo, p.connectedPeers)
+	index := p.findIndex(peerInfo, p.connectedPeers)
 	if index != -1 {
 		return
 	}
@@ -47,7 +64,7 @@ func (p *PeerData) removeConnectedPeers(peerInfo *PeerInfo) {
 }
 
 func (p *PeerData) removeDisconnectedPeers(peerInfo *PeerInfo) {
-	index := p.FindIndex(peerInfo, p.disconnectedPeers)
+	index := p.findIndex(peerInfo, p.disconnectedPeers)
 	if index != -1 {
 		return
 	}
@@ -55,11 +72,11 @@ func (p *PeerData) removeDisconnectedPeers(peerInfo *PeerInfo) {
 		p.disconnectedPeers[index+1:]...)
 }
 
-func (p *PeerData) AddConnectedPeers(ip string, port uint32) error {
+func (p *PeerData) AddConnectedPeers(ip string, port string) error {
 	timestamp := ntp.GetNTP().Time()
 	peerInfo := NewPeerInfo(ip, port, timestamp)
 
-	index := p.FindIndex(peerInfo, p.connectedPeers)
+	index := p.findIndex(peerInfo, p.connectedPeers)
 	if index == -1 {
 		p.connectedPeers = append(p.connectedPeers, peerInfo)
 	}
@@ -72,11 +89,11 @@ func (p *PeerData) AddConnectedPeers(ip string, port uint32) error {
 	return nil
 }
 
-func (p *PeerData) AddDisconnectedPeers(ip string, port uint32) error {
+func (p *PeerData) AddDisconnectedPeers(ip string, port string) error {
 	timestamp := ntp.GetNTP().Time()
 	peerInfo := NewPeerInfo(ip, port, timestamp)
 
-	index := p.FindIndex(peerInfo, p.disconnectedPeers)
+	index := p.findIndex(peerInfo, p.disconnectedPeers)
 	if index == -1 {
 		p.disconnectedPeers = append([]*PeerInfo{peerInfo},
 		p.disconnectedPeers...)
@@ -90,7 +107,7 @@ func (p *PeerData) AddDisconnectedPeers(ip string, port uint32) error {
 	return nil
 }
 
-func (p *PeerData) RemovePeer(ip string, port uint32) error {
+func (p *PeerData) RemovePeer(ip string, port string) error {
 	timestamp := ntp.GetNTP().Time()
 	peerInfo := NewPeerInfo(ip, port, timestamp)
 
@@ -149,17 +166,38 @@ func (p *PeerData) Load() error {
 		return err
 	}
 
-	return json.Unmarshal(jsonData, p.pbData)
+	err = json.Unmarshal(jsonData, p.pbData)
+	if err != nil {
+		log.Error("Error deserializing PeerData ", err.Error())
+		return err
+	}
+
+	p.pbData.DisconnectedPeers = append(p.pbData.ConnectedPeers,
+		p.pbData.DisconnectedPeers...)
+	p.pbData.ConnectedPeers = make([]*protos.PeerInfo, 0)
+
+	for _, peerInfoPBData := range p.pbData.DisconnectedPeers {
+		p1 := NewPeerInfo(peerInfoPBData.Ip, peerInfoPBData.Port, peerInfoPBData.Timestamp)
+		p.disconnectedPeers = append(p.disconnectedPeers, p1)
+	}
+
+	return nil
 }
 
 func NewPeerData() (*PeerData, error) {
-	p := &PeerData{}
+	p := &PeerData{
+		connectedPeers: make([]*PeerInfo, 0),
+		disconnectedPeers: make([]*PeerInfo, 0),
+	}
 	err := p.Load()
 	if err != nil {
 		log.Error("Failed to load PeerData ", err.Error())
 		return nil, err
 	}
 	return &PeerData {
-		pbData: &protos.PeerData{},
+		pbData: &protos.PeerData{
+			ConnectedPeers: make([]*protos.PeerInfo, 0),
+			DisconnectedPeers: make([]*protos.PeerInfo, 0),
+		},
 	}, nil
 }
