@@ -57,7 +57,7 @@ type Peer struct {
 	ntp                   ntp.NTPInterface
 	chainState            *protos.NodeChainState
 	//nodeHeaderHashWithTimestamp *NodeHeaderHashWithTimestamp
-	addPeerToPeerList        chan *protos.PLData
+	addPeerToPeerList        chan *PeerIPWithPLData
 	blockAndPeerChan         chan *BlockAndPeer
 	mrDataConn               chan *MRDataConn
 	registerAndBroadcastChan chan *messages.RegisterMessage
@@ -83,7 +83,7 @@ func newPeer(conn *net.Conn, inbound bool, chain *chain.Chain,
 	registerAndBroadcastChan chan *messages.RegisterMessage,
 	blockReceivedForAttestation chan *block.Block,
 	attestationReceivedForBlock chan *transactions.Attest,
-	addPeerToPeerList chan *protos.PLData,
+	addPeerToPeerList chan *PeerIPWithPLData,
 	blockAndPeerChan chan *BlockAndPeer,
 	messagePriority map[protos.LegacyMessage_FuncName]uint64) *Peer {
 	p := &Peer{
@@ -418,8 +418,13 @@ func (p *Peer) handle(msg *Msg) error {
 			log.Debug("Peer list already shared before")
 			return nil
 		}
+		peerIP, _, err := net.SplitHostPort(p.conn.RemoteAddr().String())
+		if err != nil {
+			log.Error("Failed to SplitHostPort for ", p.ID())
+			return nil
+		}
 		p.isPLShared = true
-		p.addPeerToPeerList <- msg.msg.GetPlData()
+		p.addPeerToPeerList <- &PeerIPWithPLData{peerIP, msg.msg.GetPlData()}
 
 	case protos.LegacyMessage_PONG:
 		log.Debug("Received PONG MSG")
@@ -752,7 +757,7 @@ func (p *Peer) SendPeerList() {
 	out := &Msg{}
 	plData := &protos.PLData{
 		PeerIps:[]string{},
-		PublicPort:19000,
+		PublicPort:uint32(config.GetUserConfig().Node.PublicPort),
 	}
 	out.msg = &protos.LegacyMessage{
 		FuncName: protos.LegacyMessage_PL,

@@ -8,6 +8,7 @@ import (
 	"github.com/theQRL/zond/chain/block"
 	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/config"
+	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/p2p/messages"
@@ -40,12 +41,18 @@ type PeersInfo struct {
 	PeersInfo []PeerInfo `json:"PeersInfo"`
 }
 
+type PeerIPWithPLData struct {
+	IP     string
+	PLData *protos.PLData
+}
+
 type Server struct {
 	config *config.Config
 
 	chain        *chain.Chain
 	ntp          ntp.NTPInterface
-	peersInfo    *PeersInfo
+	//peersInfo    *PeersInfo
+	peerData     *metadata.PeerData
 	ipCount      map[string]int
 	inboundCount uint16
 
@@ -59,7 +66,7 @@ type Server struct {
 	exit                        chan struct{}
 	connectPeersExit            chan struct{}
 	mrDataConn                  chan *MRDataConn
-	addPeerToPeerList           chan *protos.PLData
+	addPeerToPeerList           chan *PeerIPWithPLData
 	blockAndPeerChan            chan *BlockAndPeer
 	addPeer                     chan *conn
 	delPeer                     chan *peerDrop
@@ -232,23 +239,22 @@ func (srv *Server) ConnectPeers() error {
 
 			maxConnectionTry := 10
 			peerList := make([]string, 0)
-			removePeerList := make([]string, 0)
 
 			count := 0
 
-			for _, p := range srv.peersInfo.PeersInfo {
+			for _, p := range srv.peerData.DisconnectedPeers() {
 
 				if count > maxConnectionTry {
 					break
 				}
 
-				if _, ok := srv.ipCount[p.IP]; ok {
+				if _, ok := srv.ipCount[p.IP()]; ok {
 					continue
 				}
 
 				count += 1
-				peerList = append(peerList, net.JoinHostPort(p.IP, strconv.FormatInt(int64(p.Port), 10)))
-				p.LastConnectionTimestamp = srv.ntp.Time()
+				peerList = append(peerList, p.IPPort())
+				//p.LastConnectionTimestamp = srv.ntp.Time()
 			}
 			srv.peerInfoLock.Unlock()
 
@@ -260,25 +266,10 @@ func (srv *Server) ConnectPeers() error {
 					"Peer", ipPort)
 				err := srv.ConnectPeer(ipPort)
 				if err != nil {
-					removePeerList = append(removePeerList, ipPort)
+					log.Info("Failed to connect to ", ipPort)
 				}
 			}
 
-			srv.peerInfoLock.Lock()
-			for _, ipPort := range removePeerList {
-				ip, port, _ := net.SplitHostPort(ipPort)
-				var index int
-				for i, p := range srv.peersInfo.PeersInfo {
-					if p.IP == ip && strconv.FormatInt(int64(p.Port), 10) == port {
-						index = i
-						break
-					}
-				}
-				srv.peersInfo.PeersInfo = append(srv.peersInfo.PeersInfo[:index], srv.peersInfo.PeersInfo[index+1:]...)
-			}
-
-			srv.WritePeerList()
-			srv.peerInfoLock.Unlock()
 		case <-srv.connectPeersExit:
 			return nil
 		}
@@ -319,7 +310,8 @@ running:
 		case c := <-srv.addPeer:
 			srv.peerInfoLock.Lock()
 
-			log.Debug("Adding peer", "addr", c.fd.RemoteAddr())
+			log.Debug("Adding peer",
+				" addr ", c.fd.RemoteAddr())
 			p := newPeer(
 				&c.fd,
 				c.inbound,
@@ -341,6 +333,7 @@ running:
 			if p.inbound {
 				srv.inboundCount++
 			}
+			
 			if srv.ipCount[ip] > srv.config.User.Node.MaxRedundantConnections {
 				p.Disconnect()
 				// TODO: Ban peer
@@ -549,14 +542,6 @@ func (srv *Server) RequestFullMessage(mrData *protos.MRData) {
 	}
 }
 
-func (srv *Server) LoadPeerList() {
-
-}
-
-func (srv *Server) WritePeerList() error {
-	return nil
-}
-
 func (srv *Server) BlockReceived(peer *Peer, b *block.Block) {
 	headerHash := misc.Bin2HStr(b.HeaderHash())
 	log.Info(">>> Received Block",
@@ -573,7 +558,48 @@ func (srv *Server) BlockReceived(peer *Peer, b *block.Block) {
 	}
 }
 
-func (srv *Server) UpdatePeerList(pl *protos.PLData) error {
+func (srv *Server) UpdatePeerList(p *PeerIPWithPLData) error {
+	peerIP := p.IP
+	peerPort := p.PLData.PublicPort
+	if !(peerPort > 0 && peerPort < 65536) {
+		log.Warn("Invalid PublicPort ", peerPort, " shared by ", peerIP)
+		return nil
+	}
+	err := srv.peerData.AddConnectedPeers(peerIP, strconv.FormatUint(uint64(peerPort), 10))
+	if err != nil {
+		log.Error("Failed to Add Peer into peer list",
+			" ", peerIP, ":", peerPort,
+			" Reason: ", err.Error())
+		return err
+	}
+	for _, peerIPPort := range p.PLData.PeerIps {
+		peerIP, peerPort, err := net.SplitHostPort(peerIPPort)
+		if err != nil {
+			log.Error("Failed to SplitHostPort ", peerIPPort,
+				" provided by ", p.IP)
+			continue
+		}
+		intPeerPort, err := strconv.ParseUint(peerPort, 10, 32)
+		if err != nil {
+			log.Error("Failed to parse PeerPort ", peerPort,
+				" shared by ", p.IP,
+				" Reason: ", err.Error())
+			return err
+		}
+		if !(intPeerPort > 0 && intPeerPort < 65536) {
+			log.Warn("Invalid PublicPort ", intPeerPort, " shared by ", p.IP)
+			return nil
+		}
+		if srv.peerData.IsPeerInList(peerIP, peerPort) {
+			continue
+		}
+		err = srv.peerData.AddDisconnectedPeers(peerIP, peerPort)
+		if err != nil {
+			log.Error("Failed to add peer ", peerIP, ":", peerPort, " in peer list",
+				" Reason: ", err.Error())
+			continue
+		}
+	}
 	return nil
 }
 
@@ -583,12 +609,16 @@ func (srv *Server) runPeer(p *Peer) {
 	srv.delPeer <- &peerDrop{p, nil, remoteRequested}
 }
 
-func NewServer(chain *chain.Chain) *Server {
+func NewServer(chain *chain.Chain) (*Server, error) {
+	peerData, err := metadata.NewPeerData()
+	if err != nil {
+		return nil, err
+	}
 	srv := &Server{
 		config: config.GetConfig(),
 		chain: chain,
 		ntp: ntp.GetNTP(),
-		peersInfo: &PeersInfo{},
+		peerData: peerData,
 		ipCount: make(map[string]int),
 		mr: CreateMR(),
 		downloader: NewDownloader(chain),
@@ -596,7 +626,7 @@ func NewServer(chain *chain.Chain) *Server {
 		exit: make(chan struct{}),
 		connectPeersExit: make(chan struct{}),
 		mrDataConn: make(chan *MRDataConn),
-		addPeerToPeerList: make(chan *protos.PLData),
+		addPeerToPeerList: make(chan *PeerIPWithPLData),
 		blockAndPeerChan: make(chan *BlockAndPeer),
 		addPeer: make(chan *conn),
 		delPeer: make(chan *peerDrop),
@@ -629,5 +659,5 @@ func NewServer(chain *chain.Chain) *Server {
 	srv.messagePriority[protos.LegacyMessage_EBHRESP] = 0
 	srv.messagePriority[protos.LegacyMessage_P2P_ACK] = 0
 
-	return srv
+	return srv, nil
 }
