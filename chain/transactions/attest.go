@@ -79,6 +79,17 @@ func (tx *Attest) SetAffectedAddress(stateContext *state.StateContext) error {
 		return err
 	}
 
+	err = stateContext.PrepareValidatorsToXMSSAddress(tx.PK())
+	if err != nil {
+		return err
+	}
+
+	xmssAddress := stateContext.GetXMSSAddressByDilithiumPK(tx.PK())
+	err = stateContext.PrepareAddressState(misc.Bin2HStr(xmssAddress))
+	if err != nil {
+		return err
+	}
+
 	return err
 }
 

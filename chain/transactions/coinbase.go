@@ -221,17 +221,16 @@ func (tx *CoinBase) SetAffectedAddress(stateContext *state.StateContext) error {
 	//	return err
 	//}
 
-	err = stateContext.PrepareAddressState(misc.Bin2HStr(tx.PK()))
+	err = stateContext.PrepareValidatorsToXMSSAddress(tx.PK())
 	if err != nil {
 		return err
 	}
 
-	//for _, attestor := range tx.Attestors() {
-	//	err = stateContext.PrepareAddressState(misc.Bin2HStr(attestor))
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
+	xmssAddress := stateContext.GetXMSSAddressByDilithiumPK(tx.PK())
+	err = stateContext.PrepareAddressState(misc.Bin2HStr(xmssAddress))
+	if err != nil {
+		return err
+	}
 
 	return err
 }

@@ -190,8 +190,8 @@ func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error 
 	epochMetaData := metadata.NewEpochMetaData(0, b.ParentHeaderHash(), make([][]byte, 0))
 
 	stateContext, err := state.NewStateContext(db, blockHeader.SlotNumber, blockProposerDilithiumPK,
-		blockHeader.ParentHeaderHash, blockHeaderHash, b.PartialBlockSigningHash(),
-		b.BlockSigningHash(), epochMetaData)
+		blockHeader.ParentHeaderHash, blockHeader.ParentHeaderHash, blockHeaderHash,
+		b.PartialBlockSigningHash(), b.BlockSigningHash(), epochMetaData)
 	if err != nil {
 		return err
 	}
@@ -324,35 +324,8 @@ func (b *Block) Commit(db *db.DB, finalizedHeaderHash []byte, isFinalizedState b
 
 	blockProposerDilithiumPK := b.ProtocolTransactions()[0].GetPk()
 	stateContext, err := state.NewStateContext(db, blockHeader.SlotNumber, blockProposerDilithiumPK,
-		blockHeader.ParentHeaderHash, blockHeaderHash, b.PartialBlockSigningHash(),
-		b.BlockSigningHash(), epochMetaData)
-
-	if err != nil {
-		return err
-	}
-
-	validatorsToXMSSAddress := stateContext.ValidatorsToXMSSAddress()
-	for i := 1; i < len(b.ProtocolTransactions()); i++ {
-		pbData := b.ProtocolTransactions()[i]
-		// Get XMSS Address based on Dilithium PK
-		xmssAddress, err := metadata.GetXMSSAddressFromDilithiumPK(db, pbData.GetPk(),
-			parentHeaderHash, finalizedHeaderHash)
-		if err != nil {
-			return err
-		}
-		validatorsToXMSSAddress[misc.Bin2HStr(pbData.GetPk())] = xmssAddress
-		if err := stateContext.PrepareAddressState(misc.Bin2HStr(xmssAddress)); err != nil {
-			return err
-		}
-	}
-
-	// Get XMSS Address based on Dilithium PK
-	blockProposerXMSSAddress, err := metadata.GetXMSSAddressFromDilithiumPK(db,
-		blockProposerDilithiumPK, parentHeaderHash, finalizedHeaderHash)
-	validatorsToXMSSAddress[misc.Bin2HStr(blockProposerDilithiumPK)] = blockProposerXMSSAddress
-	if err := stateContext.PrepareAddressState(misc.Bin2HStr(blockProposerXMSSAddress)); err != nil {
-		return err
-	}
+		finalizedHeaderHash, blockHeader.ParentHeaderHash, blockHeaderHash,
+		b.PartialBlockSigningHash(), b.BlockSigningHash(), epochMetaData)
 
 	if err != nil {
 		return err

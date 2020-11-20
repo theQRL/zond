@@ -342,9 +342,15 @@ running:
 				log.Error("Error getting epochMetaData")
 				continue
 			}
+			finalizedHeaderHash, err := p.chain.GetFinalizedHeaderHash()
+			if err != nil {
+				log.Error("[POS] Failed to GetFinalizedHeaderHash ", err.Error())
+				continue
+			}
 			partialBlockSigningHash := p.blockBeingAttested.PartialBlockSigningHash()
 			sc, err := state.NewStateContext(p.db, p.blockBeingAttested.SlotNumber(),
 				p.blockBeingAttested.ProtocolTransactions()[0].Pk,
+				finalizedHeaderHash,
 				p.blockBeingAttested.ParentHeaderHash(),
 				p.blockBeingAttested.HeaderHash(),
 				partialBlockSigningHash,
