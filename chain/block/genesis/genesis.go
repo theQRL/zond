@@ -5,6 +5,7 @@ import (
 	"github.com/golang/protobuf/jsonpb"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/address"
+	"github.com/theQRL/zond/bazel-zond/external/go_sdk/src/math/big"
 	"github.com/theQRL/zond/chain/block"
 	"github.com/theQRL/zond/chain/block/genesis/devnet"
 	"github.com/theQRL/zond/db"
@@ -31,7 +32,9 @@ func LoadPreState() (*protos.PreState, error) {
 func ProcessPreState(preState *protos.PreState, b *block.Block, db *db.DB) error {
 	m := metadata.NewMainChainMetaData(nil, 0,
 		nil, 0)
-	bm := metadata.NewBlockMetaData(nil, b.ParentHeaderHash(), 0)
+	totalStakeAmount, _ := big.NewInt(0).MarshalText()
+	bm := metadata.NewBlockMetaData(nil,
+		b.ParentHeaderHash(), 0,totalStakeAmount)
 	err := db.DB().Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte("DB"))
 		if err := m.Commit(b); err != nil {
