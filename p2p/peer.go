@@ -9,6 +9,7 @@ import (
 	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/chain/transactions/pool"
 	"github.com/theQRL/zond/config"
+	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/p2p/messages"
@@ -57,7 +58,8 @@ type Peer struct {
 	config                *config.Config
 	ntp                   ntp.NTPInterface
 	chainState            *protos.NodeChainState
-	//nodeHeaderHashWithTimestamp *NodeHeaderHashWithTimestamp
+	peerData			  *metadata.PeerData
+
 	addPeerToPeerList           chan *PeerIPWithPLData
 	blockAndPeerChan            chan *BlockAndPeer
 	mrDataConn                  chan *MRDataConn
@@ -82,7 +84,8 @@ type Peer struct {
 }
 
 func newPeer(conn *net.Conn, inbound bool, chain *chain.Chain,
-	filter *bloom.BloomFilter, mr *MessageReceipt, mrDataConn chan *MRDataConn,
+	filter *bloom.BloomFilter, mr *MessageReceipt,
+	peerData *metadata.PeerData, mrDataConn chan *MRDataConn,
 	registerAndBroadcastChan chan *messages.RegisterMessage,
 	blockReceivedForAttestation chan *block.Block,
 	attestationReceivedForBlock chan *transactions.Attest,
@@ -101,6 +104,7 @@ func newPeer(conn *net.Conn, inbound bool, chain *chain.Chain,
 		mr:                          mr,
 		config:                      config.GetConfig(),
 		ntp:                         ntp.GetNTP(),
+		peerData:					 peerData,
 		mrDataConn:                  mrDataConn,
 		registerAndBroadcastChan:    registerAndBroadcastChan,
 		blockReceivedForAttestation: blockReceivedForAttestation,
@@ -764,10 +768,11 @@ func (p *Peer) SendFetchBlock(blockHeaderHash []byte) error {
 }
 
 func (p *Peer) SendPeerList() {
+	peerList := p.peerData.PeerList()
 	out := &Msg{}
 	plData := &protos.PLData{
-		PeerIps:[]string{},
-		PublicPort:uint32(config.GetUserConfig().Node.PublicPort),
+		PeerIps: peerList,
+		PublicPort: uint32(config.GetUserConfig().Node.PublicPort),
 	}
 	out.msg = &protos.LegacyMessage{
 		FuncName: protos.LegacyMessage_PL,

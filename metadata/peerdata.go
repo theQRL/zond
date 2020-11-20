@@ -10,13 +10,16 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"sync"
 )
 
 type PeerData struct {
 	pbData *protos.PeerData
 
-	connectedPeers []*PeerInfo
+	connectedPeers    []*PeerInfo
 	disconnectedPeers []*PeerInfo
+
+	lock sync.Mutex
 }
 
 func (p *PeerData) ConnectedPeers() []*PeerInfo {
@@ -37,11 +40,30 @@ func (p *PeerData) findIndex(peerInfo *PeerInfo,
 	return -1
 }
 
+func (p *PeerData) PeerList() []string {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	var peerList []string
+
+	for _, peerInfo := range p.connectedPeers {
+		peerList = append(peerList, peerInfo.IPPort())
+	}
+
+	for _, peerInfo := range p.disconnectedPeers {
+		peerList = append(peerList, peerInfo.IPPort())
+	}
+
+	return peerList
+}
+
 func (p *PeerData) IsPeerInList(ip string, port string) bool {
 	/*
 	Check if Peer IP and Port is already added either
 	into connected peer list or disconnected peer list
 	 */
+	p.lock.Lock()
+	defer p.lock.Unlock()
 	peerInfo := NewPeerInfo(ip, port, 0)
 	index := p.findIndex(peerInfo, p.connectedPeers)
 	if index != -1 {
@@ -73,6 +95,9 @@ func (p *PeerData) removeDisconnectedPeers(peerInfo *PeerInfo) {
 }
 
 func (p *PeerData) AddConnectedPeers(ip string, port string) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
 	timestamp := ntp.GetNTP().Time()
 	peerInfo := NewPeerInfo(ip, port, timestamp)
 
@@ -90,6 +115,9 @@ func (p *PeerData) AddConnectedPeers(ip string, port string) error {
 }
 
 func (p *PeerData) AddDisconnectedPeers(ip string, port string) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
 	timestamp := ntp.GetNTP().Time()
 	peerInfo := NewPeerInfo(ip, port, timestamp)
 
@@ -108,6 +136,9 @@ func (p *PeerData) AddDisconnectedPeers(ip string, port string) error {
 }
 
 func (p *PeerData) RemovePeer(ip string, port string) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
 	timestamp := ntp.GetNTP().Time()
 	peerInfo := NewPeerInfo(ip, port, timestamp)
 

@@ -311,6 +311,7 @@ running:
 				srv.chain,
 				srv.filter,
 				srv.mr,
+				srv.peerData,
 				srv.mrDataConn,
 				srv.registerAndBroadcastChan,
 				srv.blockReceivedForAttestation,
