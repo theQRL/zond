@@ -256,18 +256,32 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 	var parentBlockMetaData *metadata.BlockMetaData
 	var err error
 	totalStakeAmount := big.NewInt(0)
+	lastBlockTotalStakeAmount := big.NewInt(0)
 
 	if s.slotNumber != 0 {
 		parentBlockMetaData, err = metadata.GetBlockMetaData(s.db, s.parentBlockHeaderHash)
 		if  err != nil {
-			log.Error("Failed to load Parent BlockMetaData")
+			log.Error("[Commit] Failed to load Parent BlockMetaData")
 			return err
 		}
 		parentBlockMetaData.AddChildHeaderHash(s.blockHeaderHash)
 
 		err = totalStakeAmount.UnmarshalText(parentBlockMetaData.TotalStakeAmount())
 		if err != nil {
-			log.Error("Unable to unmarshal total stake amount of parent block metadata")
+			log.Error("[Commit] Unable to unmarshal total stake amount of parent block metadata")
+			return err
+		}
+
+		lastBlockMetaData, err := metadata.GetBlockMetaData(s.db, s.mainChainMetaData.LastBlockHeaderHash())
+		if err != nil {
+			log.Error("[Commit] Failed to load last block meta data ",
+				misc.Bin2HStr(s.mainChainMetaData.LastBlockHeaderHash()))
+			return err
+		}
+		err = lastBlockTotalStakeAmount.UnmarshalText(lastBlockMetaData.TotalStakeAmount())
+		if err != nil {
+			log.Error("[Commit] Unable to Unmarshal Text for lastblockmetadata total stake amount ",
+				misc.Bin2HStr(s.mainChainMetaData.LastBlockHeaderHash()))
 			return err
 		}
 	}
@@ -277,59 +291,46 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 	totalStakeAmount.Add(totalStakeAmount, currentBlockStakeAmount)
 	bytesTotalStakeAmount, err := totalStakeAmount.MarshalText()
 	if err != nil {
-		log.Error("Unable to marshal total stake amount")
+		log.Error("[Commit] Unable to marshal total stake amount")
 		return err
 	}
 
-	lastBlockMetaData, err := metadata.GetBlockMetaData(s.db, s.mainChainMetaData.LastBlockHeaderHash())
-	if err != nil {
-		log.Error("Failed to load last block meta data ",
-			misc.Bin2HStr(s.mainChainMetaData.LastBlockHeaderHash()))
-		return err
-	}
-	lastBlockTotalStakeAmount := big.NewInt(0)
-	err = lastBlockTotalStakeAmount.UnmarshalText(lastBlockMetaData.TotalStakeAmount())
-	if err != nil {
-		log.Error("Unable to Unmarshal Text for lastblockmetadata total stake amount ",
-			misc.Bin2HStr(s.mainChainMetaData.LastBlockHeaderHash()))
-		return err
-	}
 	blockMetaData := metadata.NewBlockMetaData(s.parentBlockHeaderHash, s.blockHeaderHash,
 		s.slotNumber, bytesTotalStakeAmount)
 	return s.db.DB().Update(func(tx *bbolt.Tx) error {
 		var err error
 		b := tx.Bucket([]byte("DB"))
 		if err := blockMetaData.Commit(b); err != nil {
-			log.Error("Failed to commit BlockMetaData")
+			log.Error("[Commit] Failed to commit BlockMetaData")
 			return err
 		}
 		err = s.epochBlockHashes.AddHeaderHashBySlotNumber(s.blockHeaderHash, s.slotNumber)
 		if err != nil {
-			log.Error("Failed to Add HeaderHash into EpochBlockHashes")
+			log.Error("[Commit] Failed to Add HeaderHash into EpochBlockHashes")
 			return err
 		}
 		if err:= s.epochBlockHashes.Commit(b); err != nil {
-			log.Error("Failed to commit EpochBlockHashes")
+			log.Error("[Commit] Failed to commit EpochBlockHashes")
 			return err
 		}
 
 		if s.slotNumber != 0 {
 			if err := parentBlockMetaData.Commit(b); err != nil {
-				log.Error("Failed to commit ParentBlockMetaData")
+				log.Error("[Commit] Failed to commit ParentBlockMetaData")
 				return err
 			}
 		}
 
 		if s.slotNumber == 0 || blockMetaData.Epoch() != parentBlockMetaData.Epoch() {
 			if err := s.epochMetaData.Commit(b); err != nil {
-				log.Error("Failed to commit EpochMetaData")
+				log.Error("[Commit] Failed to commit EpochMetaData")
 				return err
 			}
 		}
 
 		err = b.Put(blockStorageKey, bytesBlock)
 		if err != nil {
-			log.Error("Failed to commit block")
+			log.Error("[Commit] Failed to commit block")
 			return err
 		}
 
@@ -338,7 +339,7 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 			s.mainChainMetaData.UpdateFinalizedBlockData(s.blockHeaderHash, s.slotNumber)
 			s.mainChainMetaData.UpdateLastBlockData(s.blockHeaderHash, s.slotNumber)
 			if err := s.mainChainMetaData.Commit(b); err != nil {
-				log.Error("Failed to commit MainChainMetaData")
+				log.Error("[Commit] Failed to commit MainChainMetaData")
 				return err
 			}
 		}
@@ -347,7 +348,7 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 			// Update Main Chain Last Block Data
 			s.mainChainMetaData.UpdateLastBlockData(s.blockHeaderHash, s.slotNumber)
 			if err := s.mainChainMetaData.Commit(b); err != nil {
-				log.Error("Failed to commit MainChainMetaData")
+				log.Error("[Commit] Failed to commit MainChainMetaData")
 				return err
 			}
 		}
@@ -355,33 +356,33 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 		if !isFinalizedState {
 			b, err = tx.CreateBucketIfNotExists(metadata.GetBlockBucketName(s.blockHeaderHash))
 			if err != nil {
-				log.Error("Failed to create bucket")
+				log.Error("[Commit] Failed to create bucket")
 				return err
 			}
 		}
 		for _, addressState := range s.addressesState {
 			if err := addressState.Commit(b); err != nil {
-				log.Error("Failed to commit AddressState")
+				log.Error("[Commit] Failed to commit AddressState")
 				return err
 			}
 		}
 		for _, dilithiumMetaData := range s.dilithiumState {
 			if err := dilithiumMetaData.Commit(b); err != nil {
-				log.Error("Failed to commit DilithiumMetaData")
+				log.Error("[Commit] Failed to commit DilithiumMetaData")
 				return err
 			}
 		}
 
 		for _, slaveMetaData := range s.slaveState {
 			if err := slaveMetaData.Commit(b); err != nil {
-				log.Error("Failed to commit SlaveMetaData")
+				log.Error("[Commit] Failed to commit SlaveMetaData")
 				return err
 			}
 		}
 
 		for _, otsIndexMetaData := range s.otsIndexState {
 			if err := otsIndexMetaData.Commit(b); err != nil {
-				log.Error("Failed to commit OtsIndexMetaData")
+				log.Error("[Commit] Failed to commit OtsIndexMetaData")
 				return err
 			}
 		}
