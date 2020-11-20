@@ -5,13 +5,13 @@ import (
 	"github.com/golang/protobuf/jsonpb"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/address"
-	"github.com/theQRL/zond/bazel-zond/external/go_sdk/src/math/big"
 	"github.com/theQRL/zond/chain/block"
 	"github.com/theQRL/zond/chain/block/genesis/devnet"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/protos"
 	"go.etcd.io/bbolt"
+	"math/big"
 )
 
 func LoadPreState() (*protos.PreState, error) {
