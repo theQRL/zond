@@ -31,16 +31,6 @@ type peerDrop struct {
 	requested bool  // true if signaled by the peer
 }
 
-type PeerInfo struct {
-	IP                      string `json:"IP"`
-	Port                    uint16 `json:"Port"`
-	LastConnectionTimestamp uint64 `json:"LastConnectionTimestamp"`
-}
-
-type PeersInfo struct {
-	PeersInfo []PeerInfo `json:"PeersInfo"`
-}
-
 type PeerIPWithPLData struct {
 	IP     string
 	PLData *protos.PLData
@@ -51,7 +41,6 @@ type Server struct {
 
 	chain        *chain.Chain
 	ntp          ntp.NTPInterface
-	//peersInfo    *PeersInfo
 	peerData     *metadata.PeerData
 	ipCount      map[string]int
 	inboundCount uint16
