@@ -255,6 +255,8 @@ func (s *StateContext) GetOTSIndexState(address string, otsIndex uint64) *metada
 func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinalizedState bool) error {
 	var parentBlockMetaData *metadata.BlockMetaData
 	var err error
+	totalStakeAmount := big.NewInt(0)
+
 	if s.slotNumber != 0 {
 		parentBlockMetaData, err = metadata.GetBlockMetaData(s.db, s.parentBlockHeaderHash)
 		if  err != nil {
@@ -262,14 +264,14 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 			return err
 		}
 		parentBlockMetaData.AddChildHeaderHash(s.blockHeaderHash)
+
+		err = totalStakeAmount.UnmarshalText(parentBlockMetaData.TotalStakeAmount())
+		if err != nil {
+			log.Error("Unable to unmarshal total stake amount of parent block metadata")
+			return err
+		}
 	}
 
-	totalStakeAmount := big.NewInt(0)
-	err = totalStakeAmount.UnmarshalText(parentBlockMetaData.TotalStakeAmount())
-	if err != nil {
-		log.Error("Unable to unmarshal total stake amount of parent block metadata")
-		return err
-	}
 	currentBlockStakeAmount := big.NewInt(0)
 	currentBlockStakeAmount.SetUint64(s.currentBlockTotalStakeAmount)
 	totalStakeAmount.Add(totalStakeAmount, currentBlockStakeAmount)
