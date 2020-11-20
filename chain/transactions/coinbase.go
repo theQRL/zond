@@ -210,6 +210,11 @@ func (tx *CoinBase) SetAffectedAddress(stateContext *state.StateContext) error {
 		return err
 	}
 
+	err = stateContext.PrepareDilithiumMetaData(misc.Bin2HStr(tx.PK()))
+	if err != nil {
+		return err
+	}
+
 	// TODO: PK is dilithium PK and it must be checked if its allowed to stake current block
 	//err = stateContext.PrepareAddressState(misc.Bin2HStr(misc.PK2BinAddress(tx.PK())))
 	//if err != nil {
