@@ -217,6 +217,10 @@ func (p *PeerData) Load() error {
 
 func NewPeerData() (*PeerData, error) {
 	p := &PeerData{
+		pbData: &protos.PeerData{
+			ConnectedPeers: make([]*protos.PeerInfo, 0),
+			DisconnectedPeers: make([]*protos.PeerInfo, 0),
+		},
 		connectedPeers: make([]*PeerInfo, 0),
 		disconnectedPeers: make([]*PeerInfo, 0),
 	}
