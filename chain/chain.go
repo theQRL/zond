@@ -391,8 +391,14 @@ func (c *Chain) GetStateContext() (*state.StateContext, error) {
 		return nil, err
 	}
 
-	return state.NewStateContext(c.state.DB(), lastBlock.SlotNumber(), nil,
-		lastBlock.ParentHeaderHash(), lastBlock.HeaderHash(),
+	finalizedHeaderHash, err := c.GetFinalizedHeaderHash()
+	if err != nil {
+		return nil, err
+	}
+
+	return state.
+		NewStateContext(c.state.DB(), lastBlock.SlotNumber(), nil,
+		finalizedHeaderHash, lastBlock.ParentHeaderHash(), lastBlock.HeaderHash(),
 		lastBlock.PartialBlockSigningHash(), lastBlock.BlockSigningHash(),
 		epochMetaData)
 }
@@ -407,8 +413,13 @@ func (c *Chain) GetStateContext2(slotNumber uint64, blockProposer []byte,
 		return nil, err
 	}
 
+	finalizedHeaderHash, err := c.GetFinalizedHeaderHash()
+	if err != nil {
+		return nil, err
+	}
+
 	return state.NewStateContext(c.state.DB(), slotNumber, blockProposer,
-		parentHeaderHash, nil,
+		finalizedHeaderHash, parentHeaderHash, nil,
 		partialBlockSigningHash, nil,
 		epochMetaData)
 }

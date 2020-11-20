@@ -21,20 +21,21 @@ type StateContext struct {
 	slaveState     map[string]*metadata.SlaveMetaData
 	otsIndexState  map[string]*metadata.OTSIndexMetaData
 
-	slotNumber uint64
-	blockProposer []byte
-	parentBlockHeaderHash []byte
-	blockHeaderHash []byte
-	partialBlockSigningHash []byte
-	blockSigningHash []byte
+	slotNumber                   uint64
+	blockProposer                []byte
+	finalizedHeaderHash          []byte
+	parentBlockHeaderHash        []byte
+	blockHeaderHash              []byte
+	partialBlockSigningHash      []byte
+	blockSigningHash             []byte
 	currentBlockTotalStakeAmount uint64
 
 	validatorsToXMSSAddress map[string][]byte
-	attestorsFlag map[string]bool  // Flag just to mark if attestor has been processed, need not to be stored in state
-	blockProposerFlag bool  // Flag just to mark once block propose has been processed, need not to be stored in state
+	attestorsFlag           map[string]bool // Flag just to mark if attestor has been processed, need not to be stored in state
+	blockProposerFlag       bool            // Flag just to mark once block propose has been processed, need not to be stored in state
 
-	epochMetaData *metadata.EpochMetaData
-	epochBlockHashes *metadata.EpochBlockHashes
+	epochMetaData     *metadata.EpochMetaData
+	epochBlockHashes  *metadata.EpochBlockHashes
 	mainChainMetaData *metadata.MainChainMetaData
 }
 
@@ -70,8 +71,9 @@ func (s *StateContext) ValidatorsToXMSSAddress() map[string][]byte {
 	return s.validatorsToXMSSAddress
 }
 
-func (s *StateContext) processValidatorStakeAmount(dilithiumPK string) error {
-	slotLeaderDilithiumMetaData, ok := s.dilithiumState[dilithiumPK]
+func (s *StateContext) processValidatorStakeAmount(dilithiumPK []byte) error {
+	strKey := misc.Bin2HStr(metadata.GetDilithiumMetaDataKey(dilithiumPK))
+	slotLeaderDilithiumMetaData, ok := s.dilithiumState[strKey]
 	if !ok {
 		return errors.New(fmt.Sprintf("validator dilithium state not found for %s", dilithiumPK))
 	}
@@ -93,7 +95,7 @@ func (s *StateContext) ProcessAttestorsFlag(attestorDilithiumPK []byte) error {
 		return errors.New("attestor already attested for this slot number")
 	}
 
-	err := s.processValidatorStakeAmount(strAttestorDilithiumPK)
+	err := s.processValidatorStakeAmount(attestorDilithiumPK)
 	if err != nil {
 		return err
 	}
@@ -114,7 +116,7 @@ func (s *StateContext) ProcessBlockProposerFlag(blockProposerDilithiumPK []byte)
 		return errors.New("block proposer has already been processed")
 	}
 
-	err := s.processValidatorStakeAmount(misc.Bin2HStr(blockProposerDilithiumPK))
+	err := s.processValidatorStakeAmount(blockProposerDilithiumPK)
 	if err != nil {
 		return err
 	}
@@ -151,6 +153,22 @@ func (s *StateContext) GetAddressState(addr string) (*address.AddressState, erro
 func (s *StateContext) GetAddressStateByPK(pk []byte) (*address.AddressState, error) {
 	addr := misc.Bin2HStr(misc.PK2BinAddress(pk))
 	return s.GetAddressState(addr)
+}
+
+func (s *StateContext) PrepareValidatorsToXMSSAddress(dilithiumPK []byte) error {
+	xmssAddress, err := metadata.GetXMSSAddressFromDilithiumPK(s.db,
+		dilithiumPK, s.parentBlockHeaderHash, s.finalizedHeaderHash)
+	if err != nil {
+		log.Error("Failed to PrepareValidatorsToXMSSAddress for ",
+			misc.Bin2HStr(dilithiumPK))
+		return err
+	}
+	s.validatorsToXMSSAddress[misc.Bin2HStr(dilithiumPK)] = xmssAddress
+	return nil
+}
+
+func (s *StateContext) GetXMSSAddressByDilithiumPK(dilithiumPK []byte) []byte {
+	return s.validatorsToXMSSAddress[misc.Bin2HStr(dilithiumPK)]
 }
 
 func (s *StateContext) PrepareDilithiumMetaData(dilithiumPK string) error {
@@ -444,7 +462,8 @@ func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.Blo
 	})
 }
 
-func NewStateContext(db *db.DB, slotNumber uint64, blockProposer []byte,
+func NewStateContext(db *db.DB, slotNumber uint64,
+	blockProposer []byte, finalizedHeaderHash []byte,
 	parentBlockHeaderHash []byte, blockHeaderHash []byte,
 	partialBlockSigningHash []byte, blockSigningHash []byte,
 	epochMetaData *metadata.EpochMetaData) (*StateContext, error) {
@@ -477,6 +496,7 @@ func NewStateContext(db *db.DB, slotNumber uint64, blockProposer []byte,
 
 		slotNumber: slotNumber,
 		blockProposer: blockProposer,
+		finalizedHeaderHash: finalizedHeaderHash,
 		parentBlockHeaderHash: parentBlockHeaderHash,
 		blockHeaderHash: blockHeaderHash,
 		partialBlockSigningHash: partialBlockSigningHash,
