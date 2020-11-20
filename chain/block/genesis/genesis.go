@@ -11,6 +11,7 @@ import (
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/protos"
 	"go.etcd.io/bbolt"
+	"math/big"
 )
 
 func LoadPreState() (*protos.PreState, error) {
@@ -31,7 +32,9 @@ func LoadPreState() (*protos.PreState, error) {
 func ProcessPreState(preState *protos.PreState, b *block.Block, db *db.DB) error {
 	m := metadata.NewMainChainMetaData(nil, 0,
 		nil, 0)
-	bm := metadata.NewBlockMetaData(nil, b.ParentHeaderHash(), 0)
+	totalStakeAmount, _ := big.NewInt(0).MarshalText()
+	bm := metadata.NewBlockMetaData(nil,
+		b.ParentHeaderHash(), 0,totalStakeAmount)
 	err := db.DB().Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte("DB"))
 		if err := m.Commit(b); err != nil {
