@@ -78,7 +78,7 @@ func (p *PeerData) IsPeerInList(ip string, port string) bool {
 
 func (p *PeerData) removeConnectedPeers(peerInfo *PeerInfo) {
 	index := p.findIndex(peerInfo, p.connectedPeers)
-	if index != -1 {
+	if index == -1 {
 		return
 	}
 	p.connectedPeers = append(p.connectedPeers[:index],
@@ -87,7 +87,7 @@ func (p *PeerData) removeConnectedPeers(peerInfo *PeerInfo) {
 
 func (p *PeerData) removeDisconnectedPeers(peerInfo *PeerInfo) {
 	index := p.findIndex(peerInfo, p.disconnectedPeers)
-	if index != -1 {
+	if index == -1 {
 		return
 	}
 	p.disconnectedPeers = append(p.disconnectedPeers[:index],
