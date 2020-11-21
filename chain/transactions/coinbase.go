@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"github.com/theQRL/zond/chain/rewards"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/crypto/dilithium"
 	"github.com/theQRL/zond/protos"
@@ -91,6 +92,27 @@ func (tx *CoinBase) validateData(stateContext *state.StateContext) bool {
 	if err := stateContext.ProcessBlockProposerFlag(tx.PK()); err != nil {
 		log.Error("Failed to process block proposer ", misc.Bin2HStr(tx.PK()))
 		log.Error("Reason: ", err.Error())
+		return false
+	}
+
+	if tx.BlockProposerReward() != rewards.GetBlockReward() {
+		log.Error("Invalid Block Proposer Reward")
+		log.Error("Expected Reward ", rewards.GetBlockReward())
+		log.Error("Found Reward ", tx.BlockProposerReward())
+		return false
+	}
+
+	if tx.AttestorReward() != rewards.GetAttestorReward() {
+		log.Error("Invalid Attestor Reward")
+		log.Error("Expected Reward ", rewards.GetAttestorReward())
+		log.Error("Found Reward ", tx.AttestorReward())
+		return false
+	}
+
+	if tx.FeeReward() != stateContext.GetTotalTransactionFee() {
+		log.Error("Invalid Fee Reward")
+		log.Error("Expected Reward ", stateContext.GetTotalTransactionFee())
+		log.Error("Found Reward ", tx.FeeReward())
 		return false
 	}
 
@@ -193,6 +215,7 @@ func (tx *CoinBase) ApplyStateChanges(stateContext *state.StateContext) error {
 
 		if validatorDilithiumPK == strBlockProposerDilithiumPK {
 			addressState.AddBalance(tx.BlockProposerReward())
+			addressState.AddBalance(tx.FeeReward())
 		} else {
 			addressState.AddBalance(tx.AttestorReward())
 		}

@@ -37,6 +37,16 @@ type StateContext struct {
 	epochMetaData     *metadata.EpochMetaData
 	epochBlockHashes  *metadata.EpochBlockHashes
 	mainChainMetaData *metadata.MainChainMetaData
+
+	totalTransactionFee uint64
+}
+
+func (s *StateContext) GetTotalTransactionFee() uint64 {
+	return s.totalTransactionFee
+}
+
+func (s *StateContext) AddTransactionFee(fee uint64) {
+	s.totalTransactionFee += fee
 }
 
 func (s *StateContext) GetEpochMetaData() *metadata.EpochMetaData {
