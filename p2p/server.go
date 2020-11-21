@@ -192,7 +192,7 @@ func (srv *Server) listenLoop(listener net.Listener) {
 
 func (srv *Server) ConnectPeer(peer string) error {
 	ip, _, _ := net.SplitHostPort(peer)
-	if _, ok := srv.ipCount[ip]; ok {
+	if count, ok := srv.ipCount[ip]; ok && count > 0 {
 		return nil
 	}
 
@@ -240,8 +240,6 @@ func (srv *Server) ConnectPeers() error {
 
 			maxConnectionTry := 10
 
-			count := 0
-
 			if len(peerList) == 0 {
 				for _, p := range srv.peerData.DisconnectedPeers() {
 					if connCount, ok := srv.ipCount[p.IP()]; ok {
@@ -256,6 +254,7 @@ func (srv *Server) ConnectPeers() error {
 			}
 			srv.peerInfoLock.Unlock()
 
+			count := 0
 			removePeers := make([]string, 0)
 			for _, ipPort := range peerList {
 				if !srv.running {

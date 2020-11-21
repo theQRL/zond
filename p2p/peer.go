@@ -376,7 +376,7 @@ func (p *Peer) monitorChainState() {
 			err = p.Send(out)
 			if err != nil {
 				log.Info("Error while sending ChainState",
-					"peer", p.conn.RemoteAddr().String())
+					p.conn.RemoteAddr().String())
 				p.Disconnect()
 				return
 			}
@@ -644,8 +644,8 @@ func (p *Peer) HandleBlock(pbBlock *protos.Block) {
 	select {
 	case p.registerAndBroadcastChan <- registerMessage:
 	case <-time.After(10*time.Second):
-		log.Warn("[HandleBlock] RegisterAndBroadcastChan Timeout",
-			"Peer", p.ID())
+		log.Warn("[HandleBlock] RegisterAndBroadcastChan Timeout ",
+			p.ID())
 	}
 }
 
@@ -691,8 +691,8 @@ func (p *Peer) HandleTransaction(msg *Msg, txData *protos.Transaction) error {
 	select {
 	case p.registerAndBroadcastChan <- registerMessage:
 	case <-time.After(10*time.Second):
-		log.Warn("[TX] RegisterAndBroadcastChan Timeout",
-			"Peer", p.ID())
+		log.Warn("[TX] RegisterAndBroadcastChan Timeout ",
+			p.ID())
 	}
 	return nil
 }
@@ -738,8 +738,8 @@ func (p *Peer) HandleAttestTransaction(msg *Msg, txData *protos.ProtocolTransact
 	select {
 	case p.registerAndBroadcastChan <- registerMessage:
 	case <-time.After(10 * time.Second):
-		log.Warn("[AT] RegisterAndBroadcastChan Timeout",
-			"Peer", p.ID())
+		log.Warn("[AT] RegisterAndBroadcastChan Timeout ",
+			p.ID())
 	}
 	return nil
 }
@@ -841,8 +841,7 @@ func (p *Peer) close() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	log.Info("Disconnected ",
-		"Peer", p.conn.RemoteAddr().String())
+	log.Info("Disconnected ", p.conn.RemoteAddr().String())
 
 	close(p.exitMonitorChainState)
 	p.conn.Close()
@@ -854,8 +853,7 @@ func (p *Peer) Disconnect() {
 
 	if !p.disconnected {
 		p.disconnected = true
-		log.Info("Disconnecting ",
-			"Peer", p.conn.RemoteAddr().String())
+		log.Info("Disconnecting ", p.conn.RemoteAddr().String())
 		p.disconnectReason <- struct{}{}
 	}
 }
