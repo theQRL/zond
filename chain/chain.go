@@ -326,6 +326,14 @@ func (c *Chain) ValidateTransaction(tx transactions.TransactionInterface) error 
 
 func (c *Chain) AddBlock(b *block.Block) bool {
 	/* TODO: Revise Block Validation */
+	maxSlotNumber := c.GetMaxPossibleSlotNumber()
+	if b.SlotNumber() > maxSlotNumber {
+		log.Error("[AddBlock] Failed to add block as slot number is beyond maximum possible slot number")
+		log.Error("MaxPossibleSlotNumber ", maxSlotNumber)
+		log.Error("Block Slot Number ", b.SlotNumber())
+		return false
+	}
+
 	mainChainMetaData, err := metadata.GetMainChainMetaData(c.state.DB())
 	if err != nil {
 		log.Error("[AddBlock] Failed to Get MainChainMetaData ", err.Error())
