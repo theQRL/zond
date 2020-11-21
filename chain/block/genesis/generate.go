@@ -5,7 +5,6 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/theQRL/zond/chain/block"
 	"github.com/theQRL/zond/config"
-	"github.com/theQRL/zond/crypto/dilithium"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -23,13 +22,13 @@ func GeneratePreState(transactions []*protos.Transaction, outputFile string) err
 		Balance: devConf.Genesis.MaxCoinSupply - devConf.Genesis.SuppliedCoins,
 	}
 
-	xmssAddressBalance := &protos.AddressBalance {
-		Address: devConf.Genesis.FoundationXMSSAddress,
-		Balance: devConf.Genesis.SuppliedCoins,
-	}
+	//xmssAddressBalance := &protos.AddressBalance {
+	//	Address: devConf.Genesis.FoundationXMSSAddress,
+	//	Balance: devConf.Genesis.SuppliedCoins,
+	//}
 
 	preState.AddressBalance = append(preState.AddressBalance, coinBaseAddressBalance)
-	preState.AddressBalance = append(preState.AddressBalance, xmssAddressBalance)
+	//preState.AddressBalance = append(preState.AddressBalance, xmssAddressBalance)
 
 	jsonData, err := protojson.Marshal(preState)
 	if err != nil {
@@ -82,25 +81,25 @@ func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
 	b := block.NewBlock(networkID, c.Genesis.GenesisTimestamp, misc.HStr2Bin(dilithiumInfos[0].PK),
 		0,  c.Genesis.GenesisPrevHeaderHash, transactions, nil, 0)
 
-	for i := 0; i < len(dilithiumGroup); i++ {
-		for j := 0; j < len(dilithiumGroup[i].DilithiumInfo); j++ {
-			if i == 0  && j == 0 {
-				// Ignore as i == 0 and j == 0 is dilithiumInfo for the block proposer
-				continue
-			}
-			dilithiumInfo := dilithiumGroup[i].DilithiumInfo[j]
-			d := dilithium.RecoverDilithium(misc.HStr2Bin(dilithiumInfo.PK),
-				misc.HStr2Bin(dilithiumInfo.SK))
-			attestTx, err := b.Attest(networkID, d)
-			if err != nil {
-				return err
-			}
-			b.AddAttestTx(attestTx)
-		}
-	}
-	d := dilithium.RecoverDilithium(misc.HStr2Bin(dilithiumInfos[0].PK),
-		misc.HStr2Bin(dilithiumInfos[0].SK))
-	b.SignByProposer(d)
+	//for i := 0; i < len(dilithiumGroup); i++ {
+	//	for j := 0; j < len(dilithiumGroup[i].DilithiumInfo); j++ {
+	//		if i == 0  && j == 0 {
+	//			// Ignore as i == 0 and j == 0 is dilithiumInfo for the block proposer
+	//			continue
+	//		}
+	//		dilithiumInfo := dilithiumGroup[i].DilithiumInfo[j]
+	//		d := dilithium.RecoverDilithium(misc.HStr2Bin(dilithiumInfo.PK),
+	//			misc.HStr2Bin(dilithiumInfo.SK))
+	//		attestTx, err := b.Attest(networkID, d)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		b.AddAttestTx(attestTx)
+	//	}
+	//}
+	//d := dilithium.RecoverDilithium(misc.HStr2Bin(dilithiumInfos[0].PK),
+	//	misc.HStr2Bin(dilithiumInfos[0].SK))
+	//b.SignByProposer(d)
 
 	jsonData, err := protojson.Marshal(b.PBData())
 	if err != nil {
