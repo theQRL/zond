@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"encoding/json"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/ntp"
@@ -19,7 +20,8 @@ type PeerData struct {
 	connectedPeers    []*PeerInfo
 	disconnectedPeers []*PeerInfo
 
-	lock sync.Mutex
+	bootstrapNodes map[string]bool
+	lock           sync.Mutex
 }
 
 func (p *PeerData) ConnectedPeers() []*PeerInfo {
@@ -139,6 +141,13 @@ func (p *PeerData) RemovePeer(ip string, port string) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	ipPort := fmt.Sprintf("%s:%s", ip, port)
+	_, ok := p.bootstrapNodes[ipPort]
+	// Avoid deleting bootstrap nodes
+	if ok {
+		return nil
+	}
+
 	timestamp := ntp.GetNTP().Time()
 	peerInfo := NewPeerInfo(ip, port, timestamp)
 
@@ -223,16 +232,14 @@ func NewPeerData() (*PeerData, error) {
 		},
 		connectedPeers: make([]*PeerInfo, 0),
 		disconnectedPeers: make([]*PeerInfo, 0),
+		bootstrapNodes: make(map[string]bool),
+	}
+	for _, ipPort := range config.GetUserConfig().Node.PeerList {
+		p.bootstrapNodes[ipPort] = true
 	}
 	err := p.Load()
 	if err != nil {
 		log.Error("Failed to load PeerData ", err.Error())
-		return nil, err
 	}
-	return &PeerData {
-		pbData: &protos.PeerData{
-			ConnectedPeers: make([]*protos.PeerInfo, 0),
-			DisconnectedPeers: make([]*protos.PeerInfo, 0),
-		},
-	}, nil
+	return p, nil
 }
