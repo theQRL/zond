@@ -343,10 +343,10 @@ func (p *Peer) monitorChainState() {
 				delta -= int64(p.connectionTime)
 			}
 			if delta > int64(p.config.User.ChainStateTimeout) {
-				log.Warn("Disconnecting Peer due to Ping Timeout ",
-					"delta ", delta,
-					"currentTime ", currentTime,
-					"peer ", p.ID())
+				log.Warn("Disconnecting Peer due to Ping Timeout",
+					" delta ", delta,
+					" currentTime ", currentTime,
+					" peer ", p.ID())
 				p.Disconnect()
 				return
 			}
@@ -354,8 +354,7 @@ func (p *Peer) monitorChainState() {
 			lastBlock := p.chain.GetLastBlock()
 			lastBlockMetaData, err := p.chain.GetBlockMetaData(lastBlock.HeaderHash())
 			if err != nil {
-				log.Warn("Ping Failed Disconnecting",
-					"Peer", p.conn.RemoteAddr().String())
+				log.Warn("Ping Failed Disconnecting ", p.conn.RemoteAddr().String())
 				p.Disconnect()
 				return
 			}
@@ -834,8 +833,7 @@ loop:
 	p.close()
 	p.wg.Wait()
 
-	log.Info("Peer routine closed for ",
-		"Peer", p.conn.RemoteAddr().String())
+	log.Info("Peer routine closed for ", p.conn.RemoteAddr().String())
 	return remoteRequested
 }
 
