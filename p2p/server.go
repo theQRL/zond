@@ -39,11 +39,12 @@ type PeerIPWithPLData struct {
 type Server struct {
 	config *config.Config
 
-	chain        *chain.Chain
-	ntp          ntp.NTPInterface
-	peerData     *metadata.PeerData
-	ipCount      map[string]int
-	inboundCount uint16
+	chain            *chain.Chain
+	ntp              ntp.NTPInterface
+	peerData         *metadata.PeerData
+	ipCount          map[string]int
+	inboundCount     uint16
+	totalConnections uint16
 
 	listener     net.Listener
 	lock         sync.Mutex
@@ -65,7 +66,7 @@ type Server struct {
 
 	filter          *bloom.BloomFilter
 	mr              *MessageReceipt
-	downloader		*Downloader
+	downloader      *Downloader
 	messagePriority map[protos.LegacyMessage_FuncName]uint64
 }
 
@@ -211,10 +212,20 @@ func (srv *Server) ConnectPeers() error {
 	srv.loopWG.Add(1)
 	defer srv.loopWG.Done()
 
-	for _, peer := range srv.config.User.Node.PeerList {
-		log.Info("Connecting peer ", peer)
-		srv.ConnectPeer(peer)
-		// TODO: Update last connection time
+	for _, ipPort := range srv.config.User.Node.PeerList {
+		//log.Info("Connecting peer ", peer)
+		ip, port, err := net.SplitHostPort(ipPort)
+		if err != nil {
+			log.Error("Failed to split host port of bootstrap node ", ipPort,
+				" Reason: ", err.Error())
+			continue
+		}
+		err = srv.peerData.AddDisconnectedPeers(ip, port)
+		if err != nil {
+			log.Error("Failed to add bootstrap node in disconnected peers ", ipPort,
+				" Reason: ", err.Error())
+			continue
+		}
 	}
 
 	peerList := make([]string, 0)
@@ -236,7 +247,7 @@ func (srv *Server) ConnectPeers() error {
 					if connCount, ok := srv.ipCount[p.IP()]; ok {
 						// Ignore skipping connection to addresses
 						// when there is no connection with any peer
-						if !(srv.inboundCount == 0 && connCount == 0) {
+						if !(srv.totalConnections == 0 && connCount == 0) {
 							continue
 						}
 					}
@@ -245,6 +256,7 @@ func (srv *Server) ConnectPeers() error {
 			}
 			srv.peerInfoLock.Unlock()
 
+			removePeers := make([]string, 0)
 			for _, ipPort := range peerList {
 				if !srv.running {
 					break
@@ -258,9 +270,26 @@ func (srv *Server) ConnectPeers() error {
 				count += 1
 				if err != nil {
 					log.Info("Failed to connect to ", ipPort)
+					removePeers = append(removePeers, ipPort)
 					continue
 				}
 			}
+			srv.peerInfoLock.Lock()
+			for _, ipPort := range removePeers {
+				ip, port, err := net.SplitHostPort(ipPort)
+				if err != nil {
+					log.Error("Error splitting host and port found in removePeers ", ipPort,
+						" Reason: ", err.Error())
+					continue
+				}
+				err = srv.peerData.RemovePeer(ip, port)
+				if err != nil {
+					log.Error("Failed to removePeer",
+						" Reason: ", err.Error())
+					continue
+				}
+			}
+			srv.peerInfoLock.Unlock()
 			peerList = peerList[count:]
 
 		case <-srv.connectPeersExit:
@@ -302,7 +331,6 @@ running:
 			break running
 		case c := <-srv.addPeer:
 			srv.peerInfoLock.Lock()
-
 			log.Debug("Adding peer",
 				" addr ", c.fd.RemoteAddr())
 			p := newPeer(
@@ -324,6 +352,7 @@ running:
 
 			ip, _, _ := net.SplitHostPort(c.fd.RemoteAddr().String())
 			srv.ipCount[ip] += 1
+			srv.totalConnections += 1
 			if p.inbound {
 				srv.inboundCount++
 			}
@@ -347,6 +376,7 @@ running:
 			}
 			ip, _, _ := net.SplitHostPort(pd.conn.RemoteAddr().String())
 			srv.ipCount[ip] -= 1
+			srv.totalConnections -= 1
 			if pd.isPLShared {
 				err := srv.peerData.AddDisconnectedPeers(pd.IP(), pd.publicPort)
 				if err != nil {

@@ -270,7 +270,7 @@ func (d *Downloader) Consumer(lastBlockHeaderToDownload []byte, peerGroup []*Pee
 				}
 				log.Info("Trying To Add Block",
 					" #", b.SlotNumber(),
-					" headerhash ", misc.Bin2HStr(b.HeaderHash()))
+					" ", misc.Bin2HStr(b.HeaderHash()))
 				delete(pendingBlocks, strHeaderHash)
 				d.requestTracker.RemoveFirstElementFromSequence()
 				d.requestTracker.RemoveRequestKey(strHeaderHash)
@@ -281,8 +281,8 @@ func (d *Downloader) Consumer(lastBlockHeaderToDownload []byte, peerGroup []*Pee
 				}
 
 				log.Info("Block Added",
-					" BlockNumber", b.SlotNumber(),
-					" Headerhash", misc.Bin2HStr(b.HeaderHash()))
+					" #", b.SlotNumber(),
+					" ", misc.Bin2HStr(b.HeaderHash()))
 
 				d.slotNumberProcessed <- b.SlotNumber()
 			}
