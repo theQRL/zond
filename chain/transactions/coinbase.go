@@ -122,10 +122,13 @@ func (tx *CoinBase) Validate(stateContext *state.StateContext) bool {
 	signedMessage := tx.GetSigningHash(stateContext.BlockSigningHash())
 	txHash := tx.TxHash(signedMessage)
 
-	if !dilithium.DilithiumVerify(tx.Signature(), tx.PK(), signedMessage) {
-		log.Warn(fmt.Sprintf("Dilithium Signature Verification failed for CoinBase Txn %s",
-			misc.Bin2HStr(txHash)))
-		return false
+	// Genesis block has unsigned coinbase txn
+	if stateContext.GetSlotNumber() != 0 {
+		if !dilithium.DilithiumVerify(tx.Signature(), tx.PK(), signedMessage) {
+			log.Warn(fmt.Sprintf("Dilithium Signature Verification failed for CoinBase Txn %s",
+				misc.Bin2HStr(txHash)))
+			return false
+		}
 	}
 
 	if !tx.validateData(stateContext) {
@@ -207,12 +210,28 @@ func (tx *CoinBase) SetAffectedAddress(stateContext *state.StateContext) error {
 	coinBaseAddress := config.GetDevConfig().Genesis.CoinBaseAddress
 	err := stateContext.PrepareAddressState(misc.Bin2HStr(coinBaseAddress))
 	if err != nil {
+		log.Error("[CoinBase.SetAffectedAddress] Failed to prepare AddressState for coinbase address")
 		return err
 	}
 
-	err = stateContext.PrepareDilithiumMetaData(misc.Bin2HStr(tx.PK()))
-	if err != nil {
-		return err
+	// Genesis block has unsigned coinbase txn
+	if stateContext.GetSlotNumber() != 0 {
+		err = stateContext.PrepareDilithiumMetaData(misc.Bin2HStr(tx.PK()))
+		if err != nil {
+			log.Error("[CoinBase.SetAffectedAddress] Failed to prepare DilithiumMetadata")
+			return err
+		}
+		err = stateContext.PrepareValidatorsToXMSSAddress(tx.PK())
+		if err != nil {
+			log.Error("[CoinBase.SetAffectedAddress] Failed to prepare ValidatorsToXMSSAddress")
+			return err
+		}
+		xmssAddress := stateContext.GetXMSSAddressByDilithiumPK(tx.PK())
+		err = stateContext.PrepareAddressState(misc.Bin2HStr(xmssAddress))
+		if err != nil {
+			log.Error("[CoinBase.SetAffectedAddress] Failed to prepare AddressState for block proposer address")
+			return err
+		}
 	}
 
 	// TODO: PK is dilithium PK and it must be checked if its allowed to stake current block
@@ -220,17 +239,6 @@ func (tx *CoinBase) SetAffectedAddress(stateContext *state.StateContext) error {
 	//if err != nil {
 	//	return err
 	//}
-
-	err = stateContext.PrepareValidatorsToXMSSAddress(tx.PK())
-	if err != nil {
-		return err
-	}
-
-	xmssAddress := stateContext.GetXMSSAddressByDilithiumPK(tx.PK())
-	err = stateContext.PrepareAddressState(misc.Bin2HStr(xmssAddress))
-	if err != nil {
-		return err
-	}
 
 	return err
 }

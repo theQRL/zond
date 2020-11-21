@@ -181,7 +181,8 @@ func (b *Block) ProcessEpochMetaData(epochMetaData *metadata.EpochMetaData,
 	return nil
 }
 
-func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error {
+func (b *Block) CommitGenesis(db *db.DB) error {
+	blockProposerXMSSAddress := config.GetDevConfig().Genesis.FoundationXMSSAddress
 	blockHeader := b.Header()
 	blockHeaderHash := b.HeaderHash()
 
@@ -192,16 +193,21 @@ func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error 
 	stateContext, err := state.NewStateContext(db, blockHeader.SlotNumber, blockProposerDilithiumPK,
 		blockHeader.ParentHeaderHash, blockHeader.ParentHeaderHash, blockHeaderHash,
 		b.PartialBlockSigningHash(), b.BlockSigningHash(), epochMetaData)
+
 	if err != nil {
 		return err
 	}
 
-	if err := stateContext.PrepareAddressState(misc.Bin2HStr(blockProposerXMSSAddress)); err != nil {
-		return err
-	}
+	strBlockProposerDilithiumPK := misc.Bin2HStr(blockProposerDilithiumPK)
+	validatorsToXMSSAddress := stateContext.ValidatorsToXMSSAddress()
+	validatorsToXMSSAddress[strBlockProposerDilithiumPK] = blockProposerXMSSAddress
 
-	if err != nil {
-		return err
+	// Validating Protocol Transactions
+	for _, pbData := range b.ProtocolTransactions() {
+		tx := transactions.ProtoToProtocolTransaction(pbData)
+		if err := tx.SetAffectedAddress(stateContext); err != nil {
+			return err
+		}
 	}
 
 	// Loading States for related address, Dilithium PK, slaves etc.
@@ -212,7 +218,27 @@ func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error 
 		}
 	}
 
+	blockProposerAddressState, err := stateContext.GetAddressState(misc.Bin2HStr(blockProposerXMSSAddress))
+	if err != nil {
+		log.Error("[CommitGenesis] Failed to get address state for block proposer XMSS address")
+		return err
+	}
+	// Adding initial coins to foundation address
+	blockProposerAddressState.AddBalance(config.GetDevConfig().Genesis.SuppliedCoins)
+
 	validatorsStakeAmount := make(map[string]uint64)
+
+	// Validating & Applying Protocol Transactions
+	for _, pbData := range b.ProtocolTransactions() {
+		tx := transactions.ProtoToProtocolTransaction(pbData)
+		if !tx.Validate(stateContext) {
+			return errors.New(fmt.Sprintf("Protocol Transaction Validation failed %s",
+				tx.TxHash(tx.Signature())))
+		}
+		if err := tx.ApplyStateChanges(stateContext); err != nil {
+			return err
+		}
+	}
 
 	// Validating & Applying Transactions
 	for _, pbData := range b.Transactions() {
@@ -231,26 +257,6 @@ func (b *Block) CommitGenesis(db *db.DB, blockProposerXMSSAddress []byte) error 
 				dilithiumMetaData := stateContext.GetDilithiumState(strDilithiumPK)
 				validatorsStakeAmount[strDilithiumPK] = dilithiumMetaData.Balance()
 			}
-		}
-	}
-
-	// Validating Protocol Transactions
-	for _, pbData := range b.ProtocolTransactions() {
-		tx := transactions.ProtoToProtocolTransaction(pbData)
-		if err := tx.SetAffectedAddress(stateContext); err != nil {
-			return err
-		}
-	}
-
-	// Validating & Applying Protocol Transactions
-	for _, pbData := range b.ProtocolTransactions() {
-		tx := transactions.ProtoToProtocolTransaction(pbData)
-		if !tx.Validate(stateContext) {
-			return errors.New(fmt.Sprintf("Protocol Transaction Validation failed %s",
-				tx.TxHash(tx.Signature())))
-		}
-		if err := tx.ApplyStateChanges(stateContext); err != nil {
-			return err
 		}
 	}
 

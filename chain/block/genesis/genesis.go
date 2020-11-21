@@ -86,5 +86,5 @@ func ProcessGenesisBlock(db *db.DB) error {
 		return err
 	}
 
-	return b.CommitGenesis(db, preState.AddressBalance[1].Address)
+	return b.CommitGenesis(db)
 }
