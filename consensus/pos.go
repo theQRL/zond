@@ -175,9 +175,8 @@ running:
 					}
 					txInterface := txInfo.Transaction()
 					txPBData := txInterface.PBData()
-					tx := txInterface.(*transactions.Transaction)
-					strTxHash := misc.Bin2HStr(tx.TxHash(tx.GetSigningHash()))
-					if p.chain.ValidateTransaction(tx) != nil {
+					strTxHash := misc.Bin2HStr(txInterface.TxHash(txInterface.GetSigningHash()))
+					if p.chain.ValidateTransaction(txInterface) != nil {
 						log.Error("Transaction validation failed for ",
 							strTxHash)
 						continue

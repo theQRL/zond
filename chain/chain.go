@@ -309,7 +309,7 @@ func (c *Chain) GetEpochHeaderHashes(epoch uint64) (*protos.EpochBlockHashesMeta
 	return epochBlockHashes.PBData(), nil
 }
 
-func (c *Chain) ValidateTransaction(tx *transactions.Transaction) error {
+func (c *Chain) ValidateTransaction(tx transactions.TransactionInterface) error {
 	sc, err := c.GetStateContext()
 	if err != nil {
 		return err
