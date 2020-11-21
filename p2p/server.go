@@ -264,8 +264,7 @@ func (srv *Server) ConnectPeers() error {
 				if count >= maxConnectionTry {
 					break
 				}
-				log.Info("Trying to Connect",
-					"Peer", ipPort)
+				log.Info("Trying to Connect ", ipPort)
 				err := srv.ConnectPeer(ipPort)
 				count += 1
 				if err != nil {
