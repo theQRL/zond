@@ -203,7 +203,8 @@ func (tx *Transaction) applyStateChangesForPK(stateContext *state.StateContext) 
 		return err
 	}
 	a.IncreaseNonce()
-
+	a.SubtractBalance(tx.Fee())
+	stateContext.AddTransactionFee(tx.Fee())
 	// TODO: Set Ots Key
 
 	//if _, ok := addressesState[addrFromPK]; ok {

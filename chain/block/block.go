@@ -426,8 +426,9 @@ func NewBlock(networkId uint64, timestamp uint64, proposerAddress []byte, slotNu
 	}
 
 	blockReward := rewards.GetBlockReward()
+	attestorReward := rewards.GetAttestorReward()
 	coinBase := transactions.NewCoinBase(networkId, proposerAddress, blockReward,
-		blockReward, feeReward, lastCoinBaseNonce)
+		attestorReward, feeReward, lastCoinBaseNonce)
 
 	b.pbData.ProtocolTransactions = append(b.pbData.ProtocolTransactions, coinBase.PBData())
 

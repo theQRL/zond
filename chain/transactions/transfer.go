@@ -214,7 +214,7 @@ func (tx *Transfer) ApplyStateChanges(stateContext *state.StateContext) error {
 	if err != nil {
 		return err
 	}
-	total := tx.TotalAmounts() + tx.Fee()
+	total := tx.TotalAmounts()
 	addrState.SubtractBalance(total)
 
 	addrsTo := tx.AddrsTo()

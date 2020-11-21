@@ -181,7 +181,6 @@ func (tx *Stake) ApplyStateChanges(stateContext *state.StateContext) error {
 	if err != nil {
 		return err
 	}
-	addrState.SubtractBalance(tx.Fee())
 
 	if tx.Stake() {
 		addrState.LockStakeBalance(config.GetDevConfig().MinStakeAmount * uint64(len(tx.DilithiumPKs())))
