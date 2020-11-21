@@ -182,12 +182,6 @@ func (tx *Stake) ApplyStateChanges(stateContext *state.StateContext) error {
 		return err
 	}
 
-	if tx.Stake() {
-		addrState.LockStakeBalance(config.GetDevConfig().MinStakeAmount * uint64(len(tx.DilithiumPKs())))
-	} else {
-		addrState.ReleaseStakeBalance(config.GetDevConfig().MinStakeAmount * uint64(len(tx.DilithiumPKs())))
-	}
-
 	for _, dilithiumPK := range tx.DilithiumPKs() {
 		strDilithiumPK := misc.Bin2HStr(dilithiumPK)
 
