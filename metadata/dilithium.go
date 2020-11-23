@@ -94,7 +94,7 @@ func GetDilithiumMetaData(db *db.DB, dilithiumPK []byte,
 
 	data, err := GetDataByBucket(db, key, headerHash, finalizedHeaderHash)
 	if err != nil {
-		log.Error("Error loading DilithiumMetaData for key ", string(key), err)
+		//log.Error("Error loading DilithiumMetaData for key ", string(key), err)
 		return nil, err
 	}
 	dm := &DilithiumMetaData{
