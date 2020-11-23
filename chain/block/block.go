@@ -588,6 +588,7 @@ func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 			return nil, err
 		}
 		validatorsStakeAmount[misc.Bin2HStr(dilithiumPK)] = dilithiumMetaData.Balance()
+		totalStakeAmountAlloted += dilithiumMetaData.Balance()
 	}
 	epochMetaData.UpdatePrevEpochStakeData(0,
 		totalStakeAmountAlloted)
