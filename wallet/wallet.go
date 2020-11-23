@@ -25,7 +25,7 @@ type Wallet struct {
 func (w *Wallet) Add(height uint64, hashFunction goqrllib.EHashFunction) {
 	xmss := crypto.FromHeight(height, hashFunction)
 	xmssInfo := &protos.XMSSInfo{
-		Address: xmss.QAddress(),
+		Address: xmss.StrAddress(),
 		HexSeed: xmss.HexSeed(),
 		Mnemonic: xmss.Mnemonic(),
 	}
@@ -36,12 +36,12 @@ func (w *Wallet) Add(height uint64, hashFunction goqrllib.EHashFunction) {
 	w.Save()
 }
 
-func (w *Wallet) reqBalance(qAddress string) (uint64, error) {
+func (w *Wallet) reqBalance(address string) (uint64, error) {
 	userConfig := config.GetUserConfig()
 	apiHostPort := fmt.Sprintf("http://%s:%d",
 		userConfig.API.PublicAPI.Host,
 		userConfig.API.PublicAPI.Port)
-	url := fmt.Sprintf("%s/api/balance/%s", apiHostPort, qAddress)
+	url := fmt.Sprintf("%s/api/balance/%s", apiHostPort, address)
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {

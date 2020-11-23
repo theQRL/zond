@@ -142,6 +142,10 @@ func (x *XMSS) QAddress() string {
 	return fmt.Sprintf("Q%s", misc.Bin2HStr(x.Address()))
 }
 
+func (x *XMSS) StrAddress() string {
+	return fmt.Sprintf("%s", misc.Bin2HStr(x.Address()))
+}
+
 func (x *XMSS) OTSIndex() uint64 {
 	return uint64(x.xmss.GetIndex())
 }
