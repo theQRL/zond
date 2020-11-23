@@ -177,7 +177,7 @@ func (p *PublicAPIServer) GetAddressState(w http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 	address := vars["address"]
 
-	addressState, err := p.chain.GetAddressState(misc.Qaddress2Bin(address))
+	addressState, err := p.chain.GetAddressState(misc.HStr2Bin(address))
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			fmt.Sprintf("Error Decoding address %s\n %s", address, err.Error()),
@@ -201,7 +201,7 @@ func (p *PublicAPIServer) GetBalance(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	address := vars["address"]
 
-	addressState, err := p.chain.GetAddressState(misc.Qaddress2Bin(address))
+	addressState, err := p.chain.GetAddressState(misc.HStr2Bin(address))
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			fmt.Sprintf("Error Decoding address %s\n %s", address, err.Error()),
