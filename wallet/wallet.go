@@ -75,6 +75,14 @@ func (w *Wallet) List() {
 	}
 }
 
+func (w *Wallet) Secret() {
+	for i, xmssInfo := range w.pbData.XmssInfo {
+		fmt.Println(fmt.Sprintf("%d\t%s\t%s\t%s",
+			i + 1, xmssInfo.Address, xmssInfo.HexSeed,
+			xmssInfo.Mnemonic))
+	}
+}
+
 func (w *Wallet) Remove() {
 
 	w.Save()
