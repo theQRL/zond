@@ -83,9 +83,9 @@ func (tx *CoinBase) validateData(stateContext *state.StateContext) bool {
 		return false
 	}
 
-	if tx.Nonce() != addressState.Nonce() + 1 {
+	if tx.Nonce() != addressState.Nonce() {
 		log.Warn(fmt.Sprintf("CoinBase [%s] Invalid Nonce %d, Expected Nonce %d",
-			misc.Bin2HStr(txHash), tx.Nonce(), addressState.Nonce() + 1))
+			misc.Bin2HStr(txHash), tx.Nonce(), addressState.Nonce()))
 		return false
 	}
 
@@ -283,8 +283,7 @@ func NewCoinBase(networkId uint64, blockProposer []byte, blockProposerReward uin
 	cb.AttestorReward = attestorReward
 	cb.FeeReward = feeReward
 
-	// TODO: Make nonce for CoinBase sequential, as this will not be sequential due to slotNumber
-	tx.pbData.Nonce = lastCoinBaseNonce + 1
+	tx.pbData.Nonce = lastCoinBaseNonce
 
 	// TODO: Pass StateContext
 	//if !tx.Validate(nil) {

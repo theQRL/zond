@@ -88,9 +88,9 @@ func (tx *Transfer) validateData(stateContext *state.StateContext) bool {
 		return false
 	}
 
-	if tx.Nonce() != addressState.Nonce() + 1 {
+	if tx.Nonce() != addressState.Nonce() {
 		log.Warn(fmt.Sprintf("Transfer [%s] Invalid Nonce %d, Expected Nonce %d",
-			misc.Bin2HStr(txHash), tx.Nonce(), addressState.Nonce() + 1))
+			misc.Bin2HStr(txHash), tx.Nonce(), addressState.Nonce()))
 		return false
 	}
 

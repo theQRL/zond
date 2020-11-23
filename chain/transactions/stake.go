@@ -60,9 +60,9 @@ func (tx *Stake) validateData(stateContext *state.StateContext) bool {
 		return false
 	}
 
-	if tx.Nonce() != addressState.Nonce() + 1 {
+	if tx.Nonce() != addressState.Nonce() {
 		log.Warn(fmt.Sprintf("Stake [%s] Invalid Nonce %d, Expected Nonce %d",
-			misc.Bin2HStr(txHash), tx.Nonce(), addressState.Nonce() + 1))
+			misc.Bin2HStr(txHash), tx.Nonce(), addressState.Nonce()))
 		return false
 	}
 
