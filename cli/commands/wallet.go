@@ -37,6 +37,15 @@ func getWalletSubCommands() []*cli.Command {
 				return nil
 			},
 		},
+		{
+			Name: "secret",
+			Usage: "Show hexseed & mnemonic for the addresses in Wallet",
+			Action: func(c *cli.Context) error {
+				w := wallet.NewWallet(flags.WalletFile.Value)
+				w.Secret()
+				return nil
+			},
+		},
 	}
 }
 
