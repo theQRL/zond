@@ -1,23 +1,70 @@
 [![CircleCI](https://circleci.com/gh/theQRL/zond.svg?style=shield)](https://circleci.com/gh/theQRL/zond)
 [![Codacy Badge](https://api.codacy.com/project/badge/Coverage/46d5220277074dc59bb05a15567ec5c5)](https://www.codacy.com/app/qrl/zond?utm_source=github.com&utm_medium=referral&utm_content=theQRL/zond&utm_campaign=Badge_Coverage)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/46d5220277074dc59bb05a15567ec5c5)](https://www.codacy.com/app/qrl/zond?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=theQRL/zond&amp;utm_campaign=Badge_Grade)
-# zond
-*WARNING: This is work in progress, NOT FOR PRODUCTION USE*
+# Zond
+
+> *WARNING: This is work in progress, NOT FOR PRODUCTION USE*
+
+POS QRL Node Implementation written in GO. This code is still under heavy development and is currently undergoing DEVNET testing internally.
+
+Zond will undergo an additional public testnet once the code stabilizes and we are complete with integration and development. Look for a request for testing in our public channels.
+
 
 ## Installing
 
-#### Ubuntu
+Updated and upgraded Ubuntu distribution with `aes-ni` for cryptographic support and ample HDD space to store the chain is required.
 
-**Dependencies:**
 
-```
-sudo apt -y install swig3.0 python3-dev build-essential cmake libhwloc-dev libboost-dev ninja-build pkg-config
+### Ubuntu 
+
+#### Dependencies
+
+##### Bazel 
+
+> [Bazel](https://www.bazel.build/) is an open-source build and test tool similar to Make
+
+Install Bazel in Ubuntu following [their official instructions](https://docs.bazel.build/versions/master/install-ubuntu.html) with - 
+
+```bash
+# Add Bazel distribution URI as a package source
+sudo apt install curl gnupg
+curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg
+sudo mv bazel.gpg /etc/apt/trusted.gpg.d/
+echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
+
+# Update and Install 
+sudo apt update && sudo apt install bazel
 ```
 
-**Install gcc-5**
+##### Zond Repo
 
+Clone this repo to the local file system
+
+```bash
+git clone https://github.com/theQRL/zond.git
 ```
-sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-sudo apt-get update
-sudo apt-get install gcc-5 g++-5
+
+#### Build zond
+
+Using the Bazel build tools build both `zond` and `zond-cli` 
+
+```bash
+cd zond
+
+bazel build //cmd/zond:zond
+bazel build //cmd/zond-cli:zond-cli
 ```
+
+You now have the node and node CLI installed in `zond/bazel-bin/cmd/`
+
+
+
+## Running zond
+
+> Work In Progress to be released when public Testnet is live!
+
+## Support
+
+Questions? Issues? 
+
+Please come ask in our Discord Server - https://discord.gg/punXRMM
