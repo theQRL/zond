@@ -280,11 +280,6 @@ func (d *Downloader) Consumer(lastBlockHeaderToDownload []byte, peerGroup []*Pee
 					log.Warn("Failed To Add Block")
 					break
 				}
-
-				log.Info("Block Added",
-					" #", b.SlotNumber(),
-					" ", hex.EncodeToString(b.HeaderHash()))
-
 				d.slotNumberProcessed <- b.SlotNumber()
 			}
 
