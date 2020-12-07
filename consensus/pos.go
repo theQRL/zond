@@ -12,7 +12,6 @@ import (
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/keys"
 	"github.com/theQRL/zond/metadata"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/p2p"
 	"github.com/theQRL/zond/protos"
@@ -429,8 +428,16 @@ func NewPOS(srv *p2p.Server, chain *chain.Chain, db *db.DB) *POS {
 	for _, group := range dk.GetDilithiumGroup() {
 		for _, dilithiumInfo := range group.DilithiumInfo {
 			strPK := dilithiumInfo.PK
-			pk := misc.HStr2Bin(dilithiumInfo.PK)
-			sk := misc.HStr2Bin(dilithiumInfo.SK)
+			pk, err := hex.DecodeString(dilithiumInfo.PK)
+			if err != nil {
+				log.Error("Error decoding Dilithium PK ", err.Error())
+				return nil
+			}
+			sk, err := hex.DecodeString(dilithiumInfo.SK)
+			if err != nil {
+				log.Error("Error decoding Dilithium SK ", err.Error())
+				return nil
+			}
 			pos.validators[strPK] = dilithium.RecoverDilithium(pk, sk)
 		}
 	}

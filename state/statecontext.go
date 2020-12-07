@@ -136,13 +136,17 @@ func (s *StateContext) ProcessBlockProposerFlag(blockProposerDilithiumPK []byte)
 }
 
 func (s *StateContext) PrepareAddressState(addr string) error {
-	strKey := hex.EncodeToString(address.GetAddressStateKey(misc.HStr2Bin(addr)))
+	binAddr, err := hex.DecodeString(addr)
+	if err != nil {
+		return err
+	}
+	strKey := hex.EncodeToString(address.GetAddressStateKey(binAddr))
 	_, ok := s.addressesState[strKey]
 	if ok {
 		return nil
 	}
 
-	addressState, err := address.GetAddressState(s.db, misc.HStr2Bin(addr),
+	addressState, err := address.GetAddressState(s.db, binAddr,
 		s.parentBlockHeaderHash, s.mainChainMetaData.FinalizedBlockHeaderHash())
 	if addressState == nil {
 		return err
@@ -153,7 +157,11 @@ func (s *StateContext) PrepareAddressState(addr string) error {
 }
 
 func (s *StateContext) GetAddressState(addr string) (*address.AddressState, error) {
-	strKey := hex.EncodeToString(address.GetAddressStateKey(misc.HStr2Bin(addr)))
+	binAddr, err := hex.DecodeString(addr)
+	if err != nil {
+		return nil, err
+	}
+	strKey := hex.EncodeToString(address.GetAddressStateKey(binAddr))
 	addressState, ok := s.addressesState[strKey]
 	if !ok {
 		return nil, errors.New(fmt.Sprintf("Address %s not found in addressesState", addr))
@@ -183,13 +191,17 @@ func (s *StateContext) GetXMSSAddressByDilithiumPK(dilithiumPK []byte) []byte {
 }
 
 func (s *StateContext) PrepareDilithiumMetaData(dilithiumPK string) error {
-	strKey := hex.EncodeToString(metadata.GetDilithiumMetaDataKey(misc.HStr2Bin(dilithiumPK)))
+	binDilithiumPK, err := hex.DecodeString(dilithiumPK)
+	if err != nil {
+		return err
+	}
+	strKey := hex.EncodeToString(metadata.GetDilithiumMetaDataKey(binDilithiumPK))
 	_, ok := s.dilithiumState[strKey]
 	if ok {
 		return nil
 	}
 
-	dilithiumMetaData, err := metadata.GetDilithiumMetaData(s.db, misc.HStr2Bin(dilithiumPK),
+	dilithiumMetaData, err := metadata.GetDilithiumMetaData(s.db, binDilithiumPK,
 		s.parentBlockHeaderHash, s.mainChainMetaData.FinalizedBlockHeaderHash())
 	if dilithiumMetaData == nil {
 		return err
@@ -199,7 +211,11 @@ func (s *StateContext) PrepareDilithiumMetaData(dilithiumPK string) error {
 }
 
 func (s *StateContext) AddDilithiumMetaData(dilithiumPK string, dilithiumMetaData *metadata.DilithiumMetaData) error {
-	strKey := hex.EncodeToString(metadata.GetDilithiumMetaDataKey(misc.HStr2Bin(dilithiumPK)))
+	binDilithiumPK, err := hex.DecodeString(dilithiumPK)
+	if err != nil {
+		return err
+	}
+	strKey := hex.EncodeToString(metadata.GetDilithiumMetaDataKey(binDilithiumPK))
 	_, ok := s.dilithiumState[strKey]
 	if ok {
 		return errors.New("dilithiumPK already exists")
@@ -209,19 +225,32 @@ func (s *StateContext) AddDilithiumMetaData(dilithiumPK string, dilithiumMetaDat
 }
 
 func (s *StateContext) GetDilithiumState(dilithiumPK string) *metadata.DilithiumMetaData {
-	strKey := hex.EncodeToString(metadata.GetDilithiumMetaDataKey(misc.HStr2Bin(dilithiumPK)))
+	binDilithiumPk, err := hex.DecodeString(dilithiumPK)
+	if err != nil {
+		log.Error("Error decoding dilithium PK")
+		return nil
+	}
+	strKey := hex.EncodeToString(metadata.GetDilithiumMetaDataKey(binDilithiumPk))
 	dilithiumState, _ := s.dilithiumState[strKey]
 	return dilithiumState
 }
 
 func (s *StateContext) PrepareSlaveMetaData(masterAddr string, slavePK string) error {
-	strKey := hex.EncodeToString(metadata.GetSlaveMetaDataKey(misc.HStr2Bin(masterAddr), misc.HStr2Bin(slavePK)))
+	binMasterAddress, err := hex.DecodeString(masterAddr)
+	if err != nil {
+		return err
+	}
+	binSlavePk, err := hex.DecodeString(slavePK)
+	if err != nil {
+		return err
+	}
+	strKey := hex.EncodeToString(metadata.GetSlaveMetaDataKey(binMasterAddress, binSlavePk))
 	_, ok := s.slaveState[strKey]
 	if ok {
 		return nil
 	}
 
-	slaveMetaData, err := metadata.GetSlaveMetaData(s.db, misc.HStr2Bin(masterAddr), misc.HStr2Bin(slavePK),
+	slaveMetaData, err := metadata.GetSlaveMetaData(s.db, binMasterAddress, binSlavePk,
 		s.parentBlockHeaderHash, s.mainChainMetaData.FinalizedBlockHeaderHash())
 	if slaveMetaData == nil {
 		return err
@@ -232,7 +261,15 @@ func (s *StateContext) PrepareSlaveMetaData(masterAddr string, slavePK string) e
 
 func (s *StateContext) AddSlaveMetaData(masterAddr string, slavePK string,
 	slaveMetaData *metadata.SlaveMetaData) error {
-	strKey := hex.EncodeToString(metadata.GetSlaveMetaDataKey(misc.HStr2Bin(masterAddr), misc.HStr2Bin(slavePK)))
+	binMasterAddress, err := hex.DecodeString(masterAddr)
+	if err != nil {
+		return err
+	}
+	binSlavePk, err := hex.DecodeString(slavePK)
+	if err != nil {
+		return err
+	}
+	strKey := hex.EncodeToString(metadata.GetSlaveMetaDataKey(binMasterAddress, binSlavePk))
 	_, ok := s.slaveState[strKey]
 	if ok {
 		return errors.New("SlaveMetaData already exists")
@@ -242,20 +279,34 @@ func (s *StateContext) AddSlaveMetaData(masterAddr string, slavePK string,
 }
 
 func (s *StateContext) GetSlaveState(masterAddr string, slavePK string) *metadata.SlaveMetaData {
-	strKey := hex.EncodeToString(metadata.GetSlaveMetaDataKey(misc.HStr2Bin(masterAddr), misc.HStr2Bin(slavePK)))
+	binMasterAddress, err := hex.DecodeString(masterAddr)
+	if err != nil {
+		log.Error("Error decoding masterAddr ", err.Error())
+		return nil
+	}
+	binSlavePk, err := hex.DecodeString(slavePK)
+	if err != nil {
+		log.Error("Error decoding slavePK ", err.Error())
+		return nil
+	}
+	strKey := hex.EncodeToString(metadata.GetSlaveMetaDataKey(binMasterAddress, binSlavePk))
 	slaveMetaData, _ := s.slaveState[strKey]
 	return slaveMetaData
 }
 
 func (s *StateContext) PrepareOTSIndexMetaData(address string, otsIndex uint64) error {
-	key := metadata.GetOTSIndexMetaDataKeyByOTSIndex(misc.HStr2Bin(address), otsIndex)
+	binAddress, err := hex.DecodeString(address)
+	if err != nil {
+		return err
+	}
+	key := metadata.GetOTSIndexMetaDataKeyByOTSIndex(binAddress, otsIndex)
 	strKey := hex.EncodeToString(key)
 	_, ok := s.otsIndexState[strKey]
 	if ok {
 		return nil
 	}
 
-	otsIndexMetaData, err := metadata.GetOTSIndexMetaData(s.db, misc.HStr2Bin(address), otsIndex,
+	otsIndexMetaData, err := metadata.GetOTSIndexMetaData(s.db, binAddress, otsIndex,
 		s.parentBlockHeaderHash, s.mainChainMetaData.FinalizedBlockHeaderHash())
 	if otsIndexMetaData == nil {
 		return err
@@ -266,7 +317,11 @@ func (s *StateContext) PrepareOTSIndexMetaData(address string, otsIndex uint64) 
 
 func (s *StateContext) AddOTSIndexMetaData(address string, otsIndex uint64,
 	otsIndexMetaData *metadata.OTSIndexMetaData) error {
-	strKey := hex.EncodeToString(metadata.GetOTSIndexMetaDataKeyByOTSIndex(misc.HStr2Bin(address), otsIndex))
+	binAddress, err := hex.DecodeString(address)
+	if err != nil {
+		return err
+	}
+	strKey := hex.EncodeToString(metadata.GetOTSIndexMetaDataKeyByOTSIndex(binAddress, otsIndex))
 	_, ok := s.otsIndexState[strKey]
 	if ok {
 		return errors.New("OTSIndexMetaData already exists")
@@ -276,7 +331,12 @@ func (s *StateContext) AddOTSIndexMetaData(address string, otsIndex uint64,
 }
 
 func (s *StateContext) GetOTSIndexState(address string, otsIndex uint64) *metadata.OTSIndexMetaData {
-	strKey := hex.EncodeToString(metadata.GetOTSIndexMetaDataKeyByOTSIndex(misc.HStr2Bin(address), otsIndex))
+	binAddress, err := hex.DecodeString(address)
+	if err != nil {
+		log.Error("Error decoding address ", err.Error())
+		return nil
+	}
+	strKey := hex.EncodeToString(metadata.GetOTSIndexMetaDataKeyByOTSIndex(binAddress, otsIndex))
 	otsIndexMetaData, _ := s.otsIndexState[strKey]
 	return otsIndexMetaData
 }
