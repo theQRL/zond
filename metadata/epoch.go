@@ -1,12 +1,12 @@
 package metadata
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"go.etcd.io/bbolt"
 	"math"
@@ -174,7 +174,7 @@ func GetEpochMetaData(db *db.DB, currentBlockSlotNumber uint64, parentHeaderHash
 	data, err := db.Get(key)
 
 	if err != nil {
-		log.Error("Error loading EpochMetaData for  ", misc.Bin2HStr(prevSlotLastBlockHeaderHash),
+		log.Error("Error loading EpochMetaData for  ", hex.EncodeToString(prevSlotLastBlockHeaderHash),
 			err)
 		return nil, err
 	}

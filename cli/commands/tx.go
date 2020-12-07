@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/theQRL/zond/api"
@@ -42,7 +43,7 @@ func broadcastTransaction(transaction interface{}, url string, txHash []byte) er
 	err = json.Unmarshal(bodyBytes, &response)
 
 	responseData := response.Data.(map[string]interface{})
-	if responseData["transactionHash"].(string) == misc.Bin2HStr(txHash) {
+	if responseData["transactionHash"].(string) == hex.EncodeToString(txHash) {
 		fmt.Println("Transaction successfully broadcasted")
 	}
 	return nil

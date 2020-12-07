@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
@@ -90,7 +91,7 @@ func (srv *Server) BroadcastBlock(block *block.Block) {
 				Block: block.PBData(),
 			},
 		},
-		MsgHash: misc.Bin2HStr(block.HeaderHash()),
+		MsgHash: hex.EncodeToString(block.HeaderHash()),
 	}
 	srv.registerAndBroadcastChan <-msg
 }
@@ -106,7 +107,7 @@ func (srv *Server) BroadcastBlockForAttestation(block *block.Block, signature []
 				},
 			},
 		},
-		MsgHash: misc.Bin2HStr(block.PartialBlockSigningHash()),
+		MsgHash: hex.EncodeToString(block.PartialBlockSigningHash()),
 	}
 	srv.registerAndBroadcastChan <-msg
 }
@@ -127,7 +128,7 @@ func (srv *Server) BroadcastAttestationTransaction(attestTx *transactions.Attest
 				},
 			},
 		},
-		MsgHash: misc.Bin2HStr(attestTx.TxHash(attestTx.GetSigningHash(partialBlockSigningHash))),
+		MsgHash: hex.EncodeToString(attestTx.TxHash(attestTx.GetSigningHash(partialBlockSigningHash))),
 	}
 	log.Info("[BroadcastAttestationTransaction] Broadcasting Attestation Txn ",
 		msg.MsgHash)
@@ -391,7 +392,7 @@ running:
 			// TODO: Process Message Receipt
 			// Need to get connection too
 			mrData := mrDataConn.mrData
-			msgHash := misc.Bin2HStr(mrData.Hash)
+			msgHash := hex.EncodeToString(mrData.Hash)
 			switch mrData.Type {
 			case protos.LegacyMessage_BA:
 				/*
@@ -403,8 +404,8 @@ running:
 				if err != nil {
 					log.Info("[BlockForAttestation] Missing Parent Block",
 						" #", mrData.SlotNumber,
-						" Partial Block Signing Hash ", misc.Bin2HStr(mrData.Hash),
-						" Parent Block ", misc.Bin2HStr(mrData.ParentHeaderHash))
+						" Partial Block Signing Hash ", hex.EncodeToString(mrData.Hash),
+						" Parent Block ", hex.EncodeToString(mrData.ParentHeaderHash))
 					break
 				}
 
@@ -432,7 +433,7 @@ running:
 					finalizedBlock, err := srv.chain.GetBlock(finalizedHeaderHash)
 					if err != nil {
 						log.Error("Failed to get finalized block ",
-							misc.Bin2HStr(finalizedHeaderHash))
+							hex.EncodeToString(finalizedHeaderHash))
 						break
 					}
 					// skip slot number beyond the Finalized slot Number
@@ -447,8 +448,8 @@ running:
 				if err != nil {
 					log.Info("[BlockReceived] Missing Parent Block ",
 						" #", mrData.SlotNumber,
-						" Block ", misc.Bin2HStr(mrData.Hash),
-						" Parent Block ", misc.Bin2HStr(mrData.ParentHeaderHash))
+						" Block ", hex.EncodeToString(mrData.Hash),
+						" Parent Block ", hex.EncodeToString(mrData.ParentHeaderHash))
 					break
 				}
 
@@ -538,7 +539,7 @@ func (srv *Server) HandleTransaction(mrDataConn *MRDataConn) {
 
 func (srv *Server) RequestFullMessage(mrData *protos.MRData) {
 	for {
-		msgHash := misc.Bin2HStr(mrData.Hash)
+		msgHash := hex.EncodeToString(mrData.Hash)
 		_, ok := srv.mr.GetHashMsg(msgHash)
 		if ok {
 			if _, ok = srv.mr.GetRequestedHash(msgHash); ok {
@@ -573,7 +574,7 @@ func (srv *Server) RequestFullMessage(mrData *protos.MRData) {
 }
 
 func (srv *Server) BlockReceived(peer *Peer, b *block.Block) {
-	headerHash := misc.Bin2HStr(b.HeaderHash())
+	headerHash := hex.EncodeToString(b.HeaderHash())
 	log.Info(">>> Received Block",
 		" #", b.SlotNumber(),
 		" HeaderHash ", headerHash)

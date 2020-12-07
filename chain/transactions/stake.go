@@ -3,6 +3,7 @@ package transactions
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/crypto"
@@ -50,11 +51,11 @@ func (tx *Stake) validateData(stateContext *state.StateContext) bool {
 	txHash := tx.TxHash(tx.GetSigningHash())
 
 	if tx.Fee() < 0 {
-		log.Warn(fmt.Sprintf("Stake [%s] Invalid Fee = %d", misc.Bin2HStr(txHash), tx.Fee()))
+		log.Warn(fmt.Sprintf("Stake [%s] Invalid Fee = %d", hex.EncodeToString(txHash), tx.Fee()))
 		return false
 	}
 
-	addressState, err := stateContext.GetAddressState(misc.Bin2HStr(tx.AddrFrom()))
+	addressState, err := stateContext.GetAddressState(hex.EncodeToString(tx.AddrFrom()))
 	if err != nil {
 		log.Warn(fmt.Sprintf("[Stake] Address %s missing into state context", tx.AddrFrom()))
 		return false
@@ -62,14 +63,14 @@ func (tx *Stake) validateData(stateContext *state.StateContext) bool {
 
 	if tx.Nonce() != addressState.Nonce() {
 		log.Warn(fmt.Sprintf("Stake [%s] Invalid Nonce %d, Expected Nonce %d",
-			misc.Bin2HStr(txHash), tx.Nonce(), addressState.Nonce()))
+			hex.EncodeToString(txHash), tx.Nonce(), addressState.Nonce()))
 		return false
 	}
 
 	balance := addressState.Balance()
 	if balance < tx.Fee() {
 		log.Warn("Insufficient balance",
-			"txhash", misc.Bin2HStr(txHash),
+			"txhash", hex.EncodeToString(txHash),
 			"balance", balance,
 			"fee", tx.Fee())
 		return false
@@ -79,7 +80,7 @@ func (tx *Stake) validateData(stateContext *state.StateContext) bool {
 		requiredBalance := tx.Fee() + uint64(len(tx.DilithiumPKs())) * config.GetDevConfig().MinStakeAmount
 		if balance < requiredBalance {
 			log.Warn("Insufficient balance ",
-				"txhash ", misc.Bin2HStr(txHash),
+				"txhash ", hex.EncodeToString(txHash),
 				"balance ", balance,
 				"required balance ", requiredBalance)
 			return false
@@ -87,7 +88,7 @@ func (tx *Stake) validateData(stateContext *state.StateContext) bool {
 	} else {
 		requiredStakeBalance := uint64(0)
 		for _, dilithiumPK := range tx.DilithiumPKs() {
-			strDilithiumPK := misc.Bin2HStr(dilithiumPK)
+			strDilithiumPK := hex.EncodeToString(dilithiumPK)
 			dilithiumMetadata := stateContext.GetDilithiumState(strDilithiumPK)
 			if dilithiumMetadata == nil {
 				log.Error("DilithiumMetaData not found to for de-staking ", strDilithiumPK)
@@ -107,12 +108,12 @@ func (tx *Stake) validateData(stateContext *state.StateContext) bool {
 	// TODO: Move 100 into config
 	if lenDilithiumPKs > 100 {
 		log.Warn("Number of Dilithium Public Keys beyond limit [%s] Length = %d",
-			misc.Bin2HStr(txHash), lenDilithiumPKs)
+			hex.EncodeToString(txHash), lenDilithiumPKs)
 		return false
 	}
 
 	for _, dilithiumPK := range tx.DilithiumPKs() {
-		strDilithiumPK := misc.Bin2HStr(dilithiumPK)
+		strDilithiumPK := hex.EncodeToString(dilithiumPK)
 		dilithiumMetaData := stateContext.GetDilithiumState(strDilithiumPK)
 		if dilithiumMetaData != nil {
 			if !reflect.DeepEqual(dilithiumMetaData.Address(), tx.AddrFrom()) {
@@ -157,8 +158,8 @@ func (tx *Stake) Validate(stateContext *state.StateContext) bool {
 	// TODO: Move to common function
 	if !reflect.DeepEqual(expectedTransactionHash, txHash) {
 		log.Warn("Invalid Transaction hash",
-			"Expected Transaction hash", misc.Bin2HStr(expectedTransactionHash),
-			"Found Transaction hash", misc.Bin2HStr(txHash))
+			"Expected Transaction hash", hex.EncodeToString(expectedTransactionHash),
+			"Found Transaction hash", hex.EncodeToString(txHash))
 		return false
 	}
 
@@ -177,13 +178,13 @@ func (tx *Stake) ApplyStateChanges(stateContext *state.StateContext) error {
 		return err
 	}
 
-	addrState, err := stateContext.GetAddressState(misc.Bin2HStr(tx.AddrFrom()))
+	addrState, err := stateContext.GetAddressState(hex.EncodeToString(tx.AddrFrom()))
 	if err != nil {
 		return err
 	}
 
 	for _, dilithiumPK := range tx.DilithiumPKs() {
-		strDilithiumPK := misc.Bin2HStr(dilithiumPK)
+		strDilithiumPK := hex.EncodeToString(dilithiumPK)
 
 		dilithiumState := stateContext.GetDilithiumState(strDilithiumPK)
 
@@ -213,15 +214,15 @@ func (tx *Stake) ApplyStateChanges(stateContext *state.StateContext) error {
 func (tx *Stake) SetAffectedAddress(stateContext *state.StateContext) error {
 	// Pre-load dilithium metadata, so that the stake flag value can be validated
 	for _, dilithiumPK := range tx.DilithiumPKs() {
-		_ = stateContext.PrepareDilithiumMetaData(misc.Bin2HStr(dilithiumPK))
+		_ = stateContext.PrepareDilithiumMetaData(hex.EncodeToString(dilithiumPK))
 	}
 
-	err := stateContext.PrepareAddressState(misc.Bin2HStr(tx.AddrFrom()))
+	err := stateContext.PrepareAddressState(hex.EncodeToString(tx.AddrFrom()))
 	if err != nil {
 		return err
 	}
 
-	addrFromPK := misc.Bin2HStr(misc.PK2BinAddress(tx.PK()))
+	addrFromPK := hex.EncodeToString(misc.PK2BinAddress(tx.PK()))
 
 	err = stateContext.PrepareOTSIndexMetaData(addrFromPK, tx.OTSIndex())
 	if err != nil {

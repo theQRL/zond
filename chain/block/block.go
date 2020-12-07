@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/golang/protobuf/proto"
@@ -171,7 +172,7 @@ func (b *Block) ProcessEpochMetaData(epochMetaData *metadata.EpochMetaData,
 		}
 	}
 	for _, pbData := range b.ProtocolTransactions() {
-		strPK := misc.Bin2HStr(pbData.Pk)
+		strPK := hex.EncodeToString(pbData.Pk)
 		amount, ok := validatorsStakeAmount[strPK]
 		if !ok {
 			return errors.New(fmt.Sprintf("balance not loaded for the validator %s", strPK))
@@ -198,7 +199,7 @@ func (b *Block) CommitGenesis(db *db.DB) error {
 		return err
 	}
 
-	strBlockProposerDilithiumPK := misc.Bin2HStr(blockProposerDilithiumPK)
+	strBlockProposerDilithiumPK := hex.EncodeToString(blockProposerDilithiumPK)
 	validatorsToXMSSAddress := stateContext.ValidatorsToXMSSAddress()
 	validatorsToXMSSAddress[strBlockProposerDilithiumPK] = blockProposerXMSSAddress
 
@@ -218,7 +219,7 @@ func (b *Block) CommitGenesis(db *db.DB) error {
 		}
 	}
 
-	blockProposerAddressState, err := stateContext.GetAddressState(misc.Bin2HStr(blockProposerXMSSAddress))
+	blockProposerAddressState, err := stateContext.GetAddressState(hex.EncodeToString(blockProposerXMSSAddress))
 	if err != nil {
 		log.Error("[CommitGenesis] Failed to get address state for block proposer XMSS address")
 		return err
@@ -253,7 +254,7 @@ func (b *Block) CommitGenesis(db *db.DB) error {
 		switch pbData.Type.(type) {
 		case *protos.Transaction_Stake:
 			for _, dilithiumPK := range pbData.GetStake().DilithiumPks {
-				strDilithiumPK := misc.Bin2HStr(dilithiumPK)
+				strDilithiumPK := hex.EncodeToString(dilithiumPK)
 				dilithiumMetaData := stateContext.GetDilithiumState(strDilithiumPK)
 				validatorsStakeAmount[strDilithiumPK] = dilithiumMetaData.Balance()
 			}
@@ -306,7 +307,7 @@ func (b *Block) Commit(db *db.DB, finalizedHeaderHash []byte, isFinalizedState b
 	}
 	parentBlock, err := GetBlock(db, parentHeaderHash)
 	if err != nil {
-		log.Error("[Commit] Error getting Parent Block ", misc.Bin2HStr(parentHeaderHash))
+		log.Error("[Commit] Error getting Parent Block ", hex.EncodeToString(parentHeaderHash))
 		return err
 	}
 	if b.Timestamp() <= parentBlock.Timestamp() {
@@ -513,7 +514,7 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 	for ;; {
 		bm, err := metadata.GetBlockMetaData(db, headerHash)
 		if err != nil {
-			log.Error("[UpdateFinalizedEpoch] Failed To Load GetBlockMetaData for ", misc.Bin2HStr(headerHash))
+			log.Error("[UpdateFinalizedEpoch] Failed To Load GetBlockMetaData for ", hex.EncodeToString(headerHash))
 			return err
 		}
 		if reflect.DeepEqual(bm.HeaderHash(), stateContext.GetMainChainMetaData().FinalizedBlockHeaderHash()) {
@@ -592,7 +593,7 @@ func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 			log.Error("[CalculateEpochMetaData] Failed to get DilithiumMetaData")
 			return nil, err
 		}
-		validatorsStakeAmount[misc.Bin2HStr(dilithiumPK)] = dilithiumMetaData.Balance()
+		validatorsStakeAmount[hex.EncodeToString(dilithiumPK)] = dilithiumMetaData.Balance()
 		totalStakeAmountAlloted += dilithiumMetaData.Balance()
 	}
 	epochMetaData.UpdatePrevEpochStakeData(0,

@@ -1,6 +1,7 @@
 package view
 
 import (
+	"encoding/hex"
 	"errors"
 	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/misc"
@@ -29,16 +30,16 @@ func (t *PlainTransferTransaction) TransactionFromPBData(tx *protos.Transaction,
 		t.MasterAddress = misc.Bin2Qaddress(tx.MasterAddr)
 	}
 	t.Fee = tx.Fee
-	t.PublicKey = misc.Bin2HStr(tx.Pk)
-	t.Signature = misc.Bin2HStr(tx.Signature)
+	t.PublicKey = hex.EncodeToString(tx.Pk)
+	t.Signature = hex.EncodeToString(tx.Signature)
 	t.Nonce = tx.Nonce
-	t.TransactionHash = misc.Bin2HStr(txHash)
+	t.TransactionHash = hex.EncodeToString(txHash)
 	t.TransactionType = "transfer"
 
 	t.AddressesTo = misc.Bin2QAddresses(tx.GetTransfer().AddrsTo)
 	t.Amounts = tx.GetTransfer().Amounts
 	for _, slavePk := range tx.GetTransfer().SlavePks {
-		t.SlavePks = append(t.SlavePks, misc.Bin2HStr(slavePk))
+		t.SlavePks = append(t.SlavePks, hex.EncodeToString(slavePk))
 	}
 	t.Message = string(tx.GetTransfer().Message)
 }

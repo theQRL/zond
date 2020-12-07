@@ -310,7 +310,7 @@ func (p *PublicAPIServer) BroadcastStakeTx(w http.ResponseWriter, r *http.Reques
 			},
 			FuncName:protos.LegacyMessage_ST,
 		},
-		MsgHash: misc.Bin2HStr(txHash),
+		MsgHash: hex.EncodeToString(txHash),
 	}
 	select {
 	case p.registerAndBroadcastChan <- registerMessage:
@@ -322,7 +322,7 @@ func (p *PublicAPIServer) BroadcastStakeTx(w http.ResponseWriter, r *http.Reques
 	}
 
 	response := &BroadcastTransactionResponse{
-		TransactionHash: misc.Bin2HStr(txHash),
+		TransactionHash: hex.EncodeToString(txHash),
 	}
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",
@@ -391,7 +391,7 @@ func (p *PublicAPIServer) BroadcastTransferTx(w http.ResponseWriter, r *http.Req
 			},
 			FuncName:protos.LegacyMessage_TT,
 		},
-		MsgHash: misc.Bin2HStr(txHash),
+		MsgHash: hex.EncodeToString(txHash),
 	}
 	select {
 	case p.registerAndBroadcastChan <- registerMessage:
@@ -402,7 +402,7 @@ func (p *PublicAPIServer) BroadcastTransferTx(w http.ResponseWriter, r *http.Req
 		return
 	}
 	response := &BroadcastTransactionResponse{
-		TransactionHash: misc.Bin2HStr(txHash),
+		TransactionHash: hex.EncodeToString(txHash),
 	}
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",

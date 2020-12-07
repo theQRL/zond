@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/theQRL/qrllib/goqrllib/goqrllib"
 	"github.com/theQRL/zond/misc"
@@ -139,11 +140,11 @@ func (x *XMSS) Address() []byte {
 }
 
 func (x *XMSS) QAddress() string {
-	return fmt.Sprintf("Q%s", misc.Bin2HStr(x.Address()))
+	return fmt.Sprintf("Q%s", hex.EncodeToString(x.Address()))
 }
 
 func (x *XMSS) StrAddress() string {
-	return fmt.Sprintf("%s", misc.Bin2HStr(x.Address()))
+	return fmt.Sprintf("%s", hex.EncodeToString(x.Address()))
 }
 
 func (x *XMSS) OTSIndex() uint64 {
@@ -155,7 +156,9 @@ func (x *XMSS) SetOTSIndex(newIndex uint) {
 }
 
 func (x *XMSS) HexSeed() string {
-	return goqrllib.Bin2hstr(x.xmss.GetExtendedSeed())
+	u := misc.NewUCharVector()
+	u.New(x.xmss.GetExtendedSeed())
+	return hex.EncodeToString(u.GetBytes())
 }
 
 func (x *XMSS) ExtendedSeed() goqrllib.UcharVector {

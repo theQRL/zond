@@ -3,6 +3,7 @@ package transactions
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"github.com/theQRL/zond/crypto"
 	"github.com/theQRL/zond/protos"
@@ -72,17 +73,17 @@ func (tx *Transfer) validateData(stateContext *state.StateContext) bool {
 	// TODO: Common check that the length of all bytes field such as addressfrom, slavepks, tx hash are of even length
 	for _, amount := range tx.Amounts() {
 		if amount < 0 {
-			log.Warn("Transfer [%s] Invalid Amount = %d", misc.Bin2HStr(txHash), amount)
+			log.Warn("Transfer [%s] Invalid Amount = %d", hex.EncodeToString(txHash), amount)
 			return false
 		}
 	}
 
 	if tx.Fee() < 0 {
-		log.Warn("Transfer [%s] Invalid Fee = %d", misc.Bin2HStr(txHash), tx.Fee)
+		log.Warn("Transfer [%s] Invalid Fee = %d", hex.EncodeToString(txHash), tx.Fee)
 		return false
 	}
 
-	addressState, err := stateContext.GetAddressState(misc.Bin2HStr(tx.AddrFrom()))
+	addressState, err := stateContext.GetAddressState(hex.EncodeToString(tx.AddrFrom()))
 	if err != nil {
 		log.Warn("Transfer [%s] Address %s missing into state context", tx.AddrFrom())
 		return false
@@ -90,14 +91,14 @@ func (tx *Transfer) validateData(stateContext *state.StateContext) bool {
 
 	if tx.Nonce() != addressState.Nonce() {
 		log.Warn(fmt.Sprintf("Transfer [%s] Invalid Nonce %d, Expected Nonce %d",
-			misc.Bin2HStr(txHash), tx.Nonce(), addressState.Nonce()))
+			hex.EncodeToString(txHash), tx.Nonce(), addressState.Nonce()))
 		return false
 	}
 
 	balance := addressState.Balance()
 	if balance < tx.TotalAmounts() + tx.Fee() {
 		log.Warn("Insufficient balance",
-			"txhash", misc.Bin2HStr(txHash),
+			"txhash", hex.EncodeToString(txHash),
 			"balance", balance,
 			"fee", tx.Fee())
 		return false
@@ -141,10 +142,10 @@ func (tx *Transfer) validateData(stateContext *state.StateContext) bool {
 	for _, slavePK := range tx.SlavePKs() {
 		binAddress := misc.PK2BinAddress(slavePK)
 		if !misc.IsValidAddress(binAddress) {
-			log.Warn("Slave public key %s is invalid", misc.Bin2HStr(slavePK))
+			log.Warn("Slave public key %s is invalid", hex.EncodeToString(slavePK))
 			return false
 		}
-		slaveState := stateContext.GetSlaveState(misc.Bin2HStr(tx.AddrFrom()), misc.Bin2HStr(slavePK))
+		slaveState := stateContext.GetSlaveState(hex.EncodeToString(tx.AddrFrom()), hex.EncodeToString(slavePK))
 		if slaveState != nil {
 			log.Warn("Slave public key %s already exist for address %s", slavePK, tx.AddrFrom())
 			return false
@@ -192,8 +193,8 @@ func (tx *Transfer) Validate(stateContext *state.StateContext) bool {
 	// TODO: Move to common function
 	if !reflect.DeepEqual(expectedTransactionHash, txHash) {
 		log.Warn("Invalid Transaction hash",
-			"Expected Transaction hash", misc.Bin2HStr(expectedTransactionHash),
-			"Found Transaction hash", misc.Bin2HStr(txHash))
+			"Expected Transaction hash", hex.EncodeToString(expectedTransactionHash),
+			"Found Transaction hash", hex.EncodeToString(txHash))
 		return false
 	}
 
@@ -210,7 +211,7 @@ func (tx *Transfer) ApplyStateChanges(stateContext *state.StateContext) error {
 		return err
 	}
 
-	addrState, err := stateContext.GetAddressState(misc.Bin2HStr(tx.AddrFrom()))
+	addrState, err := stateContext.GetAddressState(hex.EncodeToString(tx.AddrFrom()))
 	if err != nil {
 		return err
 	}
@@ -223,7 +224,7 @@ func (tx *Transfer) ApplyStateChanges(stateContext *state.StateContext) error {
 		addrTo := addrsTo[index]
 		amount := amounts[index]
 
-		addrState, err := stateContext.GetAddressState(misc.Bin2HStr(addrTo))
+		addrState, err := stateContext.GetAddressState(hex.EncodeToString(addrTo))
 		if err != nil {
 			return err
 		}
@@ -233,25 +234,25 @@ func (tx *Transfer) ApplyStateChanges(stateContext *state.StateContext) error {
 }
 
 func (tx *Transfer) SetAffectedAddress(stateContext *state.StateContext) error {
-	err := stateContext.PrepareAddressState(misc.Bin2HStr(tx.AddrFrom()))
+	err := stateContext.PrepareAddressState(hex.EncodeToString(tx.AddrFrom()))
 	if err != nil {
 		return err
 	}
 	for _, address := range tx.AddrsTo() {
-		err = stateContext.PrepareAddressState(misc.Bin2HStr(address))
+		err = stateContext.PrepareAddressState(hex.EncodeToString(address))
 		if err != nil {
 			return err
 		}
 	}
 
 	for _, slavePKs := range tx.SlavePKs() {
-		err = stateContext.PrepareSlaveMetaData(misc.Bin2HStr(tx.AddrFrom()), misc.Bin2HStr(slavePKs))
+		err = stateContext.PrepareSlaveMetaData(hex.EncodeToString(tx.AddrFrom()), hex.EncodeToString(slavePKs))
 		if err != nil {
 			return err
 		}
 	}
 
-	addrFromPK := misc.Bin2HStr(misc.PK2BinAddress(tx.PK()))
+	addrFromPK := hex.EncodeToString(misc.PK2BinAddress(tx.PK()))
 
 	err = stateContext.PrepareOTSIndexMetaData(addrFromPK, tx.OTSIndex())
 	if err != nil {

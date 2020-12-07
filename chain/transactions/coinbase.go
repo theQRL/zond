@@ -3,6 +3,7 @@ package transactions
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/chain/rewards"
@@ -77,7 +78,7 @@ func (tx *CoinBase) validateData(stateContext *state.StateContext) bool {
 	txHash := tx.TxHash(tx.GetSigningHash(stateContext.BlockSigningHash()))
 
 	coinBaseAddress := config.GetDevConfig().Genesis.CoinBaseAddress
-	addressState, err := stateContext.GetAddressState(misc.Bin2HStr(coinBaseAddress))
+	addressState, err := stateContext.GetAddressState(hex.EncodeToString(coinBaseAddress))
 	if err != nil {
 		log.Warn("CoinBase [%s] Address %s missing into state context", coinBaseAddress)
 		return false
@@ -85,12 +86,12 @@ func (tx *CoinBase) validateData(stateContext *state.StateContext) bool {
 
 	if tx.Nonce() != addressState.Nonce() {
 		log.Warn(fmt.Sprintf("CoinBase [%s] Invalid Nonce %d, Expected Nonce %d",
-			misc.Bin2HStr(txHash), tx.Nonce(), addressState.Nonce()))
+			hex.EncodeToString(txHash), tx.Nonce(), addressState.Nonce()))
 		return false
 	}
 
 	if err := stateContext.ProcessBlockProposerFlag(tx.PK()); err != nil {
-		log.Error("Failed to process block proposer ", misc.Bin2HStr(tx.PK()))
+		log.Error("Failed to process block proposer ", hex.EncodeToString(tx.PK()))
 		log.Error("Reason: ", err.Error())
 		return false
 	}
@@ -120,19 +121,19 @@ func (tx *CoinBase) validateData(stateContext *state.StateContext) bool {
 	//balance := addressState.Balance()
 	//if balance < tx.TotalAmounts() {
 	//	log.Warn("Insufficient balance",
-	//		"txhash", misc.Bin2HStr(txHash),
+	//		"txhash", hex.EncodeToString(txHash),
 	//		"balance", balance,
 	//		"fee", tx.FeeReward())
 	//	return false
 	//}
 
-	//ds := stateContext.GetDilithiumState(misc.Bin2HStr(tx.PK()))
+	//ds := stateContext.GetDilithiumState(hex.EncodeToString(tx.PK()))
 	//if ds == nil {
-	//	log.Warn("Dilithium State not found for %s", misc.Bin2HStr(tx.PK()))
+	//	log.Warn("Dilithium State not found for %s", hex.EncodeToString(tx.PK()))
 	//	return false
 	//}
 	//if !ds.Stake() {
-	//	log.Warn("Dilithium PK %s is not allowed to stake", misc.Bin2HStr(tx.PK()))
+	//	log.Warn("Dilithium PK %s is not allowed to stake", hex.EncodeToString(tx.PK()))
 	//	return false
 	//}
 
@@ -148,7 +149,7 @@ func (tx *CoinBase) Validate(stateContext *state.StateContext) bool {
 	if stateContext.GetSlotNumber() != 0 {
 		if !dilithium.DilithiumVerify(tx.Signature(), tx.PK(), signedMessage) {
 			log.Warn(fmt.Sprintf("Dilithium Signature Verification failed for CoinBase Txn %s",
-				misc.Bin2HStr(txHash)))
+				hex.EncodeToString(txHash)))
 			return false
 		}
 	}
@@ -196,7 +197,7 @@ func (tx *CoinBase) ApplyStateChanges(stateContext *state.StateContext) error {
 
 	//txHash := tx.TxHash(tx.GetSigningHash(stateContext.BlockSigningHash()))
 
-	//addressState, err := stateContext.GetAddressState(misc.Bin2HStr(stateContext.BlockProposer()))
+	//addressState, err := stateContext.GetAddressState(hex.EncodeToString(stateContext.BlockProposer()))
 	//if err != nil {
 	//	return err
 	//}
@@ -205,10 +206,10 @@ func (tx *CoinBase) ApplyStateChanges(stateContext *state.StateContext) error {
 
 	validatorsToXMSSAddress := stateContext.ValidatorsToXMSSAddress()
 
-	strBlockProposerDilithiumPK := misc.Bin2HStr(stateContext.BlockProposer())
+	strBlockProposerDilithiumPK := hex.EncodeToString(stateContext.BlockProposer())
 	// TODO: Get list of attestors
 	for validatorDilithiumPK, xmssAddress  := range validatorsToXMSSAddress {
-		addressState, err := stateContext.GetAddressState(misc.Bin2HStr(xmssAddress))
+		addressState, err := stateContext.GetAddressState(hex.EncodeToString(xmssAddress))
 		if err != nil {
 			return err
 		}
@@ -221,7 +222,7 @@ func (tx *CoinBase) ApplyStateChanges(stateContext *state.StateContext) error {
 		}
 	}
 
-	addressState, err := stateContext.GetAddressState(misc.Bin2HStr(config.GetDevConfig().Genesis.CoinBaseAddress))
+	addressState, err := stateContext.GetAddressState(hex.EncodeToString(config.GetDevConfig().Genesis.CoinBaseAddress))
 	if err != nil {
 		return err
 	}
@@ -231,7 +232,7 @@ func (tx *CoinBase) ApplyStateChanges(stateContext *state.StateContext) error {
 
 func (tx *CoinBase) SetAffectedAddress(stateContext *state.StateContext) error {
 	coinBaseAddress := config.GetDevConfig().Genesis.CoinBaseAddress
-	err := stateContext.PrepareAddressState(misc.Bin2HStr(coinBaseAddress))
+	err := stateContext.PrepareAddressState(hex.EncodeToString(coinBaseAddress))
 	if err != nil {
 		log.Error("[CoinBase.SetAffectedAddress] Failed to prepare AddressState for coinbase address")
 		return err
@@ -239,7 +240,7 @@ func (tx *CoinBase) SetAffectedAddress(stateContext *state.StateContext) error {
 
 	// Genesis block has unsigned coinbase txn
 	if stateContext.GetSlotNumber() != 0 {
-		err = stateContext.PrepareDilithiumMetaData(misc.Bin2HStr(tx.PK()))
+		err = stateContext.PrepareDilithiumMetaData(hex.EncodeToString(tx.PK()))
 		if err != nil {
 			log.Error("[CoinBase.SetAffectedAddress] Failed to prepare DilithiumMetadata")
 			return err
@@ -250,7 +251,7 @@ func (tx *CoinBase) SetAffectedAddress(stateContext *state.StateContext) error {
 			return err
 		}
 		xmssAddress := stateContext.GetXMSSAddressByDilithiumPK(tx.PK())
-		err = stateContext.PrepareAddressState(misc.Bin2HStr(xmssAddress))
+		err = stateContext.PrepareAddressState(hex.EncodeToString(xmssAddress))
 		if err != nil {
 			log.Error("[CoinBase.SetAffectedAddress] Failed to prepare AddressState for block proposer address")
 			return err
@@ -258,7 +259,7 @@ func (tx *CoinBase) SetAffectedAddress(stateContext *state.StateContext) error {
 	}
 
 	// TODO: PK is dilithium PK and it must be checked if its allowed to stake current block
-	//err = stateContext.PrepareAddressState(misc.Bin2HStr(misc.PK2BinAddress(tx.PK())))
+	//err = stateContext.PrepareAddressState(hex.EncodeToString(misc.PK2BinAddress(tx.PK())))
 	//if err != nil {
 	//	return err
 	//}

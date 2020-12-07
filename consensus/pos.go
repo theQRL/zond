@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"encoding/hex"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/address"
 	"github.com/theQRL/zond/chain"
@@ -80,7 +81,7 @@ func (p *POS) Start()  {
 func (p *POS) TimeRemainingForNextAction() time.Duration {
 	isThisNodeProposer := false
 	if p.blockBeingAttested != nil {
-		proposerDilithiumPK := misc.Bin2HStr(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
+		proposerDilithiumPK := hex.EncodeToString(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
 		_, isThisNodeProposer = p.validators[proposerDilithiumPK]
 	}
 	if p.blockBeingAttested == nil || !isThisNodeProposer {
@@ -132,7 +133,7 @@ running:
 			}
 			isThisNodeProposer := false
 			if p.blockBeingAttested != nil {
-				proposerDilithiumPK := misc.Bin2HStr(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
+				proposerDilithiumPK := hex.EncodeToString(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
 				_, isThisNodeProposer = p.validators[proposerDilithiumPK]
 				if !isThisNodeProposer {
 					p.blockBeingAttested = nil
@@ -149,7 +150,7 @@ running:
 					log.Error("Error getting SlotLeader Dilithium PK By Slot Number ", err.Error())
 					continue
 				}
-				proposerD, ok := p.validators[misc.Bin2HStr(slotLeader)]
+				proposerD, ok := p.validators[hex.EncodeToString(slotLeader)]
 				if !ok {
 					continue
 				}
@@ -175,7 +176,7 @@ running:
 					}
 					txInterface := txInfo.Transaction()
 					txPBData := txInterface.PBData()
-					strTxHash := misc.Bin2HStr(txInterface.TxHash(txInterface.GetSigningHash()))
+					strTxHash := hex.EncodeToString(txInterface.TxHash(txInterface.GetSigningHash()))
 					if p.chain.ValidateTransaction(txInterface) != nil {
 						log.Error("Transaction validation failed for ",
 							strTxHash)
@@ -199,7 +200,7 @@ running:
 				p.attestors = attestors
 				p.attestations = make([]*transactions.Attest, 0)
 				for _, dilithiumPK := range attestors {
-					strDilithiumPK := misc.Bin2HStr(dilithiumPK)
+					strDilithiumPK := hex.EncodeToString(dilithiumPK)
 					d, ok := p.validators[strDilithiumPK]
 					if !ok {
 						continue
@@ -246,7 +247,7 @@ running:
 					log.Info("Number of Attestations Received ",
 						len(p.blockBeingAttested.ProtocolTransactions()) - 1,
 						" for Block #", p.blockBeingAttested.SlotNumber())
-					dilithiumPK := misc.Bin2HStr(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
+					dilithiumPK := hex.EncodeToString(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
 					proposerD, ok := p.validators[dilithiumPK]
 					if !ok {
 						log.Error("Failed to load dilithium wallet for ", dilithiumPK)
@@ -307,7 +308,7 @@ running:
 			partialBlockSigningHash := b.PartialBlockSigningHash()
 			blockProposer := b.ProtocolTransactions()[0].GetPk()
 			for _, dilithiumPK := range attestors {
-				strDilithiumPK := misc.Bin2HStr(dilithiumPK)
+				strDilithiumPK := hex.EncodeToString(dilithiumPK)
 				d, ok := p.validators[strDilithiumPK]
 				if !ok {
 					continue
@@ -382,7 +383,7 @@ running:
 
 			p.attestations = append(p.attestations, tx)
 			log.Info("Received Attest Transaction ",
-				misc.Bin2HStr(tx.TxHash(tx.GetSigningHash(partialBlockSigningHash))),
+				hex.EncodeToString(tx.TxHash(tx.GetSigningHash(partialBlockSigningHash))),
 				" for block #", p.blockBeingAttested.SlotNumber())
 
 			// Add received attestation into block
@@ -391,7 +392,7 @@ running:
 			// Check if all attestations has been received, if yes, then broadcast block
 			//if len(p.attestations) == len(p.attestors) {
 			//	slotLeader := p.blockBeingAttested.ProtocolTransactions()[0].Pk
-			//	proposerD, ok := p.validators[misc.Bin2HStr(slotLeader)]
+			//	proposerD, ok := p.validators[hex.EncodeToString(slotLeader)]
 			//	if !ok {
 			//		continue
 			//	}

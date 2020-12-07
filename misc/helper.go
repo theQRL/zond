@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"github.com/theQRL/qrllib/goqrllib/goqrllib"
 	"math"
@@ -130,10 +131,6 @@ func Reverse(s [][]byte) [][]byte {
 	return s
 }
 
-func Bin2HStr(data []byte) string {
-	return goqrllib.Bin2hstr(BytesToUCharVector(data))
-}
-
 func HStr2Bin(data string) []byte {
 	defer func() {
 		if r := recover(); r != nil {
@@ -148,7 +145,7 @@ func Qaddress2Bin(qaddress string) []byte {
 }
 
 func Bin2Qaddress(binAddress []byte) string {
-	return "Q" + Bin2HStr(binAddress)
+	return "Q" + hex.EncodeToString(binAddress)
 }
 
 func Bin2QAddresses(binAddresses [][]byte) []string {
@@ -162,7 +159,7 @@ func Bin2QAddresses(binAddresses [][]byte) []string {
 func Bin2Pks(binPks [][]byte) []string {
 	pks := make([]string, 0)
 	for i := 0 ; i < len(binPks); i++ {
-		pks = append(pks, Bin2HStr(binPks[i]))
+		pks = append(pks, hex.EncodeToString(binPks[i]))
 	}
 	return pks
 }
