@@ -169,7 +169,7 @@ func (tx *CoinBase) ApplyStateChanges(stateContext *state.StateContext) error {
 	TODO:
 	1. Verify signature from Dilithium Address
 	 */
-	//strAddrTo := misc.Bin2Qaddress(tx.AddrTo())
+	//strAddrTo := misc.Bin2Address(tx.AddrTo())
 	//if addrState, ok := addressesState[strAddrTo]; ok {
 	//	addrState.AddBalance(tx.Amount())
 	//	if tx.config.Dev.RecordTransactionHashes {
@@ -178,10 +178,10 @@ func (tx *CoinBase) ApplyStateChanges(stateContext *state.StateContext) error {
 		//}
 	//}
 
-	//strAddrFrom := misc.Bin2Qaddress(tx.config.Dev.Genesis.CoinbaseAddress)
+	//strAddrFrom := misc.Bin2Address(tx.config.Dev.Genesis.CoinbaseAddress)
 	//
 	//if addrState, ok := addressesState[strAddrFrom]; ok {
-	//	masterQAddr := misc.Bin2Qaddress(tx.MasterAddr())
+	//	masterQAddr := misc.Bin2Address(tx.MasterAddr())
 	//	addressesState[masterQAddr].SubtractBalance(tx.Amount())
 	//	if tx.config.Dev.RecordTransactionHashes {
 			//Disabled Tracking of Transaction Hash into AddressState

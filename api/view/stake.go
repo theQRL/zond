@@ -26,7 +26,7 @@ type PlainStakeTransaction struct {
 func (t *PlainStakeTransaction) TransactionFromPBData(tx *protos.Transaction, txHash []byte) {
 	t.NetworkID = tx.NetworkId
 	if tx.MasterAddr != nil {
-		t.MasterAddress = misc.Bin2Qaddress(tx.MasterAddr)
+		t.MasterAddress = misc.Bin2Address(tx.MasterAddr)
 	}
 	t.Fee = strconv.FormatUint(tx.Fee, 10)
 	t.PublicKey = hex.EncodeToString(tx.Pk)
@@ -42,16 +42,26 @@ func (t *PlainStakeTransaction) TransactionFromPBData(tx *protos.Transaction, tx
 }
 
 func (t *PlainStakeTransaction) ToStakeTransactionObject() (*transactions.Stake, error) {
-	xmssPK := misc.HStr2Bin(t.PublicKey)
+	xmssPK, err := hex.DecodeString(t.PublicKey)
+	if err != nil {
+		return nil, err
+	}
 	var masterAddr []byte
 	var dilithiumPks [][]byte
 
 	if len(t.MasterAddress) > 0 {
-		masterAddr = misc.HStr2Bin(t.MasterAddress)
+		masterAddr, err = hex.DecodeString(t.MasterAddress)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	for _, dilithiumPk := range t.DilithiumPks {
-		dilithiumPks = append(dilithiumPks, misc.HStr2Bin(dilithiumPk))
+		binDilithiumPk, err := hex.DecodeString(dilithiumPk)
+		if err != nil {
+			return nil, err
+		}
+		dilithiumPks = append(dilithiumPks, binDilithiumPk)
 	}
 
 	fee, err := strconv.ParseUint(t.Fee, 10, 64)
@@ -77,7 +87,7 @@ func (t *PlainStakeTransaction) ToStakeTransactionObject() (*transactions.Stake,
 		return nil, errors.New("error parsing stake transaction")
 	}
 
-	stakeTx.PBData().Signature = misc.HStr2Bin(t.Signature)
+	stakeTx.PBData().Signature, err = hex.DecodeString(t.Signature)
 
-	return stakeTx, nil
+	return stakeTx, err
 }

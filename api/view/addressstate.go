@@ -25,7 +25,7 @@ type IsUnusedOTSIndex struct {
 }
 
 func (a *PlainAddressState) AddressStateFromPBData(a2 *protos.AddressState) {
-	a.Address = misc.Bin2Qaddress(a2.Address)
+	a.Address = misc.Bin2Address(a2.Address)
 	a.Balance = a2.Balance
 	a.Nonce = a2.Nonce
 }

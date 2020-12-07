@@ -139,10 +139,6 @@ func (x *XMSS) Address() []byte {
 	return misc.UCharVectorToBytes(x.xmss.GetAddress())
 }
 
-func (x *XMSS) QAddress() string {
-	return fmt.Sprintf("Q%s", hex.EncodeToString(x.Address()))
-}
-
 func (x *XMSS) StrAddress() string {
 	return fmt.Sprintf("%s", hex.EncodeToString(x.Address()))
 }

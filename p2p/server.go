@@ -10,7 +10,6 @@ import (
 	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/metadata"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/p2p/messages"
 	"github.com/theQRL/zond/protos"
@@ -484,13 +483,17 @@ running:
 			srv.UpdatePeerList(addPeerToPeerList)
 		case registerAndBroadcast := <-srv.registerAndBroadcastChan:
 			srv.mr.Register(registerAndBroadcast.MsgHash, registerAndBroadcast.Msg)
-
+			binMsgHash, err := hex.DecodeString(registerAndBroadcast.MsgHash)
+			if err != nil {
+				log.Error("Error decoding message hash ", err.Error())
+				continue
+			}
 			out := &Msg{
 				msg: &protos.LegacyMessage {
 					FuncName: protos.LegacyMessage_MR,
 					Data: &protos.LegacyMessage_MrData {
 						MrData: &protos.MRData {
-							Hash: misc.HStr2Bin(registerAndBroadcast.MsgHash),
+							Hash: binMsgHash,
 							Type: registerAndBroadcast.Msg.FuncName,
 						},
 					},

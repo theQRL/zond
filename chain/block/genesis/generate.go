@@ -1,6 +1,7 @@
 package genesis
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/ghodss/yaml"
 	"github.com/theQRL/zond/chain/block"
@@ -78,7 +79,11 @@ func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
 	}
 
 	dilithiumInfos := dilithiumGroup[0].DilithiumInfo
-	b := block.NewBlock(networkID, c.Genesis.GenesisTimestamp, misc.HStr2Bin(dilithiumInfos[0].PK),
+	binDilithiumPK, err := hex.DecodeString(dilithiumInfos[0].PK)
+	if err != nil {
+		return err
+	}
+	b := block.NewBlock(networkID, c.Genesis.GenesisTimestamp, binDilithiumPK,
 		0,  c.Genesis.GenesisPrevHeaderHash, transactions, nil, 0)
 
 	//for i := 0; i < len(dilithiumGroup); i++ {
@@ -88,8 +93,15 @@ func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
 	//			continue
 	//		}
 	//		dilithiumInfo := dilithiumGroup[i].DilithiumInfo[j]
-	//		d := dilithium.RecoverDilithium(misc.HStr2Bin(dilithiumInfo.PK),
-	//			misc.HStr2Bin(dilithiumInfo.SK))
+	//		binDilithiumPK, err := hex.DecodeString(dilithiumInfo.PK)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		binDilithiumSK, err := hex.DecodeString(dilithiumInfo.SK)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		d := dilithium.RecoverDilithium(binDilithiumPK, binDilithiumSK)
 	//		attestTx, err := b.Attest(networkID, d)
 	//		if err != nil {
 	//			return err
@@ -97,8 +109,15 @@ func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
 	//		b.AddAttestTx(attestTx)
 	//	}
 	//}
-	//d := dilithium.RecoverDilithium(misc.HStr2Bin(dilithiumInfos[0].PK),
-	//	misc.HStr2Bin(dilithiumInfos[0].SK))
+	//binDilithiumPK, err := hex.DecodeString(dilithiumInfos[0].PK)
+	//if err != nil {
+	//	return err
+	//}
+	//binDilithiumSK, err := hex.DecodeString(dilithiumInfos[0].SK)
+	//if err != nil {
+	//	return err
+	//}
+	//d := dilithium.RecoverDilithium(binDilithiumPK, binDilithiumSK)
 	//b.SignByProposer(d)
 
 	jsonData, err := protojson.Marshal(b.PBData())

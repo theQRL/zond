@@ -9,7 +9,6 @@ import (
 	"github.com/theQRL/zond/api/view"
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/config"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/p2p/messages"
 	"github.com/theQRL/zond/protos"
@@ -176,11 +175,17 @@ func (p *PublicAPIServer) GetAddressState(w http.ResponseWriter, r *http.Request
 	}
 	vars := mux.Vars(r)
 	address := vars["address"]
-
-	addressState, err := p.chain.GetAddressState(misc.HStr2Bin(address))
+	binAddress, err := hex.DecodeString(address)
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			fmt.Sprintf("Error Decoding address %s\n %s", address, err.Error()),
+			nil))
+		return
+	}
+	addressState, err := p.chain.GetAddressState(binAddress)
+	if err != nil {
+		json.NewEncoder(w).Encode(p.prepareResponse(1,
+			fmt.Sprintf("Error loading address State %s\n %s", address, err.Error()),
 			nil))
 		return
 	}
@@ -200,11 +205,17 @@ func (p *PublicAPIServer) GetBalance(w http.ResponseWriter, r *http.Request) {
 	}
 	vars := mux.Vars(r)
 	address := vars["address"]
-
-	addressState, err := p.chain.GetAddressState(misc.HStr2Bin(address))
+	binAddress, err := hex.DecodeString(address)
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			fmt.Sprintf("Error Decoding address %s\n %s", address, err.Error()),
+			nil))
+		return
+	}
+	addressState, err := p.chain.GetAddressState(binAddress)
+	if err != nil {
+		json.NewEncoder(w).Encode(p.prepareResponse(1,
+			fmt.Sprintf("Error loading address state %s\n %s", address, err.Error()),
 			nil))
 		return
 	}

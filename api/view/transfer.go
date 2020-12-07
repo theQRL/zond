@@ -27,7 +27,7 @@ type PlainTransferTransaction struct {
 func (t *PlainTransferTransaction) TransactionFromPBData(tx *protos.Transaction, txHash []byte) {
 	t.NetworkID = tx.NetworkId
 	if tx.MasterAddr != nil {
-		t.MasterAddress = misc.Bin2Qaddress(tx.MasterAddr)
+		t.MasterAddress = misc.Bin2Address(tx.MasterAddr)
 	}
 	t.Fee = tx.Fee
 	t.PublicKey = hex.EncodeToString(tx.Pk)
@@ -36,7 +36,7 @@ func (t *PlainTransferTransaction) TransactionFromPBData(tx *protos.Transaction,
 	t.TransactionHash = hex.EncodeToString(txHash)
 	t.TransactionType = "transfer"
 
-	t.AddressesTo = misc.Bin2QAddresses(tx.GetTransfer().AddrsTo)
+	t.AddressesTo = misc.Bin2Addresses(tx.GetTransfer().AddrsTo)
 	t.Amounts = tx.GetTransfer().Amounts
 	for _, slavePk := range tx.GetTransfer().SlavePks {
 		t.SlavePks = append(t.SlavePks, hex.EncodeToString(slavePk))
@@ -45,19 +45,32 @@ func (t *PlainTransferTransaction) TransactionFromPBData(tx *protos.Transaction,
 }
 
 func (t *PlainTransferTransaction) ToTransferTransactionObject() (*transactions.Transfer, error) {
-	addrsTo := misc.StringAddressToBytesArray(t.AddressesTo)
-	xmssPK := misc.HStr2Bin(t.PublicKey)
+	addrsTo, err := misc.StringAddressToBytesArray(t.AddressesTo)
+	if err != nil {
+		return nil, err
+	}
+	xmssPK, err := hex.DecodeString(t.PublicKey)
+	if err != nil {
+		return nil, err
+	}
 	var masterAddr []byte
 	var slavePks [][]byte
 	var message []byte
 
 	if len(t.MasterAddress) > 0 {
-		masterAddr = misc.HStr2Bin(t.MasterAddress)
+		masterAddr, err = hex.DecodeString(t.MasterAddress)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if len(t.SlavePks) > 0 {
 		for _, slavePk := range t.SlavePks {
-			slavePks = append(slavePks, misc.HStr2Bin(slavePk))
+			binSlavePk, err := hex.DecodeString(slavePk)
+			if err != nil {
+				return nil, err
+			}
+			slavePks = append(slavePks, binSlavePk)
 		}
 	}
 
@@ -80,7 +93,7 @@ func (t *PlainTransferTransaction) ToTransferTransactionObject() (*transactions.
 		return nil, errors.New("error parsing transfer transaction")
 	}
 
-	transferTx.PBData().Signature = misc.HStr2Bin(t.Signature)
+	transferTx.PBData().Signature, err = hex.DecodeString(t.Signature)
 
-	return transferTx, nil
+	return transferTx, err
 }

@@ -6,7 +6,6 @@ import (
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/chain/block"
 	"github.com/theQRL/zond/config"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/protos"
 	"math/big"
@@ -306,7 +305,11 @@ main:
 	for ; nextIndexForRequest < len(targetSlotNumbers) ; nextIndexForRequest++ {
 		hashesPeerInfo := targetSlotNumbers[nextIndexForRequest]
 		for headerHash := range hashesPeerInfo.peerByBlockHash {
-			b, err := d.chain.GetBlock(misc.HStr2Bin(headerHash))
+			binHeaderHash, err := hex.DecodeString(headerHash)
+			if err != nil {
+				continue
+			}
+			b, err := d.chain.GetBlock(binHeaderHash)
 
 			// Ignore making request if block already exists
 			if err == nil && b != nil {
@@ -323,7 +326,7 @@ main:
 				if peer == nil || peer.disconnected {
 					continue
 				}
-				err := peer.SendFetchBlock(misc.HStr2Bin(headerHash))
+				err := peer.SendFetchBlock(binHeaderHash)
 				if err != nil {
 					log.Error("Error fetching block from peer ", peer.ID())
 					continue
@@ -644,8 +647,14 @@ func (d *Downloader) Initialize(peerGroup []*Peer,
 	d.requestTracker = NewRequestTracker()
 	d.ignorePeers = make(map[string]int)
 	var lastBlockHeaderToDownload []byte
+	var err error
 	for headerHash := range targetSlotNumbers[len(targetSlotNumbers) - 1].peerByBlockHash {
-		lastBlockHeaderToDownload = misc.HStr2Bin(headerHash)
+		lastBlockHeaderToDownload, err = hex.DecodeString(headerHash)
+		if err != nil {
+			d.isSyncing = false
+			log.Error("Error decoding target header hash ", err.Error())
+			return
+		}
 	}
 
 	go d.Consumer(lastBlockHeaderToDownload, peerGroup)

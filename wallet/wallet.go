@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -125,7 +126,11 @@ func (w *Wallet) GetXMSSByIndex(index uint) (*crypto.XMSS, error) {
 		return nil, errors.New(fmt.Sprintf("Invalid XMSS Index"))
 	}
 	strHexSeed := w.pbData.XmssInfo[index - 1].HexSeed
-	return crypto.FromExtendedSeed(misc.HStr2Bin(strHexSeed)), nil
+	binHexSeed, err := hex.DecodeString(strHexSeed)
+	if err != nil {
+		return nil, err
+	}
+	return crypto.FromExtendedSeed(binHexSeed), nil
 }
 
 func NewWallet(walletFileName string) *Wallet {

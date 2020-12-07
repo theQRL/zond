@@ -209,7 +209,7 @@ func (tx *Transaction) applyStateChangesForPK(stateContext *state.StateContext) 
 	// TODO: Set Ots Key
 
 	//if _, ok := addressesState[addrFromPK]; ok {
-	//	//if misc.Bin2Qaddress(tx.AddrFrom()) != addrFromPK {
+	//	//if misc.Bin2Address(tx.AddrFrom()) != addrFromPK {
 	//	//	addressesState[addrFromPK].AppendTransactionHash(tx.Txhash())
 	//	//}
 	//	//if tx.OtsKey() >= tx.config.Dev.MaxOTSTracking {

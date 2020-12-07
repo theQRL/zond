@@ -5,7 +5,6 @@ import (
 	"container/list"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"github.com/theQRL/qrllib/goqrllib/goqrllib"
 	"math"
 	"os"
@@ -131,29 +130,20 @@ func Reverse(s [][]byte) [][]byte {
 	return s
 }
 
-func HStr2Bin(data string) []byte {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("Recovered in f")
-		}
-	}()
-	return UCharVectorToBytes(goqrllib.Hstr2bin(data))
+func Address2Bin(qaddress string) ([]byte, error) {
+	return hex.DecodeString(qaddress)
 }
 
-func Qaddress2Bin(qaddress string) []byte {
-	return HStr2Bin(qaddress[1:])
+func Bin2Address(binAddress []byte) string {
+	return hex.EncodeToString(binAddress)
 }
 
-func Bin2Qaddress(binAddress []byte) string {
-	return "Q" + hex.EncodeToString(binAddress)
-}
-
-func Bin2QAddresses(binAddresses [][]byte) []string {
-	QAddresses := make([]string, 0)
+func Bin2Addresses(binAddresses [][]byte) []string {
+	addresses := make([]string, 0)
 	for i := 0 ; i < len(binAddresses); i++ {
-		QAddresses = append(QAddresses, Bin2Qaddress(binAddresses[i]))
+		addresses = append(addresses, Bin2Address(binAddresses[i]))
 	}
-	return QAddresses
+	return addresses
 }
 
 func Bin2Pks(binPks [][]byte) []string {
@@ -169,7 +159,7 @@ func PK2BinAddress(pk []byte) []byte {
 }
 
 func PK2Qaddress(pk []byte) string {
-	return Bin2Qaddress(PK2BinAddress(pk))
+	return Bin2Address(PK2BinAddress(pk))
 }
 
 func ConvertBytesToLong(b []byte) uint32 {
@@ -189,14 +179,17 @@ func Sha256(message string, length int64) []byte {
 	return UCharVectorToBytes(goqrllib.Sha2_256_n(BytesToUCharVector([]byte(message)), length))
 }
 
-func StringAddressToBytesArray(addrs []string) [][]byte {
+func StringAddressToBytesArray(addrs []string) ([][]byte, error) {
 	bytesAddrs := make([][]byte, len(addrs))
-
+	var err error
 	for i := 0; i < len(addrs); i++ {
-		bytesAddrs[i] = Qaddress2Bin(addrs[i])
+		bytesAddrs[i], err = Address2Bin(addrs[i])
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return bytesAddrs
+	return bytesAddrs, nil
 }
 
 func UInt64ToString(data []uint64) []string {

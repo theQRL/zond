@@ -108,7 +108,11 @@ func getTransactionSubCommands() []*cli.Command {
 				}
 				var dilithiumPKs [][]byte
 				for _, dilithiumInfo := range dilithiumGroup.DilithiumInfo {
-					dilithiumPKs = append(dilithiumPKs, misc.HStr2Bin(dilithiumInfo.PK))
+					binDilithiumPk, err := hex.DecodeString(dilithiumInfo.PK)
+					if err != nil {
+						return err
+					}
+					dilithiumPKs = append(dilithiumPKs, binDilithiumPk)
 				}
 				tx := transactions.NewStake(c.Uint64(flags.NetworkIDFlag.Name), dilithiumPKs, true,
 					fee, c.Uint64("nonce"), xmss.PK(), nil)
@@ -174,7 +178,10 @@ func getTransactionSubCommands() []*cli.Command {
 				stdOut := c.Bool(flags.TransactionStdOut.Name)
 				broadcastFlag := c.Bool(flags.BroadcastFlag.Name)
 				remoteAddr := c.String(flags.RemoteAddrFlag.Name)
-				binAddressTo := misc.HStr2Bin(addressTo)
+				binAddressTo, err := hex.DecodeString(addressTo)
+				if err != nil {
+					return err
+				}
 
 				tx := transactions.NewTransfer(
 					c.Uint64(flags.NetworkIDFlag.Name),
