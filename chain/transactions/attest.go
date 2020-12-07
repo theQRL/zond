@@ -2,12 +2,11 @@ package transactions
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/theQRL/qrllib/goqrllib/goqrllib"
 	"github.com/theQRL/zond/crypto/dilithium"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 
@@ -24,11 +23,10 @@ func (tx *Attest) GetSigningHash(partialBlockSigningHash []byte) []byte {
 	binary.Write(tmp, binary.BigEndian, tx.NetworkID())
 	binary.Write(tmp, binary.BigEndian, tx.Nonce())
 
-	tmpTXHash := misc.NewUCharVector()
-	tmpTXHash.AddBytes(tmp.Bytes())
-	tmpTXHash.New(goqrllib.Sha2_256(tmpTXHash.GetData()))
+	h := sha256.New()
+	h.Write(tmp.Bytes())
 
-	return tmpTXHash.GetBytes()
+	return h.Sum(nil)
 }
 
 func (tx *Attest) validateData(stateContext *state.StateContext) bool {

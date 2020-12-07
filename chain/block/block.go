@@ -3,20 +3,19 @@ package block
 import (
 	"bytes"
 	"crypto/md5"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"github.com/theQRL/qrllib/goqrllib/goqrllib"
 	"github.com/theQRL/zond/chain/rewards"
 	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/crypto/dilithium"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/metadata"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 	"reflect"
@@ -53,11 +52,10 @@ func (b *Block) HeaderHash() []byte {
 	coinBaseTx := transactions.ProtoToProtocolTransaction(b.ProtocolTransactions()[0])
 	tmp.Write(coinBaseTx.TxHash(coinBaseTx.GetSigningHash(blockSigningHash)))
 
-	headerHash := misc.NewUCharVector()
-	headerHash.AddBytes(tmp.Bytes())
-	headerHash.New(goqrllib.Sha2_256(headerHash.GetData()))
+	headerHash := sha256.New()
+	headerHash.Write(tmp.Bytes())
 
-	return headerHash.GetBytes()
+	return headerHash.Sum(nil)
 }
 
 func (b *Block) Transactions() []*protos.Transaction {
@@ -97,11 +95,10 @@ func (b *Block) PartialBlockSigningHash() []byte {
 	coinBaseTx := transactions.ProtoToProtocolTransaction(b.ProtocolTransactions()[0])
 	tmp.Write(coinBaseTx.GetUnsignedHash())
 
-	partialSigningHash := misc.NewUCharVector()
-	partialSigningHash.AddBytes(tmp.Bytes())
-	partialSigningHash.New(goqrllib.Sha2_256(partialSigningHash.GetData()))
+	h := sha256.New()
+	h.Write(tmp.Bytes())
 
-	return partialSigningHash.GetBytes()
+	return h.Sum(nil)
 }
 
 func (b *Block) BlockSigningHash() []byte {
@@ -125,12 +122,10 @@ func (b *Block) BlockSigningHash() []byte {
 		tmp.Write(tx.TxHash(tx.GetSigningHash(b.PartialBlockSigningHash())))
 	}
 
+	h := sha256.New()
+	h.Write(tmp.Bytes())
 
-	signingHash := misc.NewUCharVector()
-	signingHash.AddBytes(tmp.Bytes())
-	signingHash.New(goqrllib.Sha2_256(signingHash.GetData()))
-
-	return signingHash.GetBytes()
+	return h.Sum(nil)
 }
 
 func (b *Block) Attest(networkID uint64, d *dilithium.Dilithium) (*transactions.Attest, error) {

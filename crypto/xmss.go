@@ -66,9 +66,9 @@ func NewXMSS(xmssFast goqrllib.XmssFast) *XMSS {
 func FromExtendedSeed(extendedSeedBytes []byte) *XMSS {
 	extendedSeed := misc.BytesToUCharVector(extendedSeedBytes)
 	moddedExtendedSeed := misc.NewUCharVector()
-	moddedExtendedSeed.New(extendedSeed)
-	if extendedSeed.Size() != 51 {
-		message := fmt.Sprintf("Extended seed size not equals to 51 %v", extendedSeed.Size())
+	moddedExtendedSeed.New(extendedSeed.GetData())
+	if extendedSeed.GetData().Size() != 51 {
+		message := fmt.Sprintf("Extended seed size not equals to 51 %v", extendedSeed.GetData().Size())
 		panic(message)
 	}
 
@@ -157,21 +157,25 @@ func (x *XMSS) HexSeed() string {
 	return hex.EncodeToString(u.GetBytes())
 }
 
-func (x *XMSS) ExtendedSeed() goqrllib.UcharVector {
-	return x.xmss.GetExtendedSeed()
+func (x *XMSS) ExtendedSeed() *misc.UcharVector {
+	u := misc.NewUCharVector()
+	u.New(x.xmss.GetExtendedSeed())
+	return u
 }
 
-func (x *XMSS) Seed() goqrllib.UcharVector {
-	return x.xmss.GetSeed()
+func (x *XMSS) Seed() *misc.UcharVector {
+	u := misc.NewUCharVector()
+	u.New(x.xmss.GetSeed())
+	return u
 }
 
 func (x *XMSS) Sign(message []byte) []byte {
-	msg := misc.UcharVector{}
-	msg.New(x.xmss.Sign(misc.BytesToUCharVector(message)))
+	msg := misc.NewUCharVector()
+	msg.New(x.xmss.Sign(misc.BytesToUCharVector(message).GetData()))
 	return msg.GetBytes()
 }
 
 func XMSSVerify(message []byte, signature []byte, pk []byte) bool {
-	return goqrllib.XmssFastVerify(misc.BytesToUCharVector(message),
-		misc.BytesToUCharVector(signature), misc.BytesToUCharVector(pk))
+	return goqrllib.XmssFastVerify(misc.BytesToUCharVector(message).GetData(),
+		misc.BytesToUCharVector(signature).GetData(), misc.BytesToUCharVector(pk).GetData())
 }

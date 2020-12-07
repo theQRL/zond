@@ -3,6 +3,7 @@ package misc
 import (
 	"bytes"
 	"container/list"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"github.com/theQRL/qrllib/goqrllib/goqrllib"
@@ -61,29 +62,30 @@ func (v *UcharVector) GetData() goqrllib.UcharVector {
 	return v.data
 }
 
-func (v *UcharVector) AddAt() goqrllib.UcharVector {
-	return v.data
-}
-
 func (v *UcharVector) New(data goqrllib.UcharVector) {
+	if v.data != nil {
+		goqrllib.DeleteUcharVector(v.data)
+	}
 	v.data = data
 }
 
-func BytesToUCharVector(data []byte) goqrllib.UcharVector {
-	vector := goqrllib.NewUcharVector__SWIG_0()
+func BytesToUCharVector(data []byte) *UcharVector {
+	u := NewUCharVector()
 	for _, element := range data {
-		vector.Add(element)
+		u.AddByte(element)
 	}
 
-	return vector
+	return u
 }
 
-func Int64ToUCharVector(data int64) goqrllib.UcharVector {
-	return goqrllib.NewUcharVector__SWIG_1(data)
+func Int64ToUCharVector(data int64) *UcharVector {
+	u := NewUCharVector()
+	u.New(goqrllib.NewUcharVector__SWIG_1(data))
+	return u
 }
 
 func UCharVectorToBytes(data goqrllib.UcharVector) []byte {
-	vector := UcharVector{}
+	vector := NewUCharVector()
 	vector.New(data)
 
 	return vector.GetBytes()
@@ -113,7 +115,9 @@ func MerkleTXHash(hashes list.List) []byte {
 				e = e.Next()
 				tmp.AddBytes(e.Value.([]byte))
 				e = e.Next()
-				nextLayer.PushBack(UCharVectorToBytes(goqrllib.Sha2_256(tmp.GetData())))
+				h := sha256.New()
+				h.Write(tmp.GetBytes())
+				nextLayer.PushBack(h.Sum(nil))
 			}
 			z += 2
 		}
@@ -155,7 +159,7 @@ func Bin2Pks(binPks [][]byte) []string {
 }
 
 func PK2BinAddress(pk []byte) []byte {
-	return UCharVectorToBytes(goqrllib.QRLHelperGetAddress(BytesToUCharVector(pk)))
+	return UCharVectorToBytes(goqrllib.QRLHelperGetAddress(BytesToUCharVector(pk).GetData()))
 }
 
 func PK2Qaddress(pk []byte) string {
@@ -176,7 +180,7 @@ func BytesToString(data []byte) string {
 }
 
 func Sha256(message string, length int64) []byte {
-	return UCharVectorToBytes(goqrllib.Sha2_256_n(BytesToUCharVector([]byte(message)), length))
+	return UCharVectorToBytes(goqrllib.Sha2_256_n(BytesToUCharVector([]byte(message)).GetData(), length))
 }
 
 func StringAddressToBytesArray(addrs []string) ([][]byte, error) {
@@ -223,7 +227,7 @@ func FileExists(fileName string) bool {
 
 func IsValidAddress(address []byte) bool {
 	// Warning: Never pass this validation True for Coinbase Address
-	if goqrllib.QRLHelperAddressIsValid(BytesToUCharVector(address)) {
+	if goqrllib.QRLHelperAddressIsValid(BytesToUCharVector(address).GetData()) {
 		return true
 	}
 	return false

@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"github.com/stretchr/testify/assert"
 	"github.com/theQRL/qrllib/goqrllib/goqrllib"
-	"github.com/theQRL/zond/misc"
 	"math"
 	"testing"
 )
@@ -244,11 +243,10 @@ func TestXMSS_ExtendedSeed(t *testing.T) {
 	assert.Nil(t, err)
 	x.xmss = FromExtendedSeed(binHexSeed)
 
-	u := misc.NewUCharVector()
-	u.New(x.xmss.ExtendedSeed())
+	extendedSeed := x.xmss.ExtendedSeed()
 	assert.Equal(t, x.xmss.StrAddress(), address, "%v != %v", x.xmss.StrAddress(), address)
-	assert.Equal(t, hex.EncodeToString(u.GetBytes()), hexseed,
-		"%v != %v", hex.EncodeToString(u.GetBytes()), hexseed)
+	assert.Equal(t, hex.EncodeToString(extendedSeed.GetBytes()), hexseed,
+		"%v != %v", hex.EncodeToString(extendedSeed.GetBytes()), hexseed)
 }
 
 func TestXMSS_Seed(t *testing.T) {
@@ -261,8 +259,7 @@ func TestXMSS_Seed(t *testing.T) {
 	assert.Nil(t, err)
 	x.xmss = FromExtendedSeed(binHexSeed)
 
-	u := misc.NewUCharVector()
-	u.New(x.xmss.Seed())
+	u := x.xmss.Seed()
 	assert.Equal(t, x.xmss.StrAddress(), address, "%v != %v", x.xmss.StrAddress(), address)
 	assert.Equal(t, hex.EncodeToString(u.GetBytes()), seed,
 		"%v != %v", hex.EncodeToString(u.GetBytes()), seed)

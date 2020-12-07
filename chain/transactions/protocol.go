@@ -2,10 +2,9 @@ package transactions
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"github.com/golang/protobuf/proto"
-	"github.com/theQRL/qrllib/goqrllib/goqrllib"
 	"github.com/theQRL/zond/crypto/dilithium"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -110,7 +109,9 @@ func (tx *ProtocolTransaction) GenerateTxHash(hashableBytes []byte) []byte {
 	tmp.Write(tx.Signature())
 	tmp.Write(tx.PK())
 
-	return misc.UCharVectorToBytes(goqrllib.Sha2_256(misc.BytesToUCharVector(tmp.Bytes())))
+	h := sha256.New()
+	h.Write(tmp.Bytes())
+	return h.Sum(nil)
 }
 
 func (tx *ProtocolTransaction) GenerateUnSignedTxHash(hashableBytes []byte) []byte {
@@ -118,7 +119,10 @@ func (tx *ProtocolTransaction) GenerateUnSignedTxHash(hashableBytes []byte) []by
 	tmp.Write(hashableBytes)
 	tmp.Write(tx.PK())
 
-	return misc.UCharVectorToBytes(goqrllib.Sha2_256(misc.BytesToUCharVector(tmp.Bytes())))
+	h := sha256.New()
+	h.Write(tmp.Bytes())
+
+	return h.Sum(nil)
 }
 
 func (tx *ProtocolTransaction) Sign(dilithium *dilithium.Dilithium, message []byte) {
