@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
@@ -11,7 +12,6 @@ import (
 	"github.com/theQRL/zond/chain/transactions/pool"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/metadata"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
@@ -130,7 +130,7 @@ func (c *Chain) Load() error {
 	lastBlock, err := block.GetBlock(db, mainChainMetaData.LastBlockHeaderHash())
 	if err != nil {
 		log.Error("Failed to load last block for ",
-			misc.Bin2HStr(mainChainMetaData.LastBlockHeaderHash()))
+			hex.EncodeToString(mainChainMetaData.LastBlockHeaderHash()))
 		return err
 	}
 	if lastBlock == nil {
@@ -139,7 +139,7 @@ func (c *Chain) Load() error {
 
 	c.lastBlock = lastBlock
 	log.Info(fmt.Sprintf("Current Block Slot Number %d HeaderHash %s",
-		c.lastBlock.SlotNumber(), misc.Bin2HStr(c.lastBlock.HeaderHash())))
+		c.lastBlock.SlotNumber(), hex.EncodeToString(c.lastBlock.HeaderHash())))
 	return nil
 }
 
@@ -254,20 +254,20 @@ func (c *Chain) GetBlock(headerHash []byte) (*block.Block, error) {
 //
 //		b, err := c.GetBlock(headerHash)
 //		if err != nil {
-//			log.Error("Failed to GetBlock ", misc.Bin2HStr(headerHash))
+//			log.Error("Failed to GetBlock ", hex.EncodeToString(headerHash))
 //			return nil, err
 //		}
 //
 //		blockMetaData, err := c.GetBlockMetaData(headerHash)
 //		if err != nil {
-//			log.Error("Failed to GetBlockMetaData ", misc.Bin2HStr(headerHash))
+//			log.Error("Failed to GetBlockMetaData ", hex.EncodeToString(headerHash))
 //			return nil, err
 //		}
 //
 //		for _, childHeaderHash := range blockMetaData.ChildHeaderHashes() {
 //			childBlock, err := c.GetBlock(childHeaderHash)
 //			if err != nil {
-//				log.Error("Error getting child block ", misc.Bin2HStr(childHeaderHash))
+//				log.Error("Error getting child block ", hex.EncodeToString(childHeaderHash))
 //				return nil, err
 //			}
 //
@@ -353,8 +353,8 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 		parentHeaderHash := parentBlock.HeaderHash()
 		if !reflect.DeepEqual(parentHeaderHash, mainChainMetaData.FinalizedBlockHeaderHash()) {
 			log.Error("[AddBlock] ParentBlock is not the part of the finalized chain",
-				" Expected hash ", misc.Bin2HStr(mainChainMetaData.FinalizedBlockHeaderHash()),
-				" Found hash ", misc.Bin2HStr(parentHeaderHash))
+				" Expected hash ", hex.EncodeToString(mainChainMetaData.FinalizedBlockHeaderHash()),
+				" Found hash ", hex.EncodeToString(parentHeaderHash))
 			return false
 		}
 	}
@@ -362,7 +362,7 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 	err = b.Commit(c.state.DB(), mainChainMetaData.FinalizedBlockHeaderHash(), false)
 	if err != nil {
 		log.Error(fmt.Sprintf("Failed to commit block #%d %s | Error %s", b.SlotNumber(),
-			misc.Bin2HStr(b.HeaderHash()), err.Error()))
+			hex.EncodeToString(b.HeaderHash()), err.Error()))
 		return false
 	}
 
@@ -380,13 +380,13 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 		lastBlock, err := c.GetBlock(mainChainMetaData.LastBlockHeaderHash())
 		if err != nil {
 			log.Error("Failed to Get Block for LastBlockHeaderHash ",
-				misc.Bin2HStr(mainChainMetaData.LastBlockHeaderHash()))
+				hex.EncodeToString(mainChainMetaData.LastBlockHeaderHash()))
 			return true
 		}
 		c.lastBlock = lastBlock
 	}
 
-	log.Info(fmt.Sprintf("Added Block #%d %s", b.SlotNumber(), misc.Bin2HStr(b.HeaderHash())))
+	log.Info(fmt.Sprintf("Added Block #%d %s", b.SlotNumber(), hex.EncodeToString(b.HeaderHash())))
 	return true
 }
 

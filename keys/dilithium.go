@@ -1,6 +1,7 @@
 package keys
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/theQRL/zond/crypto/dilithium"
@@ -23,8 +24,8 @@ func (dk *DilithiumKeys) GetDilithiumGroup() []*protos.DilithiumGroup {
 func (dk *DilithiumKeys) Add(dilithiumGroup *protos.DilithiumGroup) {
 	d := dilithium.NewDilithium()
 	dilithiumInfo := &protos.DilithiumInfo{
-		PK: misc.Bin2HStr(d.PK()),
-		SK: misc.Bin2HStr(d.SK()),
+		PK: hex.EncodeToString(d.PK()),
+		SK: hex.EncodeToString(d.SK()),
 	}
 	dilithiumGroup.DilithiumInfo = append(dilithiumGroup.DilithiumInfo, dilithiumInfo)
 

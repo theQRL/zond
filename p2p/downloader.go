@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"encoding/hex"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/chain/block"
@@ -254,7 +255,7 @@ func (d *Downloader) Consumer(lastBlockHeaderToDownload []byte, peerGroup []*Pee
 		case blockAndPeer := <-d.blockAndPeerChannel:
 			b := blockAndPeer.block
 			// Ensure if the block received is from the same Peer from which it was requested
-			strHeaderHash := misc.Bin2HStr(blockAndPeer.block.HeaderHash())
+			strHeaderHash := hex.EncodeToString(blockAndPeer.block.HeaderHash())
 			targetPeer, ok := d.requestTracker.GetPeerByHeaderHash(strHeaderHash)
 			if !ok || blockAndPeer.peer.ID() != targetPeer.ID() {
 				continue
@@ -270,7 +271,7 @@ func (d *Downloader) Consumer(lastBlockHeaderToDownload []byte, peerGroup []*Pee
 				}
 				log.Info("Trying To Add Block",
 					" #", b.SlotNumber(),
-					" ", misc.Bin2HStr(b.HeaderHash()))
+					" ", hex.EncodeToString(b.HeaderHash()))
 				delete(pendingBlocks, strHeaderHash)
 				d.requestTracker.RemoveFirstElementFromSequence()
 				d.requestTracker.RemoveRequestKey(strHeaderHash)
@@ -282,7 +283,7 @@ func (d *Downloader) Consumer(lastBlockHeaderToDownload []byte, peerGroup []*Pee
 
 				log.Info("Block Added",
 					" #", b.SlotNumber(),
-					" ", misc.Bin2HStr(b.HeaderHash()))
+					" ", hex.EncodeToString(b.HeaderHash()))
 
 				d.slotNumberProcessed <- b.SlotNumber()
 			}
@@ -606,7 +607,7 @@ func (d *Downloader) Initialize(peerGroup []*Peer,
 				hashesWithPeerInfoBySlotNumber[slotNumber] = hashesWithPeers
 			}
 			for _, headerHash := range blockHashesBySlotNumber.HeaderHashes {
-				strHeaderHash := misc.Bin2HStr(headerHash)
+				strHeaderHash := hex.EncodeToString(headerHash)
 				data, ok := hashesWithPeers.peerByBlockHash[strHeaderHash]
 				if !ok {
 					data = make([]*Peer, 0)

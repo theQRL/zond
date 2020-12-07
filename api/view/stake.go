@@ -1,6 +1,7 @@
 package view
 
 import (
+	"encoding/hex"
 	"errors"
 	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/misc"
@@ -28,14 +29,14 @@ func (t *PlainStakeTransaction) TransactionFromPBData(tx *protos.Transaction, tx
 		t.MasterAddress = misc.Bin2Qaddress(tx.MasterAddr)
 	}
 	t.Fee = strconv.FormatUint(tx.Fee, 10)
-	t.PublicKey = misc.Bin2HStr(tx.Pk)
-	t.Signature = misc.Bin2HStr(tx.Signature)
+	t.PublicKey = hex.EncodeToString(tx.Pk)
+	t.Signature = hex.EncodeToString(tx.Signature)
 	t.Nonce = strconv.FormatUint(tx.Nonce, 10)
-	t.TransactionHash = misc.Bin2HStr(txHash)
+	t.TransactionHash = hex.EncodeToString(txHash)
 	t.TransactionType = "stake"
 
 	for _, dilithiumPk := range tx.GetStake().DilithiumPks {
-		t.DilithiumPks = append(t.DilithiumPks, misc.Bin2HStr(dilithiumPk))
+		t.DilithiumPks = append(t.DilithiumPks, hex.EncodeToString(dilithiumPk))
 	}
 	t.Stake = tx.GetStake().Stake
 }

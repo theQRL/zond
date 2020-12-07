@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"encoding/hex"
 	"errors"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
@@ -525,7 +526,7 @@ func (p *Peer) handle(msg *Msg) error {
 		fbData := msg.msg.GetFbData()
 		blockHeaderHash := fbData.BlockHeaderHash
 		log.Info("Fetch Block Request",
-			" BlockHeaderHash ", misc.Bin2HStr(blockHeaderHash),
+			" BlockHeaderHash ", hex.EncodeToString(blockHeaderHash),
 			" Peer ", p.conn.RemoteAddr().String())
 
 		b, err := p.chain.GetBlock(blockHeaderHash)
@@ -586,12 +587,12 @@ func (p *Peer) HandleBlockForAttestation(pbBlock *protos.Block, signature []byte
 	if !p.mr.IsRequested(b.PartialBlockSigningHash(), p) {
 		log.Error("Unrequested Block Received for Attestation from ", p.ID(),
 			" #", b.SlotNumber(),
-			" PartialBlockSigningHash ", misc.Bin2HStr(b.PartialBlockSigningHash()))
+			" PartialBlockSigningHash ", hex.EncodeToString(b.PartialBlockSigningHash()))
 		return
 	}
 	log.Info("Received Block for Attestation from ", p.ID(),
 		" #", b.SlotNumber(),
-		" PartialBlockSigningHash ", misc.Bin2HStr(b.PartialBlockSigningHash()))
+		" PartialBlockSigningHash ", hex.EncodeToString(b.PartialBlockSigningHash()))
 
 	// TODO: Add Block Validation
 
@@ -605,7 +606,7 @@ func (p *Peer) HandleBlockForAttestation(pbBlock *protos.Block, signature []byte
 				},
 			},
 		},
-		MsgHash: misc.Bin2HStr(b.PartialBlockSigningHash()),
+		MsgHash: hex.EncodeToString(b.PartialBlockSigningHash()),
 	}
 	p.registerAndBroadcastChan <-msg
 
@@ -618,11 +619,11 @@ func (p *Peer) HandleBlock(pbBlock *protos.Block) {
 	b := block.BlockFromPBData(pbBlock)
 	if !p.mr.IsRequested(b.HeaderHash(), p) {
 		log.Error("Unrequested Block Received from ", p.ID()," #", b.SlotNumber(), " ",
-			misc.Bin2HStr(b.HeaderHash()))
+			hex.EncodeToString(b.HeaderHash()))
 		return
 	}
 	log.Info("Received Block from ", p.ID()," #", b.SlotNumber(), " ",
-		misc.Bin2HStr(b.HeaderHash()))
+		hex.EncodeToString(b.HeaderHash()))
 
 	if !p.chain.AddBlock(b) {
 		log.Warn("Failed To Add Block")
@@ -637,7 +638,7 @@ func (p *Peer) HandleBlock(pbBlock *protos.Block) {
 	}
 
 	registerMessage := &messages.RegisterMessage{
-		MsgHash: misc.Bin2HStr(b.HeaderHash()),
+		MsgHash: hex.EncodeToString(b.HeaderHash()),
 		Msg: msg,
 	}
 
@@ -656,7 +657,7 @@ func (p *Peer) HandleTransaction(msg *Msg, txData *protos.Transaction) error {
 	if !p.mr.IsRequested(txHash, p) {
 		log.Warn("[HandleTransaction] Received Unrequested txn ",
 			" Peer", p.ID(),
-			" Tx Hash", misc.Bin2HStr(txHash))
+			" Tx Hash", hex.EncodeToString(txHash))
 		return nil
 	}
 
@@ -685,7 +686,7 @@ func (p *Peer) HandleTransaction(msg *Msg, txData *protos.Transaction) error {
 		Data: msg.msg.Data,
 	}
 	registerMessage := &messages.RegisterMessage{
-		MsgHash:misc.Bin2HStr(txHash),
+		MsgHash:hex.EncodeToString(txHash),
 		Msg:msg2,
 	}
 	select {
@@ -705,7 +706,7 @@ func (p *Peer) HandleAttestTransaction(msg *Msg, txData *protos.ProtocolTransact
 	if !p.mr.IsRequested(txHash, p) {
 		log.Warn("[HandleAttestTransaction] Received Unrequested txn",
 			" Peer", p.ID(),
-			" Tx Hash", misc.Bin2HStr(txHash))
+			" Tx Hash", hex.EncodeToString(txHash))
 		return nil
 	}
 
@@ -732,7 +733,7 @@ func (p *Peer) HandleAttestTransaction(msg *Msg, txData *protos.ProtocolTransact
 		Data: msg.msg.Data,
 	}
 	registerMessage := &messages.RegisterMessage{
-		MsgHash:misc.Bin2HStr(txHash),
+		MsgHash:hex.EncodeToString(txHash),
 		Msg:msg2,
 	}
 	select {
@@ -751,7 +752,7 @@ func (p *Peer) HandleChainState(nodeChainState *protos.NodeChainState) {
 
 func (p *Peer) SendFetchBlock(blockHeaderHash []byte) error {
 	log.Info("Fetching",
-		" Block ", misc.Bin2HStr(blockHeaderHash),
+		" Block ", hex.EncodeToString(blockHeaderHash),
 		" Peer ", p.conn.RemoteAddr().String())
 	out := &Msg{}
 	fbData := &protos.FBData{

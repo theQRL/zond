@@ -3,6 +3,7 @@ package transactions
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/qrllib/goqrllib/goqrllib"
@@ -152,7 +153,7 @@ func (tx *Transaction) AddrFrom() []byte {
 }
 
 func (tx *Transaction) AddrFromPK() string {
-	return misc.Bin2HStr(misc.PK2BinAddress(tx.PK()))
+	return hex.EncodeToString(misc.PK2BinAddress(tx.PK()))
 }
 
 func (tx *Transaction) OTSIndex() uint64 {
@@ -226,11 +227,11 @@ func (tx *Transaction) ApplyStateChanges(stateContext *state.StateContext) error
 }
 
 func (tx *Transaction) SetAffectedAddress(stateContext *state.StateContext) error {
-	err := stateContext.PrepareAddressState(misc.Bin2HStr(tx.AddrFrom()))
+	err := stateContext.PrepareAddressState(hex.EncodeToString(tx.AddrFrom()))
 	if err != nil {
 		return err
 	}
-	err = stateContext.PrepareAddressState(misc.Bin2HStr(misc.PK2BinAddress(tx.PK())))
+	err = stateContext.PrepareAddressState(hex.EncodeToString(misc.PK2BinAddress(tx.PK())))
 	return err
 }
 
@@ -255,7 +256,7 @@ func (tx *Transaction) ValidateSlave(stateContext *state.StateContext) bool {
 		return false
 	}
 
-	slaveMetaData := stateContext.GetSlaveState(misc.Bin2HStr(masterAddr), misc.Bin2HStr(slavePK))
+	slaveMetaData := stateContext.GetSlaveState(hex.EncodeToString(masterAddr), hex.EncodeToString(slavePK))
 	if slaveMetaData == nil {
 		return false
 	}

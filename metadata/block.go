@@ -1,12 +1,12 @@
 package metadata
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"go.etcd.io/bbolt"
 )
@@ -95,9 +95,9 @@ func GetBlockMetaData(d *db.DB, headerHash []byte) (*BlockMetaData, error) {
 }
 
 func GetBlockMetaDataKey(headerHash []byte) []byte {
-	return []byte(fmt.Sprintf("BLOCK-META-DATA-%s", misc.Bin2HStr(headerHash)))
+	return []byte(fmt.Sprintf("BLOCK-META-DATA-%s", hex.EncodeToString(headerHash)))
 }
 
 func GetBlockBucketName(blockHeaderHash []byte) []byte {
-	return []byte(fmt.Sprintf("BLOCK-BUCKET-%s", misc.Bin2HStr(blockHeaderHash)))
+	return []byte(fmt.Sprintf("BLOCK-BUCKET-%s", hex.EncodeToString(blockHeaderHash)))
 }

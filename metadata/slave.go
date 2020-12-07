@@ -1,11 +1,11 @@
 package metadata
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/db"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"go.etcd.io/bbolt"
 )
@@ -70,5 +70,5 @@ func GetSlaveMetaData(db *db.DB, address []byte, slavePK []byte,
 }
 
 func GetSlaveMetaDataKey(address []byte, slavePK []byte) []byte {
-	return []byte(fmt.Sprintf("SLAVE-META-DATA-%s-%s", address, misc.Bin2HStr(slavePK)))
+	return []byte(fmt.Sprintf("SLAVE-META-DATA-%s-%s", address, hex.EncodeToString(slavePK)))
 }

@@ -1,6 +1,7 @@
 package state
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
@@ -82,7 +83,7 @@ func (s *StateContext) ValidatorsToXMSSAddress() map[string][]byte {
 }
 
 func (s *StateContext) processValidatorStakeAmount(dilithiumPK []byte) error {
-	strKey := misc.Bin2HStr(metadata.GetDilithiumMetaDataKey(dilithiumPK))
+	strKey := hex.EncodeToString(metadata.GetDilithiumMetaDataKey(dilithiumPK))
 	slotLeaderDilithiumMetaData, ok := s.dilithiumState[strKey]
 	if !ok {
 		return errors.New(fmt.Sprintf("validator dilithium state not found for %s", dilithiumPK))
@@ -95,7 +96,7 @@ func (s *StateContext) ProcessAttestorsFlag(attestorDilithiumPK []byte) error {
 	if s.slotNumber == 0 {
 		return nil
 	}
-	strAttestorDilithiumPK := misc.Bin2HStr(attestorDilithiumPK)
+	strAttestorDilithiumPK := hex.EncodeToString(attestorDilithiumPK)
 	result, ok := s.attestorsFlag[strAttestorDilithiumPK]
 	if !ok {
 		return errors.New("attestor is not assigned to attest at this slot number")
@@ -135,7 +136,7 @@ func (s *StateContext) ProcessBlockProposerFlag(blockProposerDilithiumPK []byte)
 }
 
 func (s *StateContext) PrepareAddressState(addr string) error {
-	strKey := misc.Bin2HStr(address.GetAddressStateKey(misc.HStr2Bin(addr)))
+	strKey := hex.EncodeToString(address.GetAddressStateKey(misc.HStr2Bin(addr)))
 	_, ok := s.addressesState[strKey]
 	if ok {
 		return nil
@@ -152,7 +153,7 @@ func (s *StateContext) PrepareAddressState(addr string) error {
 }
 
 func (s *StateContext) GetAddressState(addr string) (*address.AddressState, error) {
-	strKey := misc.Bin2HStr(address.GetAddressStateKey(misc.HStr2Bin(addr)))
+	strKey := hex.EncodeToString(address.GetAddressStateKey(misc.HStr2Bin(addr)))
 	addressState, ok := s.addressesState[strKey]
 	if !ok {
 		return nil, errors.New(fmt.Sprintf("Address %s not found in addressesState", addr))
@@ -161,7 +162,7 @@ func (s *StateContext) GetAddressState(addr string) (*address.AddressState, erro
 }
 
 func (s *StateContext) GetAddressStateByPK(pk []byte) (*address.AddressState, error) {
-	addr := misc.Bin2HStr(misc.PK2BinAddress(pk))
+	addr := hex.EncodeToString(misc.PK2BinAddress(pk))
 	return s.GetAddressState(addr)
 }
 
@@ -170,19 +171,19 @@ func (s *StateContext) PrepareValidatorsToXMSSAddress(dilithiumPK []byte) error 
 		dilithiumPK, s.parentBlockHeaderHash, s.finalizedHeaderHash)
 	if err != nil {
 		log.Error("Failed to PrepareValidatorsToXMSSAddress for ",
-			misc.Bin2HStr(dilithiumPK))
+			hex.EncodeToString(dilithiumPK))
 		return err
 	}
-	s.validatorsToXMSSAddress[misc.Bin2HStr(dilithiumPK)] = xmssAddress
+	s.validatorsToXMSSAddress[hex.EncodeToString(dilithiumPK)] = xmssAddress
 	return nil
 }
 
 func (s *StateContext) GetXMSSAddressByDilithiumPK(dilithiumPK []byte) []byte {
-	return s.validatorsToXMSSAddress[misc.Bin2HStr(dilithiumPK)]
+	return s.validatorsToXMSSAddress[hex.EncodeToString(dilithiumPK)]
 }
 
 func (s *StateContext) PrepareDilithiumMetaData(dilithiumPK string) error {
-	strKey := misc.Bin2HStr(metadata.GetDilithiumMetaDataKey(misc.HStr2Bin(dilithiumPK)))
+	strKey := hex.EncodeToString(metadata.GetDilithiumMetaDataKey(misc.HStr2Bin(dilithiumPK)))
 	_, ok := s.dilithiumState[strKey]
 	if ok {
 		return nil
@@ -198,7 +199,7 @@ func (s *StateContext) PrepareDilithiumMetaData(dilithiumPK string) error {
 }
 
 func (s *StateContext) AddDilithiumMetaData(dilithiumPK string, dilithiumMetaData *metadata.DilithiumMetaData) error {
-	strKey := misc.Bin2HStr(metadata.GetDilithiumMetaDataKey(misc.HStr2Bin(dilithiumPK)))
+	strKey := hex.EncodeToString(metadata.GetDilithiumMetaDataKey(misc.HStr2Bin(dilithiumPK)))
 	_, ok := s.dilithiumState[strKey]
 	if ok {
 		return errors.New("dilithiumPK already exists")
@@ -208,13 +209,13 @@ func (s *StateContext) AddDilithiumMetaData(dilithiumPK string, dilithiumMetaDat
 }
 
 func (s *StateContext) GetDilithiumState(dilithiumPK string) *metadata.DilithiumMetaData {
-	strKey := misc.Bin2HStr(metadata.GetDilithiumMetaDataKey(misc.HStr2Bin(dilithiumPK)))
+	strKey := hex.EncodeToString(metadata.GetDilithiumMetaDataKey(misc.HStr2Bin(dilithiumPK)))
 	dilithiumState, _ := s.dilithiumState[strKey]
 	return dilithiumState
 }
 
 func (s *StateContext) PrepareSlaveMetaData(masterAddr string, slavePK string) error {
-	strKey := misc.Bin2HStr(metadata.GetSlaveMetaDataKey(misc.HStr2Bin(masterAddr), misc.HStr2Bin(slavePK)))
+	strKey := hex.EncodeToString(metadata.GetSlaveMetaDataKey(misc.HStr2Bin(masterAddr), misc.HStr2Bin(slavePK)))
 	_, ok := s.slaveState[strKey]
 	if ok {
 		return nil
@@ -231,7 +232,7 @@ func (s *StateContext) PrepareSlaveMetaData(masterAddr string, slavePK string) e
 
 func (s *StateContext) AddSlaveMetaData(masterAddr string, slavePK string,
 	slaveMetaData *metadata.SlaveMetaData) error {
-	strKey := misc.Bin2HStr(metadata.GetSlaveMetaDataKey(misc.HStr2Bin(masterAddr), misc.HStr2Bin(slavePK)))
+	strKey := hex.EncodeToString(metadata.GetSlaveMetaDataKey(misc.HStr2Bin(masterAddr), misc.HStr2Bin(slavePK)))
 	_, ok := s.slaveState[strKey]
 	if ok {
 		return errors.New("SlaveMetaData already exists")
@@ -241,14 +242,14 @@ func (s *StateContext) AddSlaveMetaData(masterAddr string, slavePK string,
 }
 
 func (s *StateContext) GetSlaveState(masterAddr string, slavePK string) *metadata.SlaveMetaData {
-	strKey := misc.Bin2HStr(metadata.GetSlaveMetaDataKey(misc.HStr2Bin(masterAddr), misc.HStr2Bin(slavePK)))
+	strKey := hex.EncodeToString(metadata.GetSlaveMetaDataKey(misc.HStr2Bin(masterAddr), misc.HStr2Bin(slavePK)))
 	slaveMetaData, _ := s.slaveState[strKey]
 	return slaveMetaData
 }
 
 func (s *StateContext) PrepareOTSIndexMetaData(address string, otsIndex uint64) error {
 	key := metadata.GetOTSIndexMetaDataKeyByOTSIndex(misc.HStr2Bin(address), otsIndex)
-	strKey := misc.Bin2HStr(key)
+	strKey := hex.EncodeToString(key)
 	_, ok := s.otsIndexState[strKey]
 	if ok {
 		return nil
@@ -265,7 +266,7 @@ func (s *StateContext) PrepareOTSIndexMetaData(address string, otsIndex uint64) 
 
 func (s *StateContext) AddOTSIndexMetaData(address string, otsIndex uint64,
 	otsIndexMetaData *metadata.OTSIndexMetaData) error {
-	strKey := misc.Bin2HStr(metadata.GetOTSIndexMetaDataKeyByOTSIndex(misc.HStr2Bin(address), otsIndex))
+	strKey := hex.EncodeToString(metadata.GetOTSIndexMetaDataKeyByOTSIndex(misc.HStr2Bin(address), otsIndex))
 	_, ok := s.otsIndexState[strKey]
 	if ok {
 		return errors.New("OTSIndexMetaData already exists")
@@ -275,7 +276,7 @@ func (s *StateContext) AddOTSIndexMetaData(address string, otsIndex uint64,
 }
 
 func (s *StateContext) GetOTSIndexState(address string, otsIndex uint64) *metadata.OTSIndexMetaData {
-	strKey := misc.Bin2HStr(metadata.GetOTSIndexMetaDataKeyByOTSIndex(misc.HStr2Bin(address), otsIndex))
+	strKey := hex.EncodeToString(metadata.GetOTSIndexMetaDataKeyByOTSIndex(misc.HStr2Bin(address), otsIndex))
 	otsIndexMetaData, _ := s.otsIndexState[strKey]
 	return otsIndexMetaData
 }
@@ -303,13 +304,13 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 		lastBlockMetaData, err := metadata.GetBlockMetaData(s.db, s.mainChainMetaData.LastBlockHeaderHash())
 		if err != nil {
 			log.Error("[Commit] Failed to load last block meta data ",
-				misc.Bin2HStr(s.mainChainMetaData.LastBlockHeaderHash()))
+				hex.EncodeToString(s.mainChainMetaData.LastBlockHeaderHash()))
 			return err
 		}
 		err = lastBlockTotalStakeAmount.UnmarshalText(lastBlockMetaData.TotalStakeAmount())
 		if err != nil {
 			log.Error("[Commit] Unable to Unmarshal Text for lastblockmetadata total stake amount ",
-				misc.Bin2HStr(s.mainChainMetaData.LastBlockHeaderHash()))
+				hex.EncodeToString(s.mainChainMetaData.LastBlockHeaderHash()))
 			return err
 		}
 	}
@@ -424,7 +425,7 @@ func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.Blo
 	parentBlockMetaData, err := metadata.GetBlockMetaData(s.db, bm.ParentHeaderHash())
 	if err != nil {
 		log.Error("[Finalize] Failed to load ParentBlockMetaData ",
-			misc.Bin2HStr(bm.ParentHeaderHash()))
+			hex.EncodeToString(bm.ParentHeaderHash()))
 		return err
 	}
 
@@ -447,9 +448,9 @@ func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.Blo
 			if !reflect.DeepEqual(parentBlockMetaData.HeaderHash(), bm.ParentHeaderHash()) {
 				log.Error("[Finalize] Unexpected error parent block header hash not matching")
 				log.Error("Expected ParentBlockHeaderHash ",
-					misc.Bin2HStr(bm.ParentHeaderHash()))
+					hex.EncodeToString(bm.ParentHeaderHash()))
 				log.Error("ParentBlockHeaderHash found ",
-					misc.Bin2HStr(parentBlockMetaData.HeaderHash()))
+					hex.EncodeToString(parentBlockMetaData.HeaderHash()))
 				return errors.New("unexpected error parent block header hash not matching")
 			}
 
@@ -457,7 +458,7 @@ func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.Blo
 			err := parentBlockMetaData.Commit(mainBucket)
 			if err != nil {
 				log.Error("[Finalize] Failed to Commit ParentBlockMetaData ",
-					misc.Bin2HStr(parentBlockMetaData.HeaderHash()))
+					hex.EncodeToString(parentBlockMetaData.HeaderHash()))
 				return err
 			}
 			parentBlockMetaData = bm
@@ -493,7 +494,7 @@ func NewStateContext(db *db.DB, slotNumber uint64,
 	if slotNumber > 0 {
 		slotInfo := epochMetaData.SlotInfo()[slotNumber%config.GetDevConfig().BlocksPerEpoch]
 		for _, attestorsIndex := range slotInfo.Attestors {
-			attestorsFlag[misc.Bin2HStr(epochMetaData.Validators()[attestorsIndex])] = false
+			attestorsFlag[hex.EncodeToString(epochMetaData.Validators()[attestorsIndex])] = false
 		}
 	}
 

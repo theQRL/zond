@@ -1,13 +1,13 @@
 package metadata
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"go.etcd.io/bbolt"
 	"reflect"
@@ -58,7 +58,7 @@ func (e *EpochBlockHashes) AddHeaderHashBySlotNumber(headerHash []byte,
 		if reflect.DeepEqual(storedHeaderHash, headerHash) {
 			return errors.New(
 				fmt.Sprintf("Headerhash %s already exists",
-					misc.Bin2HStr(headerHash)))
+					hex.EncodeToString(headerHash)))
 		}
 	}
 	e.BlockHashesBySlotNumber()[index].HeaderHashes = append(

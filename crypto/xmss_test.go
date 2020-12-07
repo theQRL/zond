@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"encoding/hex"
 	"github.com/stretchr/testify/assert"
 	"github.com/theQRL/qrllib/goqrllib/goqrllib"
 	"github.com/theQRL/zond/misc"
@@ -87,7 +88,7 @@ func TestXMSS_sk(t *testing.T) {
 	x.xmss = FromExtendedSeed(binSeed)
 
 	assert.Equal(t, x.xmss.QAddress(), qaddress, "%v != %v", x.xmss.QAddress(), qaddress)
-	assert.Equal(t, misc.UCharVectorToBytes(x.xmss.sk()), expectedSK, "%v != %v", misc.UCharVectorToBytes(x.xmss.sk()), expectedSK)
+	assert.Equal(t, x.xmss.sk(), expectedSK, "%v != %v", x.xmss.sk(), expectedSK)
 }
 
 func TestXMSS_PK(t *testing.T) {
@@ -100,7 +101,7 @@ func TestXMSS_PK(t *testing.T) {
 	x.xmss = FromExtendedSeed(binSeed)
 
 	assert.Equal(t, x.xmss.QAddress(), qaddress, "%v != %v", x.xmss.QAddress(), qaddress)
-	assert.Equal(t, misc.UCharVectorToBytes(x.xmss.PK()), expectedPK, "%v != %v", misc.UCharVectorToBytes(x.xmss.PK()), expectedPK)
+	assert.Equal(t, x.xmss.PK(), expectedPK, "%v != %v", x.xmss.PK(), expectedPK)
 }
 
 func TestXMSS_NumberSignatures(t *testing.T) {
@@ -156,7 +157,7 @@ func TestXMSS_Address(t *testing.T) {
 	x.xmss = FromExtendedSeed(binSeed)
 
 	assert.Equal(t, x.xmss.QAddress(), qaddress, "%v != %v", x.xmss.QAddress(), qaddress)
-	assert.Equal(t, misc.UCharVectorToBytes(x.xmss.Address()), address, "%v != %v", misc.UCharVectorToBytes(x.xmss.Address()), address)
+	assert.Equal(t, x.xmss.Address(), address, "%v != %v", x.xmss.Address(), address)
 }
 
 func TestXMSS_QAddress(t *testing.T) {
@@ -228,8 +229,11 @@ func TestXMSS_ExtendedSeed(t *testing.T) {
 	binSeed := misc.UCharVectorToBytes(goqrllib.Hstr2bin(hexseed))
 	x.xmss = FromExtendedSeed(binSeed)
 
+	u := misc.NewUCharVector()
+	u.New(x.xmss.ExtendedSeed())
 	assert.Equal(t, x.xmss.QAddress(), qaddress, "%v != %v", x.xmss.QAddress(), qaddress)
-	assert.Equal(t, goqrllib.Bin2hstr(x.xmss.ExtendedSeed()), hexseed, "%v != %v", goqrllib.Bin2hstr(x.xmss.ExtendedSeed()), hexseed)
+	assert.Equal(t, hex.EncodeToString(u.GetBytes()), hexseed,
+		"%v != %v", hex.EncodeToString(u.GetBytes()), hexseed)
 }
 
 func TestXMSS_Seed(t *testing.T) {
@@ -241,8 +245,11 @@ func TestXMSS_Seed(t *testing.T) {
 	binSeed := misc.UCharVectorToBytes(goqrllib.Hstr2bin(hexseed))
 	x.xmss = FromExtendedSeed(binSeed)
 
+	u := misc.NewUCharVector()
+	u.New(x.xmss.Seed())
 	assert.Equal(t, x.xmss.QAddress(), qaddress, "%v != %v", x.xmss.QAddress(), qaddress)
-	assert.Equal(t, goqrllib.Bin2hstr(x.xmss.Seed()), seed, "%v != %v", goqrllib.Bin2hstr(x.xmss.Seed()), seed)
+	assert.Equal(t, hex.EncodeToString(u.GetBytes()), seed,
+		"%v != %v", hex.EncodeToString(u.GetBytes()), seed)
 }
 
 func TestXMSS_Sign(t *testing.T) {
@@ -259,7 +266,7 @@ func TestXMSS_Sign(t *testing.T) {
 	assert.Equal(t, x.xmss.RemainingSignatures(), expectedRemainingSigs, "%v != %v", x.xmss.RemainingSignatures(), expectedRemainingSigs)
 
 	signature := x.xmss.Sign([]byte(""))
-	hexSignature := goqrllib.Bin2hstr(misc.BytesToUCharVector(signature))
+	hexSignature := hex.EncodeToString(signature)
 	assert.Equal(t, hexSignature, expectedHexSignature, "%v != %v", hexSignature, expectedHexSignature)
 
 	assert.Equal(t, x.xmss.RemainingSignatures(), expectedRemainingSigs-1, "%v != %v", x.xmss.RemainingSignatures(), expectedRemainingSigs-1)

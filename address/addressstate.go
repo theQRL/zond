@@ -1,11 +1,11 @@
 package address
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/metadata"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"go.etcd.io/bbolt"
 )
@@ -108,5 +108,5 @@ func GetAddressState(db *db.DB, address []byte, lastBlockHeaderHash []byte,
 }
 
 func GetAddressStateKey(address []byte) []byte {
-	return []byte(fmt.Sprintf("ADDRESS-%s", misc.Bin2HStr(address)))
+	return []byte(fmt.Sprintf("ADDRESS-%s", hex.EncodeToString(address)))
 }

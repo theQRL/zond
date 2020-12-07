@@ -1,10 +1,10 @@
 package p2p
 
 import (
+	"encoding/hex"
 	"github.com/deckarep/golang-set"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/config"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"sync"
 )
@@ -49,7 +49,7 @@ func (mr *MessageReceipt) addPeer(mrData *protos.MRData, peer *Peer) {
 	defer mr.lock.Unlock()
 
 	msgType := mrData.Type
-	msgHash := misc.Bin2HStr(mrData.Hash)
+	msgHash := hex.EncodeToString(mrData.Hash)
 	if !mr.allowedTypes.Contains(msgType) {
 		log.Error("Message Type ", msgType, " not found in allowed types")
 		return
@@ -72,7 +72,7 @@ func (mr *MessageReceipt) IsRequested(msgHashBytes []byte, peer *Peer) bool {
 	mr.lock.Lock()
 	defer mr.lock.Unlock()
 
-	msgHash := misc.Bin2HStr(msgHashBytes)
+	msgHash := hex.EncodeToString(msgHashBytes)
 	if requestedHash, ok := mr.requestedHash[msgHash]; ok {
 		if _, ok := requestedHash.peers[peer]; ok {
 			return true
@@ -115,7 +115,7 @@ func (mr *MessageReceipt) contains(msgHashBytes []byte, messageType protos.Legac
 	mr.lock.Lock()
 	defer mr.lock.Unlock()
 
-	msgHash := misc.Bin2HStr(msgHashBytes)
+	msgHash := hex.EncodeToString(msgHashBytes)
 	value, ok := mr.hashMsg[msgHash]
 	if !ok {
 		return false
@@ -128,7 +128,7 @@ func (mr *MessageReceipt) Get(messageHash []byte) *protos.LegacyMessage {
 	mr.lock.Lock()
 	defer mr.lock.Unlock()
 
-	msgHash := misc.Bin2HStr(messageHash)
+	msgHash := hex.EncodeToString(messageHash)
 	value, _ := mr.hashMsg[msgHash]
 	return value
 }

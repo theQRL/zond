@@ -1,12 +1,12 @@
 package metadata
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/db"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"go.etcd.io/bbolt"
 )
@@ -104,7 +104,7 @@ func GetDilithiumMetaData(db *db.DB, dilithiumPK []byte,
 }
 
 func GetDilithiumMetaDataKey(dilithiumPK []byte) []byte {
-	return []byte(fmt.Sprintf("DILITHIUM-META-DATA-%s", misc.Bin2HStr(dilithiumPK)))
+	return []byte(fmt.Sprintf("DILITHIUM-META-DATA-%s", hex.EncodeToString(dilithiumPK)))
 }
 
 func GetXMSSAddressFromDilithiumPK(db *db.DB, dilithiumPK []byte,

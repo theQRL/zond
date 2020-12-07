@@ -3,6 +3,7 @@ package transactions
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"github.com/theQRL/qrllib/goqrllib/goqrllib"
 	"github.com/theQRL/zond/crypto/dilithium"
@@ -31,7 +32,7 @@ func (tx *Attest) GetSigningHash(partialBlockSigningHash []byte) []byte {
 }
 
 func (tx *Attest) validateData(stateContext *state.StateContext) bool {
-	dilithiumMetaData := stateContext.GetDilithiumState(misc.Bin2HStr(tx.PK()))
+	dilithiumMetaData := stateContext.GetDilithiumState(hex.EncodeToString(tx.PK()))
 	if dilithiumMetaData == nil {
 		return false
 	}
@@ -40,7 +41,7 @@ func (tx *Attest) validateData(stateContext *state.StateContext) bool {
 	}
 
 	if err := stateContext.ProcessAttestorsFlag(tx.PK()); err != nil {
-		log.Error("Failed to Process Attest transaction for attestor ", misc.Bin2HStr(tx.PK()))
+		log.Error("Failed to Process Attest transaction for attestor ", hex.EncodeToString(tx.PK()))
 		log.Error("Reason: ", err.Error())
 		return false
 	}
@@ -53,7 +54,7 @@ func (tx *Attest) Validate(stateContext *state.StateContext) bool {
 
 	if !dilithium.DilithiumVerify(tx.Signature(), tx.PK(), messageSigned) {
 		log.Warn(fmt.Sprintf("Dilithium Signature Verification failed for Attest Txn %s",
-			misc.Bin2HStr(txHash)))
+			hex.EncodeToString(txHash)))
 		return false
 	}
 
@@ -74,7 +75,7 @@ func (tx *Attest) ApplyStateChanges(stateContext *state.StateContext) error {
 }
 
 func (tx *Attest) SetAffectedAddress(stateContext *state.StateContext) error {
-	err := stateContext.PrepareDilithiumMetaData(misc.Bin2HStr(tx.PK()))
+	err := stateContext.PrepareDilithiumMetaData(hex.EncodeToString(tx.PK()))
 	if err != nil {
 		return err
 	}
@@ -85,7 +86,7 @@ func (tx *Attest) SetAffectedAddress(stateContext *state.StateContext) error {
 	}
 
 	xmssAddress := stateContext.GetXMSSAddressByDilithiumPK(tx.PK())
-	err = stateContext.PrepareAddressState(misc.Bin2HStr(xmssAddress))
+	err = stateContext.PrepareAddressState(hex.EncodeToString(xmssAddress))
 	if err != nil {
 		return err
 	}

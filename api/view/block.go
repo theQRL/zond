@@ -1,7 +1,7 @@
 package view
 
 import (
-	"github.com/theQRL/zond/misc"
+	"encoding/hex"
 	"github.com/theQRL/zond/protos"
 )
 
@@ -14,10 +14,10 @@ type PlainBlockHeader struct {
 
 func (bh *PlainBlockHeader) BlockHeaderFromPBData(bh2 *protos.BlockHeader,
 	headerHash []byte) {
-	bh.HeaderHash = misc.Bin2HStr(headerHash)
+	bh.HeaderHash = hex.EncodeToString(headerHash)
 	bh.SlotNumber = bh2.SlotNumber
 	bh.Timestamp = bh2.TimestampSeconds
-	bh.ParentHeaderHash = misc.Bin2HStr(bh2.ParentHeaderHash)
+	bh.ParentHeaderHash = hex.EncodeToString(bh2.ParentHeaderHash)
 }
 
 type PlainBlock struct {
