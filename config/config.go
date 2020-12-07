@@ -1,7 +1,8 @@
 package config
 
 import (
-	"github.com/theQRL/zond/misc"
+	"encoding/hex"
+	"fmt"
 	"os/user"
 	"path"
 	"sync"
@@ -214,7 +215,7 @@ func GetUserConfig() (userConf *UserConfig) {
 	//	}
 	userCurrentDir, _ := user.Current() // TODO: Handle error
 	stake := &StakeConfig{
-		EnableStaking: true,
+		EnableStaking: false,
 		DilithiumKeysFileName: path.Join(path.Join(userCurrentDir.HomeDir,
 			".zond"), "dilithium_keys"),
 	}
@@ -252,13 +253,21 @@ func (u *UserConfig) GetLogFileName() string {
 }
 
 func GetDevConfig() (dev *DevConfig) {
+	binCoinBaseAddress, err := hex.DecodeString("0000000000000000000000000000000000000000000000000000000000000000")
+	if err != nil {
+		panic(fmt.Sprintf("Invalid CoinBaseAddress %v", err.Error()))
+	}
+	binFoundationXMSSAddress, err := hex.DecodeString("0005003a4d7fa2f8a30dec94363a45a412833eb1c2fc0a490333f10f4e8acb012552d1f11b15a1")
+	if err != nil {
+		panic(fmt.Sprintf("Invalid FoundationAddress %v", err.Error()))
+	}
 	genesis := &GenesisConfig{
 		GenesisPrevHeaderHash: []byte("Outside Context Problem"),
 		MaxCoinSupply:         105000000000000000,
 		SuppliedCoins:         65000000000000000,
 		GenesisDifficulty:     10000000,
-		CoinBaseAddress:       misc.HStr2Bin("0000000000000000000000000000000000000000000000000000000000000000"),
-		FoundationXMSSAddress: misc.HStr2Bin("0005003a4d7fa2f8a30dec94363a45a412833eb1c2fc0a490333f10f4e8acb012552d1f11b15a1"),
+		CoinBaseAddress:       binCoinBaseAddress,
+		FoundationXMSSAddress: binFoundationXMSSAddress,
 		GenesisTimestamp:      1605185955,
 	}
 	transaction := &TransactionConfig{
