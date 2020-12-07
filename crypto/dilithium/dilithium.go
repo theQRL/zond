@@ -24,22 +24,24 @@ func (d *Dilithium) SK() []byte {
 }
 
 func (d *Dilithium) Sign(message []byte) []byte {
-	msg := misc.UcharVector{}
-	msg.New(d.d.Sign(misc.BytesToUCharVector(message)))
+	msg := misc.NewUCharVector()
+	msg.New(d.d.Sign(misc.BytesToUCharVector(message).GetData()))
 	return msg.GetBytes()
 }
 
 func DilithiumVerify(signature []byte, pk []byte, message []byte) bool {
-	dataOut := misc.Int64ToUCharVector(int64(len(message)))
-	dilithium.DilithiumSign_open(dataOut, misc.BytesToUCharVector(signature),
-		misc.BytesToUCharVector(pk))
+	u := misc.Int64ToUCharVector(int64(len(message)))
+	uSignature := misc.BytesToUCharVector(signature)
+	uPK := misc.BytesToUCharVector(pk)
+	dilithium.DilithiumSign_open(u.GetData(), uSignature.GetData(), uPK.GetData())
 
-	bytesData := misc.UCharVectorToBytes(dilithium.DilithiumExtract_message(dataOut))
+	bytesData := misc.UCharVectorToBytes(dilithium.DilithiumExtract_message(u.GetData()))
 	return reflect.DeepEqual(bytesData, message)
 }
 
 func RecoverDilithium(pk []byte, sk []byte) *Dilithium {
-	d := dilithium.NewDilithium__SWIG_1(misc.BytesToUCharVector(pk), misc.BytesToUCharVector(sk))
+	d := dilithium.NewDilithium__SWIG_1(misc.BytesToUCharVector(pk).GetData(),
+		misc.BytesToUCharVector(sk).GetData())
 	dilith := &Dilithium{d}
 
 	// Finalizer to clean up memory allocated by C++ when object becomes unreachable

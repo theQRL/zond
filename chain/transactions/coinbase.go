@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -11,9 +12,6 @@ import (
 	"github.com/theQRL/zond/crypto/dilithium"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
-
-	"github.com/theQRL/qrllib/goqrllib/goqrllib"
-	"github.com/theQRL/zond/misc"
 )
 
 type CoinBase struct {
@@ -49,11 +47,10 @@ func (tx *CoinBase) GetSigningHash(blockSigningHash []byte) []byte {
 	binary.Write(tmp, binary.BigEndian, tx.BlockProposerReward())
 	binary.Write(tmp, binary.BigEndian, tx.AttestorReward())
 
-	tmpTXHash := misc.NewUCharVector()
-	tmpTXHash.AddBytes(tmp.Bytes())
-	tmpTXHash.New(goqrllib.Sha2_256(tmpTXHash.GetData()))
+	h := sha256.New()
+	h.Write(tmp.Bytes())
 
-	return tmpTXHash.GetBytes()
+	return h.Sum(nil)
 }
 
 func (tx *CoinBase) GetUnsignedHash() []byte {
@@ -67,11 +64,10 @@ func (tx *CoinBase) GetUnsignedHash() []byte {
 	binary.Write(tmp, binary.BigEndian, tx.BlockProposerReward())
 	binary.Write(tmp, binary.BigEndian, tx.AttestorReward())
 
-	tmpTXHash := misc.NewUCharVector()
-	tmpTXHash.AddBytes(tmp.Bytes())
-	tmpTXHash.New(goqrllib.Sha2_256(tmpTXHash.GetData()))
+	h := sha256.New()
+	h.Write(tmp.Bytes())
 
-	return tmpTXHash.GetBytes()
+	return h.Sum(nil)
 }
 
 func (tx *CoinBase) validateData(stateContext *state.StateContext) bool {

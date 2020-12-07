@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/theQRL/qrllib/goqrllib/goqrllib"
 	"github.com/theQRL/zond/misc"
 )
 
@@ -62,9 +62,10 @@ func (tx *Transfer) GetSigningHash() []byte {
 
 	tmp.Write(tx.Message())
 
-	tmpTXHash := goqrllib.Sha2_256(misc.BytesToUCharVector(tmp.Bytes()))
+	h := sha256.New()
+	h.Write(tmp.Bytes())
 
-	return misc.UCharVectorToBytes(tmpTXHash)
+	return h.Sum(nil)
 }
 
 func (tx *Transfer) validateData(stateContext *state.StateContext) bool {

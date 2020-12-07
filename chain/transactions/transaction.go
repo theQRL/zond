@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"github.com/golang/protobuf/proto"
@@ -149,7 +150,7 @@ func (tx *Transaction) AddrFrom() []byte {
 		return tx.MasterAddr()
 	}
 
-	return misc.UCharVectorToBytes(goqrllib.QRLHelperGetAddress(misc.BytesToUCharVector(tx.PK())))
+	return misc.UCharVectorToBytes(goqrllib.QRLHelperGetAddress(misc.BytesToUCharVector(tx.PK()).GetData()))
 }
 
 func (tx *Transaction) AddrFromPK() string {
@@ -191,7 +192,9 @@ func (tx *Transaction) GenerateTxHash(signingHash []byte) []byte {
 	tmp.Write(tx.Signature())
 	tmp.Write(tx.PK())
 
-	return misc.UCharVectorToBytes(goqrllib.Sha2_256(misc.BytesToUCharVector(tmp.Bytes())))
+	h := sha256.New()
+	h.Write(tmp.Bytes())
+	return h.Sum(nil)
 }
 
 func (tx *Transaction) Sign(xmss *crypto.XMSS, message []byte) {
@@ -249,7 +252,7 @@ func (tx *Transaction) ValidateSlave(stateContext *state.StateContext) bool {
 	if len(masterAddr) == 0 {
 		return true
 	}
-	addrFromPK := misc.UCharVectorToBytes(goqrllib.QRLHelperGetAddress(misc.BytesToUCharVector(tx.PK())))
+	addrFromPK := misc.UCharVectorToBytes(goqrllib.QRLHelperGetAddress(misc.BytesToUCharVector(tx.PK()).GetData()))
 
 	if reflect.DeepEqual(tx.MasterAddr(), addrFromPK) {
 		log.Warn("Matching master_addr field and address from PK")
