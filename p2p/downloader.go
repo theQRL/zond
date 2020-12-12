@@ -338,7 +338,7 @@ main:
 		}
 	}
 
-	return numberOfRequests, nextIndexForRequest + 1, nil
+	return numberOfRequests, nextIndexForRequest, nil
 }
 
 func (d *Downloader) BlockDownloader(targetSlotNumbers []*HashesAndPeerInfo,
