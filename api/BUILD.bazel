@@ -13,7 +13,6 @@ go_library(
         "//api/view:go_default_library",
         "//chain:go_default_library",
         "//config:go_default_library",
-        "//misc:go_default_library",
         "//ntp:go_default_library",
         "//p2p/messages:go_default_library",
         "//protos:go_default_library",

@@ -6,14 +6,13 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/theQRL/zond/crypto"
+	"github.com/theQRL/go-qrllib-crypto/helper"
+	"github.com/theQRL/go-qrllib-crypto/xmss"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
-
-	"github.com/theQRL/zond/misc"
 )
 
 type Transfer struct {
@@ -121,13 +120,13 @@ func (tx *Transfer) validateData(stateContext *state.StateContext) bool {
 	}
 
 	// TODO: Move to some common validation
-	if !misc.IsValidAddress(tx.AddrFrom()) {
+	if !helper.IsValidAddress(tx.AddrFrom()) {
 		log.Warn("[Transfer] Invalid address addr_from: %s", tx.AddrFrom())
 		return false
 	}
 
 	for _, addrTo := range tx.AddrsTo() {
-		if !misc.IsValidAddress(addrTo) {
+		if !helper.IsValidAddress(addrTo) {
 			log.Warn("[Transfer] Invalid address addr_to: %s", tx.AddrsTo())
 			return false
 		}
@@ -141,8 +140,8 @@ func (tx *Transfer) validateData(stateContext *state.StateContext) bool {
 	}
 
 	for _, slavePK := range tx.SlavePKs() {
-		binAddress := misc.PK2BinAddress(slavePK)
-		if !misc.IsValidAddress(binAddress) {
+		binAddress := helper.PK2BinAddress(slavePK)
+		if !helper.IsValidAddress(binAddress) {
 			log.Warn("Slave public key %s is invalid", hex.EncodeToString(slavePK))
 			return false
 		}
@@ -200,7 +199,7 @@ func (tx *Transfer) Validate(stateContext *state.StateContext) bool {
 	}
 
 	// XMSS Signature Verification
-	if !crypto.XMSSVerify(tx.GetSigningHash(), tx.Signature(), tx.PK()) {
+	if !xmss.XMSSVerify(tx.GetSigningHash(), tx.Signature(), tx.PK()) {
 		log.Warn("XMSS Verification Failed")
 		return false
 	}
@@ -253,7 +252,7 @@ func (tx *Transfer) SetAffectedAddress(stateContext *state.StateContext) error {
 		}
 	}
 
-	addrFromPK := hex.EncodeToString(misc.PK2BinAddress(tx.PK()))
+	addrFromPK := hex.EncodeToString(helper.PK2BinAddress(tx.PK()))
 
 	err = stateContext.PrepareOTSIndexMetaData(addrFromPK, tx.OTSIndex())
 	if err != nil {

@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/theQRL/qrllib/goqrllib/goqrllib"
+	"github.com/theQRL/go-qrllib-crypto/xmss"
 	"github.com/theQRL/zond/api"
 	"github.com/theQRL/zond/config"
-	"github.com/theQRL/zond/crypto"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -23,12 +22,12 @@ type Wallet struct {
 	pbData *protos.Wallet
 }
 
-func (w *Wallet) Add(height uint64, hashFunction goqrllib.EHashFunction) {
-	xmss := crypto.FromHeight(height, hashFunction)
+func (w *Wallet) Add(height uint64, hashFunction xmss.EHashFunction) {
+	x := xmss.FromHeight(height, hashFunction)
 	xmssInfo := &protos.XMSSInfo{
-		Address: xmss.StrAddress(),
-		HexSeed: xmss.HexSeed(),
-		Mnemonic: xmss.Mnemonic(),
+		Address: x.StrAddress(),
+		HexSeed: x.HexSeed(),
+		Mnemonic: x.Mnemonic(),
 	}
 	w.pbData.XmssInfo = append(w.pbData.XmssInfo, xmssInfo)
 
@@ -121,7 +120,7 @@ func (w *Wallet) Load() {
 	}
 }
 
-func (w *Wallet) GetXMSSByIndex(index uint) (*crypto.XMSS, error) {
+func (w *Wallet) GetXMSSByIndex(index uint) (*xmss.XMSS, error) {
 	if int(index) > len(w.pbData.XmssInfo) {
 		return nil, errors.New(fmt.Sprintf("Invalid XMSS Index"))
 	}
@@ -130,7 +129,7 @@ func (w *Wallet) GetXMSSByIndex(index uint) (*crypto.XMSS, error) {
 	if err != nil {
 		return nil, err
 	}
-	return crypto.FromExtendedSeed(binHexSeed), nil
+	return xmss.FromExtendedSeed(binHexSeed), nil
 }
 
 func NewWallet(walletFileName string) *Wallet {

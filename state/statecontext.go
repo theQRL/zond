@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"github.com/theQRL/go-qrllib-crypto/helper"
 	"github.com/theQRL/zond/address"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/metadata"
-	"github.com/theQRL/zond/misc"
 	"go.etcd.io/bbolt"
 	"math/big"
 	"reflect"
@@ -170,7 +170,7 @@ func (s *StateContext) GetAddressState(addr string) (*address.AddressState, erro
 }
 
 func (s *StateContext) GetAddressStateByPK(pk []byte) (*address.AddressState, error) {
-	addr := hex.EncodeToString(misc.PK2BinAddress(pk))
+	addr := hex.EncodeToString(helper.PK2BinAddress(pk))
 	return s.GetAddressState(addr)
 }
 

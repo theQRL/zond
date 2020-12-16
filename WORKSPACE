@@ -242,8 +242,8 @@ go_repository(
 go_repository(
     name = "com_github_stretchr_testify",
     importpath = "github.com/stretchr/testify",
-    sum = "h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJyk=",
-    version = "v1.4.0",
+    sum = "h1:hDPOHmpOpP40lSULcqw7IrRb/u7w6RpDC9399XyoNd0=",
+    version = "v1.6.1",
 )
 
 git_repository(
@@ -499,4 +499,18 @@ go_repository(
     importpath = "gopkg.in/tomb.v1",
     sum = "h1:uRGJdciOHaEIrze2W8Q3AKkepLTh2hOroT7a+7czfdQ=",
     version = "v1.0.0-20141024135613-dd632973f1e7",
+)
+
+go_repository(
+    name = "com_github_theqrl_go_qrllib_crypto",
+    importpath = "github.com/theQRL/go-qrllib-crypto",
+    sum = "h1:MzWCvHs74DJ+Tp3AKaWklNUv+5uUZrn7rHjVVqV/QK4=",
+    version = "v0.0.0-20201216132758-851d39cc0d43",
+)
+
+go_repository(
+    name = "in_gopkg_yaml_v3",
+    importpath = "gopkg.in/yaml.v3",
+    sum = "h1:dUUwHk2QECo/6vqA44rthZ8ie2QXMNeKRTHCNY2nXvo=",
+    version = "v3.0.0-20200313102051-9f266ea9e77c",
 )

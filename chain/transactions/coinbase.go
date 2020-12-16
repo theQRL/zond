@@ -7,9 +7,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"github.com/theQRL/go-qrllib-crypto/dilithium"
 	"github.com/theQRL/zond/chain/rewards"
 	"github.com/theQRL/zond/config"
-	"github.com/theQRL/zond/crypto/dilithium"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 )
@@ -165,7 +165,7 @@ func (tx *CoinBase) ApplyStateChanges(stateContext *state.StateContext) error {
 	TODO:
 	1. Verify signature from Dilithium Address
 	 */
-	//strAddrTo := misc.Bin2Address(tx.AddrTo())
+	//strAddrTo := helper.Bin2Address(tx.AddrTo())
 	//if addrState, ok := addressesState[strAddrTo]; ok {
 	//	addrState.AddBalance(tx.Amount())
 	//	if tx.config.Dev.RecordTransactionHashes {
@@ -174,10 +174,10 @@ func (tx *CoinBase) ApplyStateChanges(stateContext *state.StateContext) error {
 		//}
 	//}
 
-	//strAddrFrom := misc.Bin2Address(tx.config.Dev.Genesis.CoinbaseAddress)
+	//strAddrFrom := helper.Bin2Address(tx.config.Dev.Genesis.CoinbaseAddress)
 	//
 	//if addrState, ok := addressesState[strAddrFrom]; ok {
-	//	masterQAddr := misc.Bin2Address(tx.MasterAddr())
+	//	masterQAddr := helper.Bin2Address(tx.MasterAddr())
 	//	addressesState[masterQAddr].SubtractBalance(tx.Amount())
 	//	if tx.config.Dev.RecordTransactionHashes {
 			//Disabled Tracking of Transaction Hash into AddressState

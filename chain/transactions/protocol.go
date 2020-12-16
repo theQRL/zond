@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"github.com/golang/protobuf/proto"
-	"github.com/theQRL/zond/crypto/dilithium"
+	"github.com/theQRL/go-qrllib-crypto/dilithium"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 	"google.golang.org/protobuf/encoding/protojson"

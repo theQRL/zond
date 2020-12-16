@@ -6,9 +6,9 @@ go_library(
     importpath = "github.com/theQRL/zond/keys",
     visibility = ["//visibility:public"],
     deps = [
-        "//crypto/dilithium:go_default_library",
         "//misc:go_default_library",
         "//protos:go_default_library",
+        "@com_github_theqrl_go_qrllib_crypto//dilithium:go_default_library",
         "@org_golang_google_protobuf//encoding/protojson:go_default_library",
     ],
 )

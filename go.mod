@@ -17,8 +17,9 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/stretchr/testify v1.4.0
-	github.com/theQRL/qrllib v1.2.0
+	github.com/stretchr/testify v1.6.1
+	github.com/theQRL/go-qrllib-crypto v0.0.0-20201216132758-851d39cc0d43
+	github.com/theQRL/qrllib v1.2.2
 	github.com/urfave/cli/v2 v2.2.0
 	github.com/willf/bitset v1.1.11 // indirect
 	github.com/willf/bloom v2.0.3+incompatible

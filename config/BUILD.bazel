@@ -5,5 +5,4 @@ go_library(
     srcs = ["config.go"],
     importpath = "github.com/theQRL/zond/config",
     visibility = ["//visibility:public"],
-    deps = ["//misc:go_default_library"],
 )
