@@ -6,16 +6,15 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"github.com/theQRL/go-qrllib-crypto/helper"
+	"github.com/theQRL/go-qrllib-crypto/xmss"
 	"github.com/theQRL/zond/config"
-	"github.com/theQRL/zond/crypto"
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
-
-	"github.com/theQRL/zond/misc"
 )
 
 type Stake struct {
@@ -129,7 +128,7 @@ func (tx *Stake) validateData(stateContext *state.StateContext) bool {
 		}
 	}
 
-	if !misc.IsValidAddress(tx.AddrFrom()) {
+	if !helper.IsValidAddress(tx.AddrFrom()) {
 		log.Warn("[Stake] Invalid address addr_from: %s", tx.AddrFrom())
 		return false
 	}
@@ -165,7 +164,7 @@ func (tx *Stake) Validate(stateContext *state.StateContext) bool {
 	}
 
 	// XMSS Signature Verification
-	if !crypto.XMSSVerify(tx.GetSigningHash(), tx.Signature(), tx.PK()) {
+	if !xmss.XMSSVerify(tx.GetSigningHash(), tx.Signature(), tx.PK()) {
 		log.Warn("XMSS Verification Failed")
 		return false
 	}
@@ -223,7 +222,7 @@ func (tx *Stake) SetAffectedAddress(stateContext *state.StateContext) error {
 		return err
 	}
 
-	addrFromPK := hex.EncodeToString(misc.PK2BinAddress(tx.PK()))
+	addrFromPK := hex.EncodeToString(helper.PK2BinAddress(tx.PK()))
 
 	err = stateContext.PrepareOTSIndexMetaData(addrFromPK, tx.OTSIndex())
 	if err != nil {

@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/theQRL/zond/crypto/dilithium"
+	"github.com/theQRL/go-qrllib-crypto/dilithium"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 

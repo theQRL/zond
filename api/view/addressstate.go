@@ -1,7 +1,7 @@
 package view
 
 import (
-	"github.com/theQRL/zond/misc"
+	"github.com/theQRL/go-qrllib-crypto/helper"
 	"github.com/theQRL/zond/protos"
 )
 
@@ -25,7 +25,7 @@ type IsUnusedOTSIndex struct {
 }
 
 func (a *PlainAddressState) AddressStateFromPBData(a2 *protos.AddressState) {
-	a.Address = misc.Bin2Address(a2.Address)
+	a.Address = helper.Bin2Address(a2.Address)
 	a.Balance = a2.Balance
 	a.Nonce = a2.Nonce
 }

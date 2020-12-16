@@ -19,7 +19,6 @@ go_library(
     deps = [
         "//config:go_default_library",
         "//db:go_default_library",
-        "//misc:go_default_library",
         "//ntp:go_default_library",
         "//protos:go_default_library",
         "@com_github_golang_protobuf//proto:go_default_library",

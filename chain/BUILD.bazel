@@ -13,7 +13,6 @@ go_library(
         "//chain/transactions/pool:go_default_library",
         "//config:go_default_library",
         "//metadata:go_default_library",
-        "//misc:go_default_library",
         "//ntp:go_default_library",
         "//protos:go_default_library",
         "//state:go_default_library",

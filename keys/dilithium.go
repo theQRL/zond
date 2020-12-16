@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/theQRL/zond/crypto/dilithium"
+	"github.com/theQRL/go-qrllib-crypto/dilithium"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"google.golang.org/protobuf/encoding/protojson"

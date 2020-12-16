@@ -3,12 +3,12 @@ package consensus
 import (
 	"encoding/hex"
 	log "github.com/sirupsen/logrus"
+	"github.com/theQRL/go-qrllib-crypto/dilithium"
 	"github.com/theQRL/zond/address"
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/chain/block"
 	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/config"
-	"github.com/theQRL/zond/crypto/dilithium"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/keys"
 	"github.com/theQRL/zond/metadata"

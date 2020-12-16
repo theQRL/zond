@@ -1,8 +1,9 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
-	"github.com/theQRL/qrllib/goqrllib/goqrllib"
+	"github.com/theQRL/go-qrllib-crypto/xmss"
 	"github.com/theQRL/zond/cli/flags"
 	"github.com/theQRL/zond/wallet"
 	"github.com/urfave/cli/v2"
@@ -21,8 +22,12 @@ func getWalletSubCommands() []*cli.Command {
 				heightFlag,
 			},
 			Action: func(c *cli.Context) error {
+				hashType, ok := xmss.EHashFunctions["sha2_256"]
+				if !ok {
+					return errors.New("invalid xmss hash type")
+				}
 				w := wallet.NewWallet(flags.WalletFile.Value)
-				w.Add(heightFlag.Value, goqrllib.SHA2_256)
+				w.Add(heightFlag.Value, hashType)
 
 				fmt.Println("Wallet Created")
 				return nil

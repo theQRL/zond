@@ -7,10 +7,9 @@ import (
 	"encoding/hex"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"github.com/theQRL/qrllib/goqrllib/goqrllib"
-	"github.com/theQRL/zond/crypto"
+	"github.com/theQRL/go-qrllib-crypto/helper"
+	"github.com/theQRL/go-qrllib-crypto/xmss"
 	"github.com/theQRL/zond/metadata"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -76,7 +75,7 @@ type TransactionInterface interface {
 
 	GetSigningHash() []byte
 
-	Sign(xmss *crypto.XMSS, message []byte)
+	Sign(xmss *xmss.XMSS, message []byte)
 
 	ApplyStateChanges(stateContext *state.StateContext) error
 
@@ -150,11 +149,11 @@ func (tx *Transaction) AddrFrom() []byte {
 		return tx.MasterAddr()
 	}
 
-	return misc.UCharVectorToBytes(goqrllib.QRLHelperGetAddress(misc.BytesToUCharVector(tx.PK()).GetData()))
+	return helper.PK2BinAddress(tx.PK())
 }
 
 func (tx *Transaction) AddrFromPK() string {
-	return hex.EncodeToString(misc.PK2BinAddress(tx.PK()))
+	return hex.EncodeToString(helper.PK2BinAddress(tx.PK()))
 }
 
 func (tx *Transaction) OTSIndex() uint64 {
@@ -171,12 +170,10 @@ func (tx *Transaction) FromPBData(pbData *protos.Transaction) {
 
 func (tx *Transaction) GetSlave() []byte {
 	pk := tx.PK()
-	upk := misc.NewUCharVector()
-	upk.AddBytes(pk)
-	upk.New(goqrllib.QRLHelperGetAddress(upk.GetData()))
+	address := helper.PK2BinAddress(pk)
 
-	if !reflect.DeepEqual(upk.GetBytes(), tx.AddrFrom()) {
-		return upk.GetBytes()
+	if !reflect.DeepEqual(address, tx.AddrFrom()) {
+		return address
 	}
 
 	return nil
@@ -197,7 +194,7 @@ func (tx *Transaction) GenerateTxHash(signingHash []byte) []byte {
 	return h.Sum(nil)
 }
 
-func (tx *Transaction) Sign(xmss *crypto.XMSS, message []byte) {
+func (tx *Transaction) Sign(xmss *xmss.XMSS, message []byte) {
 	tx.pbData.Signature = xmss.Sign(message)
 }
 
@@ -212,7 +209,7 @@ func (tx *Transaction) applyStateChangesForPK(stateContext *state.StateContext) 
 	// TODO: Set Ots Key
 
 	//if _, ok := addressesState[addrFromPK]; ok {
-	//	//if misc.Bin2Address(tx.AddrFrom()) != addrFromPK {
+	//	//if helper.Bin2Address(tx.AddrFrom()) != addrFromPK {
 	//	//	addressesState[addrFromPK].AppendTransactionHash(tx.Txhash())
 	//	//}
 	//	//if tx.OtsKey() >= tx.config.Dev.MaxOTSTracking {
@@ -234,7 +231,7 @@ func (tx *Transaction) SetAffectedAddress(stateContext *state.StateContext) erro
 	if err != nil {
 		return err
 	}
-	err = stateContext.PrepareAddressState(hex.EncodeToString(misc.PK2BinAddress(tx.PK())))
+	err = stateContext.PrepareAddressState(hex.EncodeToString(helper.PK2BinAddress(tx.PK())))
 	return err
 }
 
@@ -252,7 +249,7 @@ func (tx *Transaction) ValidateSlave(stateContext *state.StateContext) bool {
 	if len(masterAddr) == 0 {
 		return true
 	}
-	addrFromPK := misc.UCharVectorToBytes(goqrllib.QRLHelperGetAddress(misc.BytesToUCharVector(tx.PK()).GetData()))
+	addrFromPK := helper.PK2BinAddress(tx.PK())
 
 	if reflect.DeepEqual(tx.MasterAddr(), addrFromPK) {
 		log.Warn("Matching master_addr field and address from PK")

@@ -3,8 +3,8 @@ package view
 import (
 	"encoding/hex"
 	"errors"
+	"github.com/theQRL/go-qrllib-crypto/helper"
 	"github.com/theQRL/zond/chain/transactions"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"strconv"
 )
@@ -26,7 +26,7 @@ type PlainStakeTransaction struct {
 func (t *PlainStakeTransaction) TransactionFromPBData(tx *protos.Transaction, txHash []byte) {
 	t.NetworkID = tx.NetworkId
 	if tx.MasterAddr != nil {
-		t.MasterAddress = misc.Bin2Address(tx.MasterAddr)
+		t.MasterAddress = helper.Bin2Address(tx.MasterAddr)
 	}
 	t.Fee = strconv.FormatUint(tx.Fee, 10)
 	t.PublicKey = hex.EncodeToString(tx.Pk)
