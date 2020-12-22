@@ -16,8 +16,8 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/stretchr/testify v1.6.1
-	github.com/theQRL/go-libp2p-qrl v0.0.0-20201218151637-0bc463da5c16
-	github.com/theQRL/go-qrllib-crypto v0.0.0-20201216132758-851d39cc0d43
+	github.com/theQRL/go-libp2p-qrl v0.0.0-20201222131058-6dc0bcd5a379
+	github.com/theQRL/go-qrllib-crypto v0.0.0-20201222125451-26856452460c
 	github.com/urfave/cli/v2 v2.2.0
 	github.com/willf/bitset v1.1.11 // indirect
 	github.com/willf/bloom v2.0.3+incompatible
