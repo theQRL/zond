@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"github.com/golang/protobuf/proto"
+	"github.com/libp2p/go-libp2p-core/network"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/chain/block"
@@ -41,7 +42,7 @@ type EBHRespInfo struct {
 
 type Peer struct {
 	id      string
-	conn    net.Conn
+	stream  network.Stream
 	inbound bool
 
 	lock sync.Mutex
@@ -84,7 +85,7 @@ type Peer struct {
 	publicPort string
 }
 
-func newPeer(conn *net.Conn, inbound bool, chain *chain.Chain,
+func newPeer(conn network.Stream, inbound bool, chain *chain.Chain,
 	filter *bloom.BloomFilter, mr *MessageReceipt,
 	peerData *metadata.PeerData, mrDataConn chan *MRDataConn,
 	registerAndBroadcastChan chan *messages.RegisterMessage,
@@ -94,7 +95,7 @@ func newPeer(conn *net.Conn, inbound bool, chain *chain.Chain,
 	blockAndPeerChan chan *BlockAndPeer,
 	messagePriority map[protos.LegacyMessage_FuncName]uint64) *Peer {
 	p := &Peer{
-		conn:                        *conn,
+		stream:                      conn,
 		inbound:                     inbound,
 		chain:                       chain,
 		disconnected:                false,
@@ -116,10 +117,10 @@ func newPeer(conn *net.Conn, inbound bool, chain *chain.Chain,
 		messagePriority:             messagePriority,
 		outgoingQueue:               &PriorityQueue{},
 	}
-	p.id = p.conn.RemoteAddr().String()
+	p.id = p.stream.ID()
 	ip, _, _ := net.SplitHostPort(p.id)
 	p.ip = ip
-	log.Info("New Peer connected ", p.conn.RemoteAddr().String())
+	log.Info("New Peer connected ", p.stream.ID())
 	return p
 }
 
@@ -251,7 +252,7 @@ func (p *Peer) SendNext() error {
 			return nil
 		}
 		p.bytesSent += uint64(len(outgoingBytes))
-		_, err := p.conn.Write(outgoingBytes)
+		_, err := p.stream.Write(outgoingBytes)
 
 		if err != nil {
 			log.Error("Error while writing message on socket", "error", err)
@@ -270,12 +271,12 @@ func (p *Peer) ReadMsg() (msg *Msg, size uint32, err error) {
 	// TODO: Add Read timeout
 	msg = &Msg{}
 	buf := make([]byte, 4)
-	if _, err := io.ReadFull(p.conn, buf); err != nil {
+	if _, err := io.ReadFull(p.stream, buf); err != nil {
 		return msg, 0, err
 	}
 	size = misc.ConvertBytesToLong(buf)
 	buf = make([]byte, size)
-	if _, err := io.ReadFull(p.conn, buf); err != nil {
+	if _, err := io.ReadFull(p.stream, buf); err != nil {
 		return nil, 0, err
 	}
 	message := &protos.LegacyMessage{}
@@ -355,7 +356,7 @@ func (p *Peer) monitorChainState() {
 			lastBlock := p.chain.GetLastBlock()
 			lastBlockMetaData, err := p.chain.GetBlockMetaData(lastBlock.HeaderHash())
 			if err != nil {
-				log.Warn("Ping Failed Disconnecting ", p.conn.RemoteAddr().String())
+				log.Warn("Ping Failed Disconnecting ", p.stream.ID())
 				p.Disconnect()
 				return
 			}
@@ -377,7 +378,7 @@ func (p *Peer) monitorChainState() {
 			err = p.Send(out)
 			if err != nil {
 				log.Info("Error while sending ChainState",
-					p.conn.RemoteAddr().String())
+					p.stream.ID())
 				p.Disconnect()
 				return
 			}
@@ -431,7 +432,7 @@ func (p *Peer) handle(msg *Msg) error {
 			log.Debug("Peer list already shared before")
 			return nil
 		}
-		peerIP, _, err := net.SplitHostPort(p.conn.RemoteAddr().String())
+		peerIP, _, err := net.SplitHostPort(p.stream.ID())
 		if err != nil {
 			log.Error("Failed to SplitHostPort for ", p.ID())
 			return nil
@@ -527,7 +528,7 @@ func (p *Peer) handle(msg *Msg) error {
 		blockHeaderHash := fbData.BlockHeaderHash
 		log.Info("Fetch Block Request",
 			" BlockHeaderHash ", hex.EncodeToString(blockHeaderHash),
-			" Peer ", p.conn.RemoteAddr().String())
+			" Peer ", p.stream.ID())
 
 		b, err := p.chain.GetBlock(blockHeaderHash)
 		if err != nil {
@@ -753,7 +754,7 @@ func (p *Peer) HandleChainState(nodeChainState *protos.NodeChainState) {
 func (p *Peer) SendFetchBlock(blockHeaderHash []byte) error {
 	log.Info("Fetching",
 		" Block ", hex.EncodeToString(blockHeaderHash),
-		" Peer ", p.conn.RemoteAddr().String())
+		" Peer ", p.stream.ID())
 	out := &Msg{}
 	fbData := &protos.FBData{
 		BlockHeaderHash: blockHeaderHash,
@@ -834,7 +835,7 @@ loop:
 	p.close()
 	p.wg.Wait()
 
-	log.Info("Peer routine closed for ", p.conn.RemoteAddr().String())
+	log.Info("Peer routine closed for ", p.stream.ID())
 	return remoteRequested
 }
 
@@ -842,10 +843,10 @@ func (p *Peer) close() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	log.Info("Disconnected ", p.conn.RemoteAddr().String())
+	log.Info("Disconnected ", p.stream.ID())
 
 	close(p.exitMonitorChainState)
-	p.conn.Close()
+	p.stream.Close()
 }
 
 func (p *Peer) Disconnect() {
@@ -854,7 +855,7 @@ func (p *Peer) Disconnect() {
 
 	if !p.disconnected {
 		p.disconnected = true
-		log.Info("Disconnecting ", p.conn.RemoteAddr().String())
+		log.Info("Disconnecting ", p.stream.ID())
 		p.disconnectReason <- struct{}{}
 	}
 }

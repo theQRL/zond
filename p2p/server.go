@@ -1,9 +1,17 @@
 package p2p
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/chain/block"
@@ -21,7 +29,7 @@ import (
 )
 
 type conn struct {
-	fd      net.Conn
+	fd      network.Stream
 	inbound bool
 }
 
@@ -39,6 +47,7 @@ type PeerIPWithPLData struct {
 type Server struct {
 	config *config.Config
 
+	host             host.Host
 	chain            *chain.Chain
 	ntp              ntp.NTPInterface
 	peerData         *metadata.PeerData
@@ -134,7 +143,15 @@ func (srv *Server) BroadcastAttestationTransaction(attestTx *transactions.Attest
 	srv.registerAndBroadcastChan <-msg
 }
 
-func (srv *Server) Start() (err error) {
+func (srv *Server) handleStream(s network.Stream) {
+
+	log.Println("Got a new stream!")
+
+	// Create a buffer stream for non blocking read and write.
+	srv.addPeer <- &conn{s, true}
+}
+
+func (srv *Server) Start(keys crypto.PrivKey) (err error) {
 	srv.lock.Lock()
 	defer srv.lock.Unlock()
 	if srv.running {
@@ -143,7 +160,7 @@ func (srv *Server) Start() (err error) {
 
 	srv.filter = bloom.New(200000, 5)
 	//srv.chain.GetTransactionPool().SetRegisterAndBroadcastChan(srv.registerAndBroadcastChan)
-	if err := srv.startListening(); err != nil {
+	if err := srv.startListening(keys); err != nil {
 		return err
 	}
 
@@ -174,36 +191,28 @@ func (srv *Server) Stop() (err error) {
 	return nil
 }
 
-func (srv *Server) listenLoop(listener net.Listener) {
-	srv.loopWG.Add(1)
-	defer srv.loopWG.Done()
-
-	for {
-		c, err := listener.Accept()
-
-		if err != nil {
-			log.Error("Read ERROR Reason: ", err)
-			return
-		}
-		log.Info("New Peer joined")
-		srv.addPeer <- &conn{c, true}
-	}
-}
-
-func (srv *Server) ConnectPeer(peer string) error {
-	ip, _, _ := net.SplitHostPort(peer)
-	if count, ok := srv.ipCount[ip]; ok && count > 0 {
-		return nil
-	}
-
-	c, err := net.DialTimeout("tcp", peer, 10 * time.Second)
-
+func (srv *Server) ConnectPeer(dest string) error {
+	maddr, err := multiaddr.NewMultiaddr(dest)
 	if err != nil {
-		log.Warn("Error while connecting to Peer ", peer)
 		return err
 	}
-	log.Info("Connected to peer ", peer)
-	srv.addPeer <- &conn{c, false}
+
+	info, err := peer.AddrInfoFromP2pAddr(maddr)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Look into PermanentAddrTTL
+	srv.host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
+
+	s, err := srv.host.NewStream(context.Background(),
+		info.ID,
+		config.GetDevConfig().ProtocolID)
+	if err != nil {
+		return err
+	}
+
+	srv.addPeer <- &conn{s, false}
 
 	return nil
 }
@@ -296,18 +305,33 @@ func (srv *Server) ConnectPeers() error {
 	}
 }
 
-func (srv *Server) startListening() error {
-	bindingAddress := fmt.Sprintf("%s:%d",
+func (srv *Server) startListening(keys crypto.PrivKey) error {
+	multiAddrStr := fmt.Sprintf("/ipv4/%s/tcp/%d",
 		srv.config.User.Node.BindingIP,
 		srv.config.User.Node.LocalPort)
-
-	listener, err := net.Listen("tcp", bindingAddress)
+	sourceMultiAddr, _ := multiaddr.NewMultiaddr(multiAddrStr)
+	host, err := libp2p.New(
+		context.Background(),
+		libp2p.ListenAddrs(sourceMultiAddr),
+		libp2p.Identity(keys),
+		)
 	if err != nil {
 		return err
 	}
+	srv.host = host
+	host.SetStreamHandler(config.GetDevConfig().ProtocolID,
+		srv.handleStream)
+	//bindingAddress := fmt.Sprintf("%s:%d",
+	//	srv.config.User.Node.BindingIP,
+	//	srv.config.User.Node.LocalPort)
 
-	srv.listener = listener
-	go srv.listenLoop(listener)
+	//listener, err := net.Listen("tcp", bindingAddress)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//srv.listener = listener
+	//go srv.listenLoop(listener)
 
 	return nil
 }
@@ -330,9 +354,9 @@ running:
 		case c := <-srv.addPeer:
 			srv.peerInfoLock.Lock()
 			log.Debug("Adding peer",
-				" addr ", c.fd.RemoteAddr())
+				" addr ", c.fd.Conn().RemoteMultiaddr())
 			p := newPeer(
-				&c.fd,
+				c.fd,
 				c.inbound,
 				srv.chain,
 				srv.filter,
@@ -346,9 +370,9 @@ running:
 				srv.blockAndPeerChan,
 				srv.messagePriority)
 			go srv.runPeer(p)
-			peers[c.fd.RemoteAddr().String()] = p
+			peers[c.fd.ID()] = p
 
-			ip, _, _ := net.SplitHostPort(c.fd.RemoteAddr().String())
+			ip, _, _ := net.SplitHostPort(c.fd.ID())
 			srv.ipCount[ip] += 1
 			srv.totalConnections += 1
 			if p.inbound {
@@ -367,12 +391,12 @@ running:
 			srv.peerInfoLock.Lock()
 
 			log.Debug("Removing Peer", "err", pd.err)
-			peer := peers[pd.conn.RemoteAddr().String()]
-			delete(peers, pd.conn.RemoteAddr().String())
+			peer := peers[pd.stream.ID()]
+			delete(peers, pd.stream.ID())
 			if pd.inbound {
 				srv.inboundCount--
 			}
-			ip, _, _ := net.SplitHostPort(pd.conn.RemoteAddr().String())
+			ip, _, _ := net.SplitHostPort(pd.stream.ID())
 			srv.ipCount[ip] -= 1
 			srv.totalConnections -= 1
 			if pd.isPLShared {
