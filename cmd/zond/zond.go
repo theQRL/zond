@@ -1,8 +1,10 @@
 package main
 
 import (
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/mattn/go-colorable"
 	log "github.com/sirupsen/logrus"
+	crypto2 "github.com/theQRL/go-libp2p-qrl/crypto"
 	"github.com/theQRL/zond/api"
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/config"
@@ -12,6 +14,7 @@ import (
 	"github.com/theQRL/zond/p2p"
 	"github.com/theQRL/zond/state"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"time"
@@ -25,13 +28,13 @@ func ConfigCheck() bool {
 	return true
 }
 
-func run(c *chain.Chain, db *db.DB) error {
+func run(c *chain.Chain, db *db.DB, keys crypto.PrivKey) error {
 	srv, err := p2p.NewServer(c)
 	if err != nil {
 		log.Error("Failed to initialize server")
 		return err
 	}
-	go srv.Start()
+	go srv.Start(keys)
 	defer srv.Stop()
 
 	if config.GetUserConfig().API.PublicAPI.Enabled {
@@ -88,6 +91,29 @@ func SetLogOutput() error {
 	return nil
 }
 
+func loadP2PDilithiumKey(filePath string) (crypto.PrivKey, error) {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		keys, _, err := crypto2.GenerateDilithiumKey(nil)
+		if err != nil {
+			return nil, err
+		}
+		data, err := keys.Raw()
+		if err := ioutil.WriteFile(filePath, data, 0644); err != nil {
+			return nil, err
+		}
+		return keys, nil
+	}
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	data, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	return crypto2.UnmarshalDilithiumPrivateKey(data)
+}
+
 func main() {
 	userConfig := config.GetUserConfig()
 	devConfig := config.GetDevConfig()
@@ -109,6 +135,13 @@ func main() {
 		return
 	}
 
+	crypto2.LoadAllExtendedKeyTypes()
+	keys, err := loadP2PDilithiumKey(userConfig.GetAbsoluteNodeKeyFilePath())
+	if err != nil {
+		log.Error("Failed to loadP2PDilithiumKey ", err.Error())
+		return
+	}
+
 	s, err := state.NewState(userConfig.DataDir(), devConfig.DBName)
 	if err != nil {
 		log.Error("Error while loading state ", err.Error())
@@ -120,7 +153,7 @@ func main() {
 		return
 	}
 	log.Info("Main Chain Loaded Successfully")
-	err = run(c, s.DB())
+	err = run(c, s.DB(), keys)
 	if err != nil {
 		log.Error("Initialization Error ", err.Error())
 	}

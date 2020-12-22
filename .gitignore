@@ -1,1 +1,4 @@
 \.idea
+cmd/zond/zond
+cmd/zond/zond-cli
+bazel-*

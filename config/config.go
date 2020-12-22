@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"os/user"
 	"path"
 	"sync"
@@ -72,8 +73,9 @@ type UserConfig struct {
 
 	BaseDir            string
 	ChainFileDirectory string
+	NodeKeyFileName    string
 
-	API                  *API
+	API *API
 	//MongoProcessorConfig *MongoProcessorConfig
 }
 
@@ -87,6 +89,8 @@ type APIConfig struct {
 
 type DevConfig struct {
 	Genesis *GenesisConfig
+
+	ProtocolID protocol.ID
 
 	Version string
 
@@ -232,6 +236,7 @@ func GetUserConfig() (userConf *UserConfig) {
 
 		BaseDir:            path.Join(userCurrentDir.HomeDir, ".zond"),
 		ChainFileDirectory: "data",
+		NodeKeyFileName:    "node.key",
 
 		API: api,
 		//MongoProcessorConfig: mongoProcessorConfig,
@@ -242,6 +247,10 @@ func GetUserConfig() (userConf *UserConfig) {
 
 func (u *UserConfig) DataDir() string {
 	return path.Join(u.BaseDir, u.ChainFileDirectory)
+}
+
+func (u *UserConfig) GetAbsoluteNodeKeyFilePath() string {
+	return path.Join(u.BaseDir, u.NodeKeyFileName)
 }
 
 func (u *UserConfig) SetDataDir(dataDir string) {
@@ -276,6 +285,8 @@ func GetDevConfig() (dev *DevConfig) {
 
 	dev = &DevConfig{
 		Genesis: genesis,
+
+		ProtocolID: "/zond/0.0.1",
 
 		Version: "0.0.1 go",
 
