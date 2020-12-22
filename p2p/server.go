@@ -306,7 +306,7 @@ func (srv *Server) ConnectPeers() error {
 }
 
 func (srv *Server) startListening(keys crypto.PrivKey) error {
-	multiAddrStr := fmt.Sprintf("/ipv4/%s/tcp/%d",
+	multiAddrStr := fmt.Sprintf("/ip4/%s/tcp/%d",
 		srv.config.User.Node.BindingIP,
 		srv.config.User.Node.LocalPort)
 	sourceMultiAddr, _ := multiaddr.NewMultiaddr(multiAddrStr)
@@ -321,6 +321,10 @@ func (srv *Server) startListening(keys crypto.PrivKey) error {
 	srv.host = host
 	host.SetStreamHandler(config.GetDevConfig().ProtocolID,
 		srv.handleStream)
+
+	listenAddr := fmt.Sprintf("%s/p2p/%s",
+		multiAddrStr, host.ID().Pretty())
+	log.Info("Listening at ", listenAddr)
 	//bindingAddress := fmt.Sprintf("%s:%d",
 	//	srv.config.User.Node.BindingIP,
 	//	srv.config.User.Node.LocalPort)
