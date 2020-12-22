@@ -505,10 +505,10 @@ github.com/stretchr/testify v1.5.1/go.mod h1:5W2xD1RspED5o8YsWQXVCued0rvSQ+mT+I5
 github.com/stretchr/testify v1.6.1 h1:hDPOHmpOpP40lSULcqw7IrRb/u7w6RpDC9399XyoNd0=
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/syndtr/goleveldb v1.0.0/go.mod h1:ZVVdQEZoIme9iO1Ch2Jdy24qqXrMMOU6lpPAyBWyWuQ=
-github.com/theQRL/go-libp2p-qrl v0.0.0-20201218151637-0bc463da5c16 h1:9CCrC48WCkqZO7dsX4jTvQwXwWNy6ANnP/Uk6NrpStY=
-github.com/theQRL/go-libp2p-qrl v0.0.0-20201218151637-0bc463da5c16/go.mod h1:5vClb0n6QIjsKeI9TkeNNODYsKOIQuu4zCUvqy1B11w=
-github.com/theQRL/go-qrllib-crypto v0.0.0-20201216132758-851d39cc0d43 h1:MzWCvHs74DJ+Tp3AKaWklNUv+5uUZrn7rHjVVqV/QK4=
-github.com/theQRL/go-qrllib-crypto v0.0.0-20201216132758-851d39cc0d43/go.mod h1:YuyBtemnZor1eUnOe9zZ2IoRT6ZbXv7s+K8y6OIPa4w=
+github.com/theQRL/go-libp2p-qrl v0.0.0-20201222131058-6dc0bcd5a379 h1:981X2hHni+68Re3Z8zZ8TyIUvf6PvqQMhIN3s4VowM8=
+github.com/theQRL/go-libp2p-qrl v0.0.0-20201222131058-6dc0bcd5a379/go.mod h1:rPdG+riGobpD+Zp1FMgnmqNhBT6c3haLNgORL8mMveE=
+github.com/theQRL/go-qrllib-crypto v0.0.0-20201222125451-26856452460c h1:/gKsfTtUgU0ghZpxL8NxEPv1JGSs6uTEHQY0cPqD8P8=
+github.com/theQRL/go-qrllib-crypto v0.0.0-20201222125451-26856452460c/go.mod h1:YuyBtemnZor1eUnOe9zZ2IoRT6ZbXv7s+K8y6OIPa4w=
 github.com/theQRL/qrllib v1.2.2 h1:Kq1bbZiSUijTkIa1UY6ZrkVuBt5KHpxVcQsPggxFNQ4=
 github.com/theQRL/qrllib v1.2.2/go.mod h1:bkj3/twNgbQzB6APeSZvE0H3vBUSkG3WdHcVpJWQn2Q=
 github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=

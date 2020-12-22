@@ -504,8 +504,8 @@ go_repository(
 go_repository(
     name = "com_github_theqrl_go_qrllib_crypto",
     importpath = "github.com/theQRL/go-qrllib-crypto",
-    sum = "h1:MzWCvHs74DJ+Tp3AKaWklNUv+5uUZrn7rHjVVqV/QK4=",
-    version = "v0.0.0-20201216132758-851d39cc0d43",
+    sum = "h1:/gKsfTtUgU0ghZpxL8NxEPv1JGSs6uTEHQY0cPqD8P8=",
+    version = "v0.0.0-20201222125451-26856452460c",
 )
 
 go_repository(
@@ -1477,8 +1477,8 @@ go_repository(
 go_repository(
     name = "com_github_theqrl_go_libp2p_qrl",
     importpath = "github.com/theQRL/go-libp2p-qrl",
-    sum = "h1:9CCrC48WCkqZO7dsX4jTvQwXwWNy6ANnP/Uk6NrpStY=",
-    version = "v0.0.0-20201218151637-0bc463da5c16",
+    sum = "h1:981X2hHni+68Re3Z8zZ8TyIUvf6PvqQMhIN3s4VowM8=",
+    version = "v0.0.0-20201222131058-6dc0bcd5a379",
 )
 
 go_repository(
