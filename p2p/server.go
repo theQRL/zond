@@ -23,7 +23,6 @@ import (
 	"github.com/theQRL/zond/protos"
 	"github.com/willf/bloom"
 	"net"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -40,8 +39,8 @@ type peerDrop struct {
 }
 
 type PeerIPWithPLData struct {
-	IP     string
-	PLData *protos.PLData
+	multiAddr string
+	PLData    *protos.PLData
 }
 
 type Server struct {
@@ -221,17 +220,11 @@ func (srv *Server) ConnectPeers() error {
 	srv.loopWG.Add(1)
 	defer srv.loopWG.Done()
 
-	for _, ipPort := range srv.config.User.Node.PeerList {
+	for _, multiAddr := range srv.config.User.Node.PeerList {
 		//log.Info("Connecting peer ", peer)
-		ip, port, err := net.SplitHostPort(ipPort)
+		err := srv.peerData.AddDisconnectedPeers(multiAddr)
 		if err != nil {
-			log.Error("Failed to split host port of bootstrap node ", ipPort,
-				" Reason: ", err.Error())
-			continue
-		}
-		err = srv.peerData.AddDisconnectedPeers(ip, port)
-		if err != nil {
-			log.Error("Failed to add bootstrap node in disconnected peers ", ipPort,
+			log.Error("Failed to add bootstrap node in disconnected peers ", multiAddr,
 				" Reason: ", err.Error())
 			continue
 		}
@@ -258,38 +251,32 @@ func (srv *Server) ConnectPeers() error {
 							continue
 						}
 					}
-					peerList = append(peerList, p.IPPort())
+					peerList = append(peerList, p.MultiAddr())
 				}
 			}
 			srv.peerInfoLock.Unlock()
 
 			count := 0
 			removePeers := make([]string, 0)
-			for _, ipPort := range peerList {
+			for _, multiAddr := range peerList {
 				if !srv.running {
 					break
 				}
 				if count >= maxConnectionTry {
 					break
 				}
-				log.Info("Trying to Connect ", ipPort)
-				err := srv.ConnectPeer(ipPort)
+				log.Info("Trying to Connect ", multiAddr)
+				err := srv.ConnectPeer(multiAddr)
 				count += 1
 				if err != nil {
-					log.Info("Failed to connect to ", ipPort)
-					removePeers = append(removePeers, ipPort)
+					log.Info("Failed to connect to ", multiAddr)
+					removePeers = append(removePeers, multiAddr)
 					continue
 				}
 			}
 			srv.peerInfoLock.Lock()
-			for _, ipPort := range removePeers {
-				ip, port, err := net.SplitHostPort(ipPort)
-				if err != nil {
-					log.Error("Error splitting host and port found in removePeers ", ipPort,
-						" Reason: ", err.Error())
-					continue
-				}
-				err = srv.peerData.RemovePeer(ip, port)
+			for _, multiAddr := range removePeers {
+				err := srv.peerData.RemovePeer(multiAddr)
 				if err != nil {
 					log.Error("Failed to removePeer",
 						" Reason: ", err.Error())
@@ -404,10 +391,10 @@ running:
 			srv.ipCount[ip] -= 1
 			srv.totalConnections -= 1
 			if pd.isPLShared {
-				err := srv.peerData.AddDisconnectedPeers(pd.IP(), pd.publicPort)
+				err := srv.peerData.AddDisconnectedPeers(pd.multiAddr)
 				if err != nil {
 					log.Error("Failed to add peer into disconnected peers",
-						" ", pd.IP(), ":", pd.publicPort,
+						" ", pd.multiAddr,
 						" Reason: ", err.Error())
 				}
 			}
@@ -621,43 +608,20 @@ func (srv *Server) BlockReceived(peer *Peer, b *block.Block) {
 }
 
 func (srv *Server) UpdatePeerList(p *PeerIPWithPLData) error {
-	peerIP := p.IP
-	peerPort := p.PLData.PublicPort
-	if !(peerPort > 0 && peerPort < 65536) {
-		log.Warn("Invalid PublicPort ", peerPort, " shared by ", peerIP)
-		return nil
-	}
-	err := srv.peerData.AddConnectedPeers(peerIP, strconv.FormatUint(uint64(peerPort), 10))
+	err := srv.peerData.AddConnectedPeers(p.multiAddr)
 	if err != nil {
 		log.Error("Failed to Add Peer into peer list",
-			" ", peerIP, ":", peerPort,
+			" ", p.multiAddr,
 			" Reason: ", err.Error())
 		return err
 	}
-	for _, peerIPPort := range p.PLData.PeerIps {
-		peerIP, peerPort, err := net.SplitHostPort(peerIPPort)
-		if err != nil {
-			log.Error("Failed to SplitHostPort ", peerIPPort,
-				" provided by ", p.IP)
+	for _, peerMultiAddr := range p.PLData.PeerIps {
+		if srv.peerData.IsPeerInList(peerMultiAddr) {
 			continue
 		}
-		intPeerPort, err := strconv.ParseUint(peerPort, 10, 32)
+		err = srv.peerData.AddDisconnectedPeers(peerMultiAddr)
 		if err != nil {
-			log.Error("Failed to parse PeerPort ", peerPort,
-				" shared by ", p.IP,
-				" Reason: ", err.Error())
-			return err
-		}
-		if !(intPeerPort > 0 && intPeerPort < 65536) {
-			log.Warn("Invalid PublicPort ", intPeerPort, " shared by ", p.IP)
-			return nil
-		}
-		if srv.peerData.IsPeerInList(peerIP, peerPort) {
-			continue
-		}
-		err = srv.peerData.AddDisconnectedPeers(peerIP, peerPort)
-		if err != nil {
-			log.Error("Failed to add peer ", peerIP, ":", peerPort, " in peer list",
+			log.Error("Failed to add peer ", peerMultiAddr, " in peer list",
 				" Reason: ", err.Error())
 			continue
 		}

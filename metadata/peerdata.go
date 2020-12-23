@@ -2,7 +2,6 @@ package metadata
 
 import (
 	"encoding/json"
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/ntp"
@@ -49,24 +48,24 @@ func (p *PeerData) PeerList() []string {
 	var peerList []string
 
 	for _, peerInfo := range p.connectedPeers {
-		peerList = append(peerList, peerInfo.IPPort())
+		peerList = append(peerList, peerInfo.MultiAddr())
 	}
 
 	for _, peerInfo := range p.disconnectedPeers {
-		peerList = append(peerList, peerInfo.IPPort())
+		peerList = append(peerList, peerInfo.MultiAddr())
 	}
 
 	return peerList
 }
 
-func (p *PeerData) IsPeerInList(ip string, port string) bool {
+func (p *PeerData) IsPeerInList(multiAddr string) bool {
 	/*
 	Check if Peer IP and Port is already added either
 	into connected peer list or disconnected peer list
 	 */
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	peerInfo := NewPeerInfo(ip, port, 0)
+	peerInfo := NewPeerInfo(multiAddr, 0)
 	index := p.findIndex(peerInfo, p.connectedPeers)
 	if index != -1 {
 		return true
@@ -96,12 +95,12 @@ func (p *PeerData) removeDisconnectedPeers(peerInfo *PeerInfo) {
 		p.disconnectedPeers[index+1:]...)
 }
 
-func (p *PeerData) AddConnectedPeers(ip string, port string) error {
+func (p *PeerData) AddConnectedPeers(multiAddr string) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	timestamp := ntp.GetNTP().Time()
-	peerInfo := NewPeerInfo(ip, port, timestamp)
+	peerInfo := NewPeerInfo(multiAddr, timestamp)
 
 	index := p.findIndex(peerInfo, p.connectedPeers)
 	if index == -1 {
@@ -116,12 +115,12 @@ func (p *PeerData) AddConnectedPeers(ip string, port string) error {
 	return nil
 }
 
-func (p *PeerData) AddDisconnectedPeers(ip string, port string) error {
+func (p *PeerData) AddDisconnectedPeers(multiAddr string) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	timestamp := ntp.GetNTP().Time()
-	peerInfo := NewPeerInfo(ip, port, timestamp)
+	peerInfo := NewPeerInfo(multiAddr, timestamp)
 
 	index := p.findIndex(peerInfo, p.disconnectedPeers)
 	if index == -1 {
@@ -137,19 +136,18 @@ func (p *PeerData) AddDisconnectedPeers(ip string, port string) error {
 	return nil
 }
 
-func (p *PeerData) RemovePeer(ip string, port string) error {
+func (p *PeerData) RemovePeer(multiAddr string) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	ipPort := fmt.Sprintf("%s:%s", ip, port)
-	_, ok := p.bootstrapNodes[ipPort]
+	_, ok := p.bootstrapNodes[multiAddr]
 	// Avoid deleting bootstrap nodes
 	if ok {
 		return nil
 	}
 
 	timestamp := ntp.GetNTP().Time()
-	peerInfo := NewPeerInfo(ip, port, timestamp)
+	peerInfo := NewPeerInfo(multiAddr, timestamp)
 
 	p.removeConnectedPeers(peerInfo)
 	p.removeDisconnectedPeers(peerInfo)
@@ -217,7 +215,8 @@ func (p *PeerData) Load() error {
 	p.pbData.ConnectedPeers = make([]*protos.PeerInfo, 0)
 
 	for _, peerInfoPBData := range p.pbData.DisconnectedPeers {
-		p1 := NewPeerInfo(peerInfoPBData.Ip, peerInfoPBData.Port, peerInfoPBData.Timestamp)
+		p1 := NewPeerInfo(peerInfoPBData.MultiAddr,
+			peerInfoPBData.Timestamp)
 		p.disconnectedPeers = append(p.disconnectedPeers, p1)
 	}
 
