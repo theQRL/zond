@@ -7,7 +7,13 @@ import (
 	"math"
 	"os"
 	"strconv"
+	"strings"
 )
+
+func IPFromMultiAddr(multiAddr string) string {
+	info := strings.Split(multiAddr, "/")
+	return info[2]
+}
 
 func MerkleTXHash(hashes list.List) []byte {
 	j := int(math.Ceil(math.Log2(float64(hashes.Len()))))
