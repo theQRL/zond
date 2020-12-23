@@ -119,10 +119,10 @@ func newPeer(conn network.Stream, inbound bool, chain *chain.Chain,
 		messagePriority:             messagePriority,
 		outgoingQueue:               &PriorityQueue{},
 	}
-	p.id = p.stream.ID()
-	ip, _, _ := net.SplitHostPort(p.id)
+	p.id = p.stream.Conn().RemotePeer().Pretty()
+	ip, _, _ := net.SplitHostPort(misc.IPFromMultiAddr(p.stream.Conn().RemoteMultiaddr().String()))
 	p.ip = ip
-	log.Info("New Peer connected ", p.stream.ID())
+	log.Info("New Peer connected ", p.stream.Conn().RemoteMultiaddr())
 	return p
 }
 
@@ -358,7 +358,7 @@ func (p *Peer) monitorChainState() {
 			lastBlock := p.chain.GetLastBlock()
 			lastBlockMetaData, err := p.chain.GetBlockMetaData(lastBlock.HeaderHash())
 			if err != nil {
-				log.Warn("Ping Failed Disconnecting ", p.stream.ID())
+				log.Warn("Ping Failed Disconnecting ", p.stream.Conn().RemoteMultiaddr())
 				p.Disconnect()
 				return
 			}
@@ -380,7 +380,7 @@ func (p *Peer) monitorChainState() {
 			err = p.Send(out)
 			if err != nil {
 				log.Info("Error while sending ChainState",
-					p.stream.ID())
+					p.stream.Conn().RemoteMultiaddr())
 				p.Disconnect()
 				return
 			}
@@ -526,7 +526,7 @@ func (p *Peer) handle(msg *Msg) error {
 		blockHeaderHash := fbData.BlockHeaderHash
 		log.Info("Fetch Block Request",
 			" BlockHeaderHash ", hex.EncodeToString(blockHeaderHash),
-			" Peer ", p.stream.ID())
+			" Peer ", p.stream.Conn().RemoteMultiaddr())
 
 		b, err := p.chain.GetBlock(blockHeaderHash)
 		if err != nil {
@@ -752,7 +752,7 @@ func (p *Peer) HandleChainState(nodeChainState *protos.NodeChainState) {
 func (p *Peer) SendFetchBlock(blockHeaderHash []byte) error {
 	log.Info("Fetching",
 		" Block ", hex.EncodeToString(blockHeaderHash),
-		" Peer ", p.stream.ID())
+		" Peer ", p.stream.Conn().RemoteMultiaddr())
 	out := &Msg{}
 	fbData := &protos.FBData{
 		BlockHeaderHash: blockHeaderHash,
@@ -833,7 +833,7 @@ loop:
 	p.close()
 	p.wg.Wait()
 
-	log.Info("Peer routine closed for ", p.stream.ID())
+	log.Info("Peer routine closed for ", p.stream.Conn().RemoteMultiaddr())
 	return remoteRequested
 }
 
@@ -841,7 +841,7 @@ func (p *Peer) close() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	log.Info("Disconnected ", p.stream.ID())
+	log.Info("Disconnected ", p.stream.Conn().RemoteMultiaddr())
 
 	close(p.exitMonitorChainState)
 	p.stream.Close()
@@ -853,7 +853,7 @@ func (p *Peer) Disconnect() {
 
 	if !p.disconnected {
 		p.disconnected = true
-		log.Info("Disconnecting ", p.stream.ID())
+		log.Info("Disconnecting ", p.stream.Conn().RemoteMultiaddr())
 		p.disconnectReason <- struct{}{}
 	}
 }
