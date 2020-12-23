@@ -3,6 +3,7 @@ package p2p
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/libp2p/go-libp2p-core/network"
 	log "github.com/sirupsen/logrus"
@@ -41,9 +42,10 @@ type EBHRespInfo struct {
 }
 
 type Peer struct {
-	id      string
-	stream  network.Stream
-	inbound bool
+	id        string
+	multiAddr string
+	stream    network.Stream
+	inbound   bool
 
 	lock sync.Mutex
 
@@ -60,7 +62,7 @@ type Peer struct {
 	config                *config.Config
 	ntp                   ntp.NTPInterface
 	chainState            *protos.NodeChainState
-	peerData			  *metadata.PeerData
+	peerData              *metadata.PeerData
 
 	addPeerToPeerList           chan *PeerIPWithPLData
 	blockAndPeerChan            chan *BlockAndPeer
@@ -432,14 +434,10 @@ func (p *Peer) handle(msg *Msg) error {
 			log.Debug("Peer list already shared before")
 			return nil
 		}
-		peerIP, _, err := net.SplitHostPort(p.stream.ID())
-		if err != nil {
-			log.Error("Failed to SplitHostPort for ", p.ID())
-			return nil
-		}
 		p.publicPort = strconv.FormatUint(uint64(msg.msg.GetPlData().PublicPort), 10)
+		p.multiAddr = fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", p.ip, p.publicPort, p.stream.Conn().RemotePeer())
 		p.isPLShared = true
-		p.addPeerToPeerList <- &PeerIPWithPLData{peerIP, msg.msg.GetPlData()}
+		p.addPeerToPeerList <- &PeerIPWithPLData{p.multiAddr, msg.msg.GetPlData()}
 
 	case protos.LegacyMessage_PONG:
 		log.Debug("Received PONG MSG")
