@@ -1,6 +1,7 @@
 package view
 
 import (
+	"encoding/hex"
 	"github.com/theQRL/zond/protos"
 )
 
