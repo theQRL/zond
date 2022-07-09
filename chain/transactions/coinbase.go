@@ -7,11 +7,12 @@ import (
 	"encoding/hex"
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	"github.com/theQRL/go-qrllib-crypto/dilithium"
+	"github.com/theQRL/go-qrllib/dilithium"
 	"github.com/theQRL/zond/chain/rewards"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
+	"reflect"
 )
 
 type CoinBase struct {
@@ -31,7 +32,7 @@ func (tx *CoinBase) FeeReward() uint64 {
 }
 
 func (tx *CoinBase) TotalAmounts(numberOfAttestors uint64) uint64 {
-	totalAmount := tx.BlockProposerReward() + tx.AttestorReward() * numberOfAttestors
+	totalAmount := tx.BlockProposerReward() + tx.AttestorReward()*numberOfAttestors
 	return totalAmount
 }
 
@@ -143,7 +144,9 @@ func (tx *CoinBase) Validate(stateContext *state.StateContext) bool {
 
 	// Genesis block has unsigned coinbase txn
 	if stateContext.GetSlotNumber() != 0 {
-		if !dilithium.DilithiumVerify(tx.Signature(), tx.PK(), signedMessage) {
+		var pkSized [dilithium.PKSizePacked]uint8
+		copy(pkSized[:], tx.PK())
+		if !reflect.DeepEqual(dilithium.Open(tx.Signature(), &pkSized), signedMessage) {
 			log.Warn(fmt.Sprintf("Dilithium Signature Verification failed for CoinBase Txn %s",
 				hex.EncodeToString(txHash)))
 			return false
@@ -160,30 +163,30 @@ func (tx *CoinBase) Validate(stateContext *state.StateContext) bool {
 
 func (tx *CoinBase) ApplyStateChanges(stateContext *state.StateContext) error {
 	/*
-	CoinBase signature will be a dilithium signature, so it is required
-	to separate this transaction into a separate coinbase transaction
-	TODO:
-	1. Verify signature from Dilithium Address
-	 */
-	//strAddrTo := helper.Bin2Address(tx.AddrTo())
+		CoinBase signature will be a dilithium signature, so it is required
+		to separate this transaction into a separate coinbase transaction
+		TODO:
+		1. Verify signature from Dilithium Address
+	*/
+	//strAddrTo := hex.EncodeToString(tx.AddrTo())
 	//if addrState, ok := addressesState[strAddrTo]; ok {
 	//	addrState.AddBalance(tx.Amount())
 	//	if tx.config.Dev.RecordTransactionHashes {
-			//Disabled Tracking of Transaction Hash into AddressState
-			//addrState.AppendTransactionHash(tx.Txhash())
-		//}
+	//Disabled Tracking of Transaction Hash into AddressState
+	//addrState.AppendTransactionHash(tx.Txhash())
+	//}
 	//}
 
-	//strAddrFrom := helper.Bin2Address(tx.config.Dev.Genesis.CoinbaseAddress)
+	//strAddrFrom := hex.EncodeToString(tx.config.Dev.Genesis.CoinbaseAddress)
 	//
 	//if addrState, ok := addressesState[strAddrFrom]; ok {
-	//	masterQAddr := helper.Bin2Address(tx.MasterAddr())
+	//	masterQAddr := hex.EncodeToString(tx.MasterAddr())
 	//	addressesState[masterQAddr].SubtractBalance(tx.Amount())
 	//	if tx.config.Dev.RecordTransactionHashes {
-			//Disabled Tracking of Transaction Hash into AddressState
-			//addressesState[masterQAddr].AppendTransactionHash(tx.Txhash())
-		//}
-		//addrState.IncreaseNonce()
+	//Disabled Tracking of Transaction Hash into AddressState
+	//addressesState[masterQAddr].AppendTransactionHash(tx.Txhash())
+	//}
+	//addrState.IncreaseNonce()
 	//}
 
 	// TODO:
@@ -204,7 +207,7 @@ func (tx *CoinBase) ApplyStateChanges(stateContext *state.StateContext) error {
 
 	strBlockProposerDilithiumPK := hex.EncodeToString(stateContext.BlockProposer())
 	// TODO: Get list of attestors
-	for validatorDilithiumPK, xmssAddress  := range validatorsToXMSSAddress {
+	for validatorDilithiumPK, xmssAddress := range validatorsToXMSSAddress {
 		addressState, err := stateContext.GetAddressState(hex.EncodeToString(xmssAddress))
 		if err != nil {
 			return err

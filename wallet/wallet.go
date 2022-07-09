@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/theQRL/go-qrllib-crypto/xmss"
+	"github.com/theQRL/go-qrllib/xmss"
 	"github.com/theQRL/zond/api"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/misc"
@@ -22,12 +22,13 @@ type Wallet struct {
 	pbData *protos.Wallet
 }
 
-func (w *Wallet) Add(height uint64, hashFunction xmss.EHashFunction) {
-	x := xmss.FromHeight(height, hashFunction)
+func (w *Wallet) Add(height uint8, hashFunction xmss.HashFunction) {
+	x := xmss.NewXMSSFromHeight(height, hashFunction)
+	address := x.GetAddress()
 	xmssInfo := &protos.XMSSInfo{
-		Address: x.StrAddress(),
-		HexSeed: x.HexSeed(),
-		Mnemonic: x.Mnemonic(),
+		Address:  hex.EncodeToString(address[:]),
+		HexSeed:  x.GetHexSeed(),
+		Mnemonic: x.GetMnemonic(),
 	}
 	w.pbData.XmssInfo = append(w.pbData.XmssInfo, xmssInfo)
 
@@ -71,14 +72,14 @@ func (w *Wallet) List() {
 			outputBalance = "?"
 		}
 		fmt.Println(fmt.Sprintf("%d\t%s\t%s",
-			i + 1, xmssInfo.Address, outputBalance))
+			i+1, xmssInfo.Address, outputBalance))
 	}
 }
 
 func (w *Wallet) Secret() {
 	for i, xmssInfo := range w.pbData.XmssInfo {
 		fmt.Println(fmt.Sprintf("%d\t%s\t%s\t%s",
-			i + 1, xmssInfo.Address, xmssInfo.HexSeed,
+			i+1, xmssInfo.Address, xmssInfo.HexSeed,
 			xmssInfo.Mnemonic))
 	}
 }
@@ -124,12 +125,14 @@ func (w *Wallet) GetXMSSByIndex(index uint) (*xmss.XMSS, error) {
 	if int(index) > len(w.pbData.XmssInfo) {
 		return nil, errors.New(fmt.Sprintf("Invalid XMSS Index"))
 	}
-	strHexSeed := w.pbData.XmssInfo[index - 1].HexSeed
+	strHexSeed := w.pbData.XmssInfo[index-1].HexSeed
 	binHexSeed, err := hex.DecodeString(strHexSeed)
+	var binHexSeedSized [51]uint8
+	copy(binHexSeedSized[:], binHexSeed)
 	if err != nil {
 		return nil, err
 	}
-	return xmss.FromExtendedSeed(binHexSeed), nil
+	return xmss.NewXMSSFromExtendedSeed(binHexSeedSized), nil
 }
 
 func NewWallet(walletFileName string) *Wallet {

@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"github.com/theQRL/go-qrllib-crypto/dilithium"
+	"github.com/theQRL/go-qrllib/dilithium"
 	"github.com/theQRL/zond/chain/rewards"
 	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/config"
@@ -379,11 +379,11 @@ func (b *Block) Commit(db *db.DB, finalizedHeaderHash []byte, isFinalizedState b
 	*/
 
 	/*
-	1. Load MainChainState
-	2. Check if finalized block epoch and current block epoch difference is >= 2
-	3. If condition 2 is true, then check if finality achieved
-	4. Check must only be done on the first block of the epoch
-	 */
+		1. Load MainChainState
+		2. Check if finalized block epoch and current block epoch difference is >= 2
+		3. If condition 2 is true, then check if finality achieved
+		4. Check must only be done on the first block of the epoch
+	*/
 
 	blocksPerEpoch := config.GetDevConfig().BlocksPerEpoch
 	parentEpoch := parentBlockMetaData.SlotNumber() / blocksPerEpoch
@@ -392,7 +392,6 @@ func (b *Block) Commit(db *db.DB, finalizedHeaderHash []byte, isFinalizedState b
 	if parentEpoch != epoch {
 		b.UpdateFinalizedEpoch(db, stateContext)
 	}
-
 
 	bytesBlock, err := b.Serialize()
 	if err != nil {
@@ -404,7 +403,7 @@ func (b *Block) Commit(db *db.DB, finalizedHeaderHash []byte, isFinalizedState b
 func NewBlock(networkId uint64, timestamp uint64, proposerAddress []byte, slotNumber uint64,
 	parentHeaderHash []byte, txs []*protos.Transaction, protocolTxs []*protos.ProtocolTransaction,
 	lastCoinBaseNonce uint64) *Block {
-	b := &Block {
+	b := &Block{
 		pbData: &protos.Block{},
 	}
 
@@ -438,7 +437,7 @@ func NewBlock(networkId uint64, timestamp uint64, proposerAddress []byte, slotNu
 func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext) error {
 	currentEpochMetaData := stateContext.GetEpochMetaData()
 	// Ignore Finalization if TotalStakeAmountFound is less than the 2/3rd of TotalStakeAmountAlloted
-	if currentEpochMetaData.TotalStakeAmountFound() * 3 < currentEpochMetaData.TotalStakeAmountAlloted() * 2 {
+	if currentEpochMetaData.TotalStakeAmountFound()*3 < currentEpochMetaData.TotalStakeAmountAlloted()*2 {
 		return nil
 	}
 
@@ -448,10 +447,10 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 	finalizedBlockEpoch := mainChainMetaData.FinalizedBlockSlotNumber() / blocksPerEpoch
 
 	if mainChainMetaData.FinalizedBlockSlotNumber() == 0 {
-		if currentEpoch - finalizedBlockEpoch < 3 {
+		if currentEpoch-finalizedBlockEpoch < 3 {
 			return nil
 		}
-	} else if currentEpoch - finalizedBlockEpoch <= 3 {
+	} else if currentEpoch-finalizedBlockEpoch <= 3 {
 		return nil
 	}
 
@@ -466,7 +465,7 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 		return nil
 	}
 
-	for ;; {
+	for {
 		newBM, err := metadata.GetBlockMetaData(db, bm.ParentHeaderHash())
 		if err != nil {
 			log.Error("[UpdateFinalizedEpoch] Failed to GetBlockMetaData")
@@ -485,14 +484,14 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 
 	epochMetaData, err := metadata.GetEpochMetaData(db, bm.SlotNumber(), bm.ParentHeaderHash())
 	if err != nil {
-		log.Error("[UpdateFinalizedEpoch] Failed to load EpochMetaData for ", bm.Epoch() - 1)
+		log.Error("[UpdateFinalizedEpoch] Failed to load EpochMetaData for ", bm.Epoch()-1)
 		return err
 	}
-	if epochMetaData.TotalStakeAmountFound() * 3 < epochMetaData.TotalStakeAmountAlloted() * 2 {
+	if epochMetaData.TotalStakeAmountFound()*3 < epochMetaData.TotalStakeAmountAlloted()*2 {
 		return nil
 	}
 
-	for ;; {
+	for {
 		newBM, err := metadata.GetBlockMetaData(db, bm.ParentHeaderHash())
 		if err != nil {
 			log.Error("[UpdateFinalizedEpoch] Failed to GetBlockMetaData")
@@ -506,7 +505,7 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 
 	headerHash := bm.ParentHeaderHash()
 	blockMetaDataPathForFinalization := make([]*metadata.BlockMetaData, 0)
-	for ;; {
+	for {
 		bm, err := metadata.GetBlockMetaData(db, headerHash)
 		if err != nil {
 			log.Error("[UpdateFinalizedEpoch] Failed To Load GetBlockMetaData for ", hex.EncodeToString(headerHash))
@@ -542,7 +541,7 @@ func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 	if parentBlockMetaData.SlotNumber() == 0 {
 		pathToFirstBlockOfEpoch = append(pathToFirstBlockOfEpoch, parentBlockMetaData.HeaderHash())
 	} else {
-		for ;epoch == parentEpoch; {
+		for epoch == parentEpoch {
 			pathToFirstBlockOfEpoch = append(pathToFirstBlockOfEpoch, parentBlockMetaData.HeaderHash())
 			if parentBlockMetaData.SlotNumber() == 0 {
 				break
@@ -560,7 +559,7 @@ func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 		return nil, errors.New("lenPathToFirstBlockOfEpoch is 0")
 	}
 
-	firstBlockOfEpochHeaderHash := pathToFirstBlockOfEpoch[lenPathToFirstBlockOfEpoch - 1]
+	firstBlockOfEpochHeaderHash := pathToFirstBlockOfEpoch[lenPathToFirstBlockOfEpoch-1]
 	blockMetaData, err := metadata.GetBlockMetaData(db, firstBlockOfEpochHeaderHash)
 	if err != nil {
 		return nil, err
@@ -583,7 +582,7 @@ func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
 	for _, dilithiumPK := range epochMetaData.Validators() {
 		// TODO: Get Dilithium Public Key Balance
 		dilithiumMetaData, err := metadata.GetDilithiumMetaData(db, dilithiumPK,
-		pathToFirstBlockOfEpoch[0], mainChainMetaData.FinalizedBlockHeaderHash())
+			pathToFirstBlockOfEpoch[0], mainChainMetaData.FinalizedBlockHeaderHash())
 		if err != nil {
 			log.Error("[CalculateEpochMetaData] Failed to get DilithiumMetaData")
 			return nil, err
@@ -622,7 +621,7 @@ func GetBlockStorageKey(blockHeaderHash []byte) []byte {
 }
 
 func GetBlock(db *db.DB, blockHeaderHash []byte) (*Block, error) {
-	data, err  := db.Get(GetBlockStorageKey(blockHeaderHash))
+	data, err := db.Get(GetBlockStorageKey(blockHeaderHash))
 	if err != nil {
 		return nil, err
 	}
@@ -634,5 +633,5 @@ func GetBlock(db *db.DB, blockHeaderHash []byte) (*Block, error) {
 }
 
 func BlockFromPBData(pbData *protos.Block) *Block {
-	return &Block { pbData }
+	return &Block{pbData}
 }

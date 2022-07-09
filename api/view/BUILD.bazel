@@ -12,7 +12,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//chain/transactions:go_default_library",
+        "//misc:go_default_library",
         "//protos:go_default_library",
-        "@com_github_theqrl_go_qrllib_crypto//helper:go_default_library",
     ],
 )

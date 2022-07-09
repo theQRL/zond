@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	"github.com/theQRL/go-qrllib-crypto/helper"
+	"github.com/theQRL/go-qrllib/xmss"
 	"github.com/theQRL/zond/address"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/metadata"
+	"github.com/theQRL/zond/misc"
 	"go.etcd.io/bbolt"
 	"math/big"
 	"reflect"
@@ -118,7 +119,7 @@ func (s *StateContext) ProcessBlockProposerFlag(blockProposerDilithiumPK []byte)
 	if s.slotNumber == 0 {
 		return nil
 	}
-	slotInfo := s.epochMetaData.SlotInfo()[s.slotNumber % config.GetDevConfig().BlocksPerEpoch]
+	slotInfo := s.epochMetaData.SlotInfo()[s.slotNumber%config.GetDevConfig().BlocksPerEpoch]
 	slotLeader := s.epochMetaData.Validators()[slotInfo.SlotLeader]
 	if !reflect.DeepEqual(slotLeader, blockProposerDilithiumPK) {
 		return errors.New("unexpected block proposer")
@@ -170,7 +171,8 @@ func (s *StateContext) GetAddressState(addr string) (*address.AddressState, erro
 }
 
 func (s *StateContext) GetAddressStateByPK(pk []byte) (*address.AddressState, error) {
-	addr := hex.EncodeToString(helper.PK2BinAddress(pk))
+	address := xmss.GetXMSSAddressFromPK(misc.UnSizedPKToSizedPK(pk))
+	addr := hex.EncodeToString(address[:])
 	return s.GetAddressState(addr)
 }
 
@@ -349,7 +351,7 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 
 	if s.slotNumber != 0 {
 		parentBlockMetaData, err = metadata.GetBlockMetaData(s.db, s.parentBlockHeaderHash)
-		if  err != nil {
+		if err != nil {
 			log.Error("[Commit] Failed to load Parent BlockMetaData")
 			return err
 		}
@@ -398,7 +400,7 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 			log.Error("[Commit] Failed to Add HeaderHash into EpochBlockHashes")
 			return err
 		}
-		if err:= s.epochBlockHashes.Commit(b); err != nil {
+		if err := s.epochBlockHashes.Commit(b); err != nil {
 			log.Error("[Commit] Failed to commit EpochBlockHashes")
 			return err
 		}
@@ -481,7 +483,7 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, isFinal
 }
 
 func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.BlockMetaData) error {
-	bm := blockMetaDataPathForFinalization[len(blockMetaDataPathForFinalization) - 1]
+	bm := blockMetaDataPathForFinalization[len(blockMetaDataPathForFinalization)-1]
 	parentBlockMetaData, err := metadata.GetBlockMetaData(s.db, bm.ParentHeaderHash())
 	if err != nil {
 		log.Error("[Finalize] Failed to load ParentBlockMetaData ",
@@ -558,26 +560,26 @@ func NewStateContext(db *db.DB, slotNumber uint64,
 		}
 	}
 
-	return &StateContext {
+	return &StateContext{
 		db:             db,
 		addressesState: make(map[string]*address.AddressState),
 		dilithiumState: make(map[string]*metadata.DilithiumMetaData),
 		slaveState:     make(map[string]*metadata.SlaveMetaData),
 		otsIndexState:  make(map[string]*metadata.OTSIndexMetaData),
 
-		slotNumber: slotNumber,
-		blockProposer: blockProposer,
-		finalizedHeaderHash: finalizedHeaderHash,
-		parentBlockHeaderHash: parentBlockHeaderHash,
-		blockHeaderHash: blockHeaderHash,
+		slotNumber:              slotNumber,
+		blockProposer:           blockProposer,
+		finalizedHeaderHash:     finalizedHeaderHash,
+		parentBlockHeaderHash:   parentBlockHeaderHash,
+		blockHeaderHash:         blockHeaderHash,
 		partialBlockSigningHash: partialBlockSigningHash,
-		blockSigningHash: blockSigningHash,
+		blockSigningHash:        blockSigningHash,
 		validatorsToXMSSAddress: make(map[string][]byte),
-		attestorsFlag: attestorsFlag,
-		blockProposerFlag: false,
+		attestorsFlag:           attestorsFlag,
+		blockProposerFlag:       false,
 
-		epochMetaData: epochMetaData,
-		epochBlockHashes: epochBlockHashes,
+		epochMetaData:     epochMetaData,
+		epochBlockHashes:  epochBlockHashes,
 		mainChainMetaData: mainChainMetaData,
 	}, nil
 }

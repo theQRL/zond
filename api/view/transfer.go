@@ -3,13 +3,13 @@ package view
 import (
 	"encoding/hex"
 	"errors"
-	"github.com/theQRL/go-qrllib-crypto/helper"
 	"github.com/theQRL/zond/chain/transactions"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 )
 
 type PlainTransferTransaction struct {
-	NetworkID		uint64 `json:"networkID"`
+	NetworkID       uint64 `json:"networkID"`
 	MasterAddress   string `json:"masterAddress"`
 	Fee             uint64 `json:"fee"`
 	PublicKey       string `json:"publicKey"`
@@ -27,7 +27,7 @@ type PlainTransferTransaction struct {
 func (t *PlainTransferTransaction) TransactionFromPBData(tx *protos.Transaction, txHash []byte) {
 	t.NetworkID = tx.NetworkId
 	if tx.MasterAddr != nil {
-		t.MasterAddress = helper.Bin2Address(tx.MasterAddr)
+		t.MasterAddress = hex.EncodeToString(tx.MasterAddr)
 	}
 	t.Fee = tx.Fee
 	t.PublicKey = hex.EncodeToString(tx.Pk)
@@ -36,7 +36,7 @@ func (t *PlainTransferTransaction) TransactionFromPBData(tx *protos.Transaction,
 	t.TransactionHash = hex.EncodeToString(txHash)
 	t.TransactionType = "transfer"
 
-	t.AddressesTo = helper.Bin2Addresses(tx.GetTransfer().AddrsTo)
+	t.AddressesTo = misc.Bin2Addresses(tx.GetTransfer().AddrsTo)
 	t.Amounts = tx.GetTransfer().Amounts
 	for _, slavePk := range tx.GetTransfer().SlavePks {
 		t.SlavePks = append(t.SlavePks, hex.EncodeToString(slavePk))
@@ -45,7 +45,7 @@ func (t *PlainTransferTransaction) TransactionFromPBData(tx *protos.Transaction,
 }
 
 func (t *PlainTransferTransaction) ToTransferTransactionObject() (*transactions.Transfer, error) {
-	addrsTo, err := helper.StringAddressToBytesArray(t.AddressesTo)
+	addrsTo, err := misc.StringAddressToBytesArray(t.AddressesTo)
 	if err != nil {
 		return nil, err
 	}

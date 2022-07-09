@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"github.com/golang/protobuf/proto"
-	"github.com/theQRL/go-qrllib-crypto/dilithium"
+	"github.com/theQRL/go-qrllib/dilithium"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -86,7 +86,6 @@ func (tx *ProtocolTransaction) TxHash(signingHash []byte) []byte {
 	return tx.GenerateTxHash(signingHash)
 }
 
-
 func (tx *ProtocolTransaction) SetNonce(n uint64) {
 	tx.pbData.Nonce = n
 }
@@ -126,8 +125,9 @@ func (tx *ProtocolTransaction) GenerateUnSignedTxHash(hashableBytes []byte) []by
 }
 
 func (tx *ProtocolTransaction) Sign(dilithium *dilithium.Dilithium, message []byte) {
-	tx.pbData.Signature = dilithium.Sign(message)
-	tx.pbData.Pk = dilithium.PK()
+	tx.pbData.Signature = dilithium.Seal(message)
+	pk := dilithium.GetPK()
+	tx.pbData.Pk = pk[:]
 }
 
 func (tx *ProtocolTransaction) ApplyStateChanges(stateContext *state.StateContext) error {

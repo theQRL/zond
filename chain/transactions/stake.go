@@ -6,10 +6,10 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/theQRL/go-qrllib-crypto/helper"
-	"github.com/theQRL/go-qrllib-crypto/xmss"
+	"github.com/theQRL/go-qrllib/xmss"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/metadata"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 	"reflect"
@@ -77,7 +77,7 @@ func (tx *Stake) validateData(stateContext *state.StateContext) bool {
 	}
 
 	if tx.Stake() {
-		requiredBalance := tx.Fee() + uint64(len(tx.DilithiumPKs())) * config.GetDevConfig().MinStakeAmount
+		requiredBalance := tx.Fee() + uint64(len(tx.DilithiumPKs()))*config.GetDevConfig().MinStakeAmount
 		if balance < requiredBalance {
 			log.Warn("Insufficient balance ",
 				"txhash ", hex.EncodeToString(txHash),
@@ -128,7 +128,7 @@ func (tx *Stake) validateData(stateContext *state.StateContext) bool {
 		}
 	}
 
-	if !helper.IsValidAddress(tx.AddrFrom()) {
+	if !xmss.IsValidXMSSAddress(misc.UnSizedXMSSAddressToSizedXMSSAddress(tx.AddrFrom())) {
 		log.Warn("[Stake] Invalid address addr_from: %s", tx.AddrFrom())
 		return false
 	}
@@ -164,7 +164,7 @@ func (tx *Stake) Validate(stateContext *state.StateContext) bool {
 	}
 
 	// XMSS Signature Verification
-	if !xmss.XMSSVerify(tx.GetSigningHash(), tx.Signature(), tx.PK()) {
+	if !xmss.Verify(tx.GetSigningHash(), tx.Signature(), misc.UnSizedPKToSizedPK(tx.PK())) {
 		log.Warn("XMSS Verification Failed")
 		return false
 	}
@@ -222,7 +222,8 @@ func (tx *Stake) SetAffectedAddress(stateContext *state.StateContext) error {
 		return err
 	}
 
-	addrFromPK := hex.EncodeToString(helper.PK2BinAddress(tx.PK()))
+	address := xmss.GetXMSSAddressFromPK(misc.UnSizedPKToSizedPK(tx.PK()))
+	addrFromPK := hex.EncodeToString(address[:])
 
 	err = stateContext.PrepareOTSIndexMetaData(addrFromPK, tx.OTSIndex())
 	if err != nil {
