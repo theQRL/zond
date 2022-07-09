@@ -1,14 +1,13 @@
 package view
 
 import (
-	"github.com/theQRL/go-qrllib-crypto/helper"
 	"github.com/theQRL/zond/protos"
 )
 
 type PlainAddressState struct {
-	Address           string   `json:"address" bson:"address"`
-	Balance           uint64   `json:"balance" bson:"balance"`
-	Nonce             uint64   `json:"nonce" bson:"nonce"`
+	Address string `json:"address" bson:"address"`
+	Balance uint64 `json:"balance" bson:"balance"`
+	Nonce   uint64 `json:"nonce" bson:"nonce"`
 }
 
 type PlainBalance struct {
@@ -25,7 +24,7 @@ type IsUnusedOTSIndex struct {
 }
 
 func (a *PlainAddressState) AddressStateFromPBData(a2 *protos.AddressState) {
-	a.Address = helper.Bin2Address(a2.Address)
+	a.Address = hex.EncodeToString(a2.Address)
 	a.Balance = a2.Balance
 	a.Nonce = a2.Nonce
 }

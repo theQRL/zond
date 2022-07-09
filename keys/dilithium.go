@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/theQRL/go-qrllib-crypto/dilithium"
+	"github.com/theQRL/go-qrllib/dilithium"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -22,10 +22,12 @@ func (dk *DilithiumKeys) GetDilithiumGroup() []*protos.DilithiumGroup {
 }
 
 func (dk *DilithiumKeys) Add(dilithiumGroup *protos.DilithiumGroup) {
-	d := dilithium.NewDilithium()
+	d := dilithium.New()
+	pk := d.GetPK()
+	sk := d.GetSK()
 	dilithiumInfo := &protos.DilithiumInfo{
-		PK: hex.EncodeToString(d.PK()),
-		SK: hex.EncodeToString(d.SK()),
+		PK: hex.EncodeToString(pk[:]),
+		SK: hex.EncodeToString(sk[:]),
 	}
 	dilithiumGroup.DilithiumInfo = append(dilithiumGroup.DilithiumInfo, dilithiumInfo)
 
@@ -39,7 +41,7 @@ func (dk *DilithiumKeys) AddGroup(dilithiumGroup *protos.DilithiumGroup) {
 
 func (dk *DilithiumKeys) List() {
 	for i, dilithiumGroup := range dk.pbData.DilithiumGroup {
-		for _, dilithiumInfo := range dilithiumGroup.DilithiumInfo{
+		for _, dilithiumInfo := range dilithiumGroup.DilithiumInfo {
 			fmt.Println(fmt.Sprintf("Group #%d\tPK: %s\tSK: %s", i, dilithiumInfo.PK, dilithiumInfo.SK))
 		}
 	}
@@ -68,9 +70,8 @@ func (dk *DilithiumKeys) GetDilithiumGroupByIndex(index uint) (*protos.Dilithium
 	if int(index) > len(dk.pbData.DilithiumGroup) {
 		return nil, errors.New(fmt.Sprintf("Invalid Dilithium Group Index"))
 	}
-	return dk.pbData.DilithiumGroup[index - 1], nil
+	return dk.pbData.DilithiumGroup[index-1], nil
 }
-
 
 func (dk *DilithiumKeys) Load() {
 	dk.pbData = &protos.DilithiumKeys{}

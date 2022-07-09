@@ -32,9 +32,9 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 git_repository(
     name = "com_google_protobuf",
-    commit = "09745575a923640154bcf307fba8aedff47f240a",
+    commit = "839b18b1ba42639fedecfd751102afcc5736b5d4",
     remote = "https://github.com/protocolbuffers/protobuf",
-    shallow_since = "1558721209 -0700",
+    shallow_since = "1656011596 -0700",
 )
 
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
@@ -244,23 +244,6 @@ go_repository(
     importpath = "github.com/stretchr/testify",
     sum = "h1:hDPOHmpOpP40lSULcqw7IrRb/u7w6RpDC9399XyoNd0=",
     version = "v1.6.1",
-)
-
-git_repository(
-    name = "com_github_theqrl_qrllib",
-    remote = "https://github.com/theQRL/qrllib",
-    commit = "99bf7f1427a0cf026b868627fbbe077de0d28522",
-    recursive_init_submodules = True,
-    patch_cmds = [
-        "cmake -DBUILD_GO=ON",
-        "make",
-        "rm goqrllib/goqrllib/*.cxx",
-        "rm goqrllib/dilithium/*.cxx",
-        "rm goqrllib/kyber/*.cxx",
-        "bazel run //:gazelle",
-        "rm tests/golang/misc/*.bazel",
-        "rm tests/golang/tests/*.bazel",
-    ],
 )
 
 go_repository(
@@ -502,11 +485,19 @@ go_repository(
 )
 
 go_repository(
-    name = "com_github_theqrl_go_qrllib_crypto",
-    importpath = "github.com/theQRL/go-qrllib-crypto",
-    sum = "h1:/gKsfTtUgU0ghZpxL8NxEPv1JGSs6uTEHQY0cPqD8P8=",
-    version = "v0.0.0-20201222125451-26856452460c",
+    name = "com_github_theqrl_go_qrllib",
+    importpath = "github.com/theQRL/go-qrllib",
+    sum = "h1:9PxMLUTWxy1Y+pAxrLfzFkD+5LNpWtGIQ1Dt+167cVI=",
+    version = "v0.0.0-20220709170248-6c0e87493188",
 )
+
+go_repository(
+    name = "com_github_theqrl_go_libp2p_qrl",
+    importpath = "github.com/theQRL/go-libp2p-qrl",
+    sum = "h1:cNx7H6HZD67ZBWlii8nnJbxW+exVt0SPTx7xuPwS36M=",
+    version = "v0.0.0-20220709170510-5cc6ad1936fb",
+)
+
 
 go_repository(
     name = "in_gopkg_yaml_v3",
@@ -1472,13 +1463,6 @@ go_repository(
     importpath = "github.com/syndtr/goleveldb",
     sum = "h1:fBdIW9lB4Iz0n9khmH8w27SJ3QEJ7+IgjPEwGSZiFdE=",
     version = "v1.0.0",
-)
-
-go_repository(
-    name = "com_github_theqrl_go_libp2p_qrl",
-    importpath = "github.com/theQRL/go-libp2p-qrl",
-    sum = "h1:981X2hHni+68Re3Z8zZ8TyIUvf6PvqQMhIN3s4VowM8=",
-    version = "v0.0.0-20201222131058-6dc0bcd5a379",
 )
 
 go_repository(

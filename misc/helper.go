@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"container/list"
 	"crypto/sha256"
+	"encoding/hex"
+	"github.com/theQRL/go-qrllib/xmss"
 	"math"
 	"os"
 	"strconv"
@@ -54,7 +56,7 @@ func BytesToString(data []byte) string {
 }
 
 func ShorToQuanta(data uint64) string {
-	convertedData := float64(data) / 1000000000  // TODO: Replace with config.dev.ShorPerQuanta
+	convertedData := float64(data) / 1000000000 // TODO: Replace with config.dev.ShorPerQuanta
 	return strconv.FormatFloat(convertedData, 'f', 9, 64)
 }
 
@@ -72,4 +74,35 @@ func FileExists(fileName string) bool {
 		return false
 	}
 	return !info.IsDir()
+}
+
+func Bin2Addresses(binAddresses [][]byte) []string {
+	addresses := make([]string, 0)
+	for i := 0; i < len(binAddresses); i++ {
+		addresses = append(addresses, hex.EncodeToString(binAddresses[i]))
+	}
+	return addresses
+}
+
+func StringAddressToBytesArray(addrs []string) ([][]byte, error) {
+	bytesAddrs := make([][]byte, len(addrs))
+	var err error
+	for i := 0; i < len(addrs); i++ {
+		bytesAddrs[i], err = hex.DecodeString(addrs[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return bytesAddrs, nil
+}
+
+func UnSizedPKToSizedPK(pk []byte) (pkSized [xmss.ExtendedPKSize]uint8) {
+	copy(pkSized[:], pk)
+	return
+}
+
+func UnSizedXMSSAddressToSizedXMSSAddress(addr []byte) (addrSized [xmss.AddressSize]uint8) {
+	copy(addrSized[:], addr)
+	return
 }

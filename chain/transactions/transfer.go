@@ -6,8 +6,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/theQRL/go-qrllib-crypto/helper"
-	"github.com/theQRL/go-qrllib-crypto/xmss"
+	"github.com/theQRL/go-qrllib/xmss"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 	"reflect"
@@ -96,7 +96,7 @@ func (tx *Transfer) validateData(stateContext *state.StateContext) bool {
 	}
 
 	balance := addressState.Balance()
-	if balance < tx.TotalAmounts() + tx.Fee() {
+	if balance < tx.TotalAmounts()+tx.Fee() {
 		log.Warn("Insufficient balance",
 			"txhash", hex.EncodeToString(txHash),
 			"balance", balance,
@@ -120,13 +120,13 @@ func (tx *Transfer) validateData(stateContext *state.StateContext) bool {
 	}
 
 	// TODO: Move to some common validation
-	if !helper.IsValidAddress(tx.AddrFrom()) {
+	if !xmss.IsValidXMSSAddress(misc.UnSizedXMSSAddressToSizedXMSSAddress(tx.AddrFrom())) {
 		log.Warn("[Transfer] Invalid address addr_from: %s", tx.AddrFrom())
 		return false
 	}
 
 	for _, addrTo := range tx.AddrsTo() {
-		if !helper.IsValidAddress(addrTo) {
+		if !xmss.IsValidXMSSAddress(misc.UnSizedXMSSAddressToSizedXMSSAddress(addrTo)) {
 			log.Warn("[Transfer] Invalid address addr_to: %s", tx.AddrsTo())
 			return false
 		}
@@ -140,8 +140,8 @@ func (tx *Transfer) validateData(stateContext *state.StateContext) bool {
 	}
 
 	for _, slavePK := range tx.SlavePKs() {
-		binAddress := helper.PK2BinAddress(slavePK)
-		if !helper.IsValidAddress(binAddress) {
+		binAddress := xmss.GetXMSSAddressFromPK(misc.UnSizedPKToSizedPK(slavePK))
+		if !xmss.IsValidXMSSAddress(binAddress) {
 			log.Warn("Slave public key %s is invalid", hex.EncodeToString(slavePK))
 			return false
 		}
@@ -164,12 +164,12 @@ func (tx *Transfer) validateData(stateContext *state.StateContext) bool {
 
 func (tx *Transfer) Validate(stateContext *state.StateContext) bool {
 	/*
-	TODO:
-	1. Validate OTS Key Reuse
-	2. Validate Slave [ done ]
-	3. Validate Data in the fields [ done ]
-	4. Validate Signature [done]
-	 */
+		TODO:
+		1. Validate OTS Key Reuse
+		2. Validate Slave [ done ]
+		3. Validate Data in the fields [ done ]
+		4. Validate Signature [done]
+	*/
 	txHash := tx.TxHash(tx.GetSigningHash())
 
 	if !tx.ValidateSlave(stateContext) {
@@ -199,7 +199,7 @@ func (tx *Transfer) Validate(stateContext *state.StateContext) bool {
 	}
 
 	// XMSS Signature Verification
-	if !xmss.XMSSVerify(tx.GetSigningHash(), tx.Signature(), tx.PK()) {
+	if !xmss.Verify(tx.GetSigningHash(), tx.Signature(), misc.UnSizedPKToSizedPK(tx.PK())) {
 		log.Warn("XMSS Verification Failed")
 		return false
 	}
@@ -251,8 +251,8 @@ func (tx *Transfer) SetAffectedAddress(stateContext *state.StateContext) error {
 			return err
 		}
 	}
-
-	addrFromPK := hex.EncodeToString(helper.PK2BinAddress(tx.PK()))
+	address := xmss.GetXMSSAddressFromPK(misc.UnSizedPKToSizedPK(tx.PK()))
+	addrFromPK := hex.EncodeToString(address[:])
 
 	err = stateContext.PrepareOTSIndexMetaData(addrFromPK, tx.OTSIndex())
 	if err != nil {

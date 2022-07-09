@@ -1,9 +1,8 @@
 package commands
 
 import (
-	"errors"
 	"fmt"
-	"github.com/theQRL/go-qrllib-crypto/xmss"
+	"github.com/theQRL/go-qrllib/xmss"
 	"github.com/theQRL/zond/cli/flags"
 	"github.com/theQRL/zond/wallet"
 	"github.com/urfave/cli/v2"
@@ -11,21 +10,18 @@ import (
 
 func getWalletSubCommands() []*cli.Command {
 	heightFlag := &cli.Uint64Flag{
-		Name: "height",
-		Value: 10,  // TODO: Move this to Dev Config
+		Name:  "height",
+		Value: 10, // TODO: Move this to Dev Config
 	}
-	return []*cli.Command {
+	return []*cli.Command{
 		{
-			Name: "add",
+			Name:  "add",
 			Usage: "Adds a new XMSS address into the Wallet",
-			Flags: []cli.Flag {
+			Flags: []cli.Flag{
 				heightFlag,
 			},
 			Action: func(c *cli.Context) error {
-				hashType, ok := xmss.EHashFunctions["sha2_256"]
-				if !ok {
-					return errors.New("invalid xmss hash type")
-				}
+				hashType := xmss.SHA2_256
 				w := wallet.NewWallet(flags.WalletFile.Value)
 				w.Add(heightFlag.Value, hashType)
 
@@ -34,7 +30,7 @@ func getWalletSubCommands() []*cli.Command {
 			},
 		},
 		{
-			Name: "list",
+			Name:  "list",
 			Usage: "List all addresses in a Wallet",
 			Action: func(c *cli.Context) error {
 				w := wallet.NewWallet(flags.WalletFile.Value)
@@ -43,7 +39,7 @@ func getWalletSubCommands() []*cli.Command {
 			},
 		},
 		{
-			Name: "secret",
+			Name:  "secret",
 			Usage: "Show hexseed & mnemonic for the addresses in Wallet",
 			Action: func(c *cli.Context) error {
 				w := wallet.NewWallet(flags.WalletFile.Value)
@@ -56,9 +52,9 @@ func getWalletSubCommands() []*cli.Command {
 
 func AddWalletCommand(app *cli.App) {
 	app.Commands = append(app.Commands, &cli.Command{
-		Name: "wallet",
+		Name:  "wallet",
 		Usage: "Commands to manage Zond Wallet",
-		Flags: []cli.Flag {
+		Flags: []cli.Flag{
 			flags.WalletFile,
 		},
 		Subcommands: getWalletSubCommands(),

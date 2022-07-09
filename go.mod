@@ -16,15 +16,13 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/stretchr/testify v1.6.1
-	github.com/theQRL/go-libp2p-qrl v0.0.0-20201222131058-6dc0bcd5a379
-	github.com/theQRL/go-qrllib-crypto v0.0.0-20201222125451-26856452460c
+	github.com/theQRL/go-libp2p-qrl v0.0.0-20220709170510-5cc6ad1936fb
+	github.com/theQRL/go-qrllib v0.0.0-20220709170248-6c0e87493188
 	github.com/urfave/cli/v2 v2.2.0
 	github.com/willf/bitset v1.1.11 // indirect
 	github.com/willf/bloom v2.0.3+incompatible
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	go.etcd.io/bbolt v1.3.5
-	golang.org/x/net v0.0.0-20200625001655-4c5254603344 // indirect
-	golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0

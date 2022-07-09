@@ -3,7 +3,7 @@ package consensus
 import (
 	"encoding/hex"
 	log "github.com/sirupsen/logrus"
-	"github.com/theQRL/go-qrllib-crypto/dilithium"
+	"github.com/theQRL/go-qrllib/dilithium"
 	"github.com/theQRL/zond/address"
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/chain/block"
@@ -37,16 +37,16 @@ type POS struct {
 
 	blockBeingAttested *block.Block // Block being proposed by this node and
 	// awaiting for the attestations
-	attestors [][]byte
+	attestors    [][]byte
 	attestations []*transactions.Attest
 }
 
-func (p *POS) Start()  {
+func (p *POS) Start() {
 	/* TODO
-		1. Load Dilithium Keys from file based in config
-		2. Check if Stake Enabled
-		3.
-	 */
+	1. Load Dilithium Keys from file based in config
+	2. Check if Stake Enabled
+	3.
+	*/
 
 	/* Scenarios
 	1.
@@ -61,20 +61,20 @@ func (p *POS) Start()  {
 	POS is called with next slot leader due to timeout,
 	then check if next slotleader key is present
 
-	 */
+	*/
 
 	/*
-	POS will call itself after every
+		POS will call itself after every
 
-	1. sleep for next slot time - current time
-	2. On Timer, check if slot leader is one of the address from wallet
-	3. If yes, then fetch last block from Chain, create a new block,
-	   broadcast it to server for attestation
-	4. Keep adding attestation to the block, as soon as a threshold,
-	   sign the block and broadcast it.
-	5.
+		1. sleep for next slot time - current time
+		2. On Timer, check if slot leader is one of the address from wallet
+		3. If yes, then fetch last block from Chain, create a new block,
+		   broadcast it to server for attestation
+		4. Keep adding attestation to the block, as soon as a threshold,
+		   sign the block and broadcast it.
+		5.
 
-	 */
+	*/
 }
 
 func (p *POS) TimeRemainingForNextAction() time.Duration {
@@ -90,7 +90,7 @@ func (p *POS) TimeRemainingForNextAction() time.Duration {
 		blockTiming := p.config.Dev.BlockTime
 
 		currentSlot := (currentTime - genesisTimestamp) / blockTiming
-		nextSlotTime := genesisTimestamp + (currentSlot + 1) * blockTiming
+		nextSlotTime := genesisTimestamp + (currentSlot+1)*blockTiming
 
 		timeRemainingForNextSlot := nextSlotTime - currentTime
 		return time.Duration(timeRemainingForNextSlot) * time.Second
@@ -104,7 +104,7 @@ func (p *POS) TimeRemainingForNextAction() time.Duration {
 		blockTiming := p.config.Dev.BlockTime
 		// TODO: move this 45 seconds into config
 		return time.Duration(
-			(genesisTimestamp + slotNumber * blockTiming + 45) - currentTime) * time.Second
+			(genesisTimestamp+slotNumber*blockTiming+45)-currentTime) * time.Second
 	}
 }
 
@@ -168,7 +168,7 @@ running:
 				txPool := p.chain.GetTransactionPool()
 				txs := make([]*protos.Transaction, 0)
 				// TODO: Replace hardcoded 100 with some max block size
-				for i := 0; i < 100 ; {
+				for i := 0; i < 100; {
 					txInfo := txPool.Pop()
 					if txInfo == nil {
 						break
@@ -185,7 +185,8 @@ running:
 					log.Info("Added transaction ", strTxHash, " into block #", slotNumber)
 					i++
 				}
-				b := block.NewBlock(0, ntp.GetNTP().Time(), proposerD.PK(), slotNumber,
+				pk := proposerD.GetPK()
+				b := block.NewBlock(0, ntp.GetNTP().Time(), pk[:], slotNumber,
 					lastBlock.HeaderHash(), txs, nil, coinBaseState.Nonce())
 
 				header := b.Header()
@@ -229,10 +230,10 @@ running:
 				}
 
 				/*
-				1. If any attestation remaining,
-				then Broadcast Unsigned block via server for attestation
-				2. Optimization needed PartialBlockSigningHash is called two times
-				 */
+					1. If any attestation remaining,
+					then Broadcast Unsigned block via server for attestation
+					2. Optimization needed PartialBlockSigningHash is called two times
+				*/
 				partialBlockSigningHash := b.PartialBlockSigningHash()
 				log.Info("Broadcasting Block #", slotNumber, " for attestation")
 				p.srv.BroadcastBlockForAttestation(b, proposerD.Sign(partialBlockSigningHash))
@@ -244,7 +245,7 @@ running:
 				// broadcast the block
 				if len(p.blockBeingAttested.ProtocolTransactions()) > 1 {
 					log.Info("Number of Attestations Received ",
-						len(p.blockBeingAttested.ProtocolTransactions()) - 1,
+						len(p.blockBeingAttested.ProtocolTransactions())-1,
 						" for Block #", p.blockBeingAttested.SlotNumber())
 					dilithiumPK := hex.EncodeToString(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
 					proposerD, ok := p.validators[dilithiumPK]
@@ -269,13 +270,13 @@ running:
 				p.blockBeingAttested = nil
 				p.attestations = make([]*transactions.Attest, 0)
 			}
-		case b := <- p.blockReceivedForAttestation:
+		case b := <-p.blockReceivedForAttestation:
 			if !p.config.User.Stake.EnableStaking {
 				continue
 			}
 			/*
-			This case happens, when the block is proposed by some outside node.
-			 */
+				This case happens, when the block is proposed by some outside node.
+			*/
 			/*
 				TODO:
 				Check if block slot number must be equal to the current expected slot number
@@ -322,7 +323,7 @@ running:
 					b.ParentHeaderHash(),
 					partialBlockSigningHash)
 			}
-		case tx := <- p.attestationReceivedForBlock:
+		case tx := <-p.attestationReceivedForBlock:
 			if !p.config.User.Stake.EnableStaking {
 				continue
 			}
@@ -330,14 +331,14 @@ running:
 				continue
 			}
 			/*
-			When the attestation is received, check if the attest transaction is for the block
-			proposed by this node.
-			 */
+				When the attestation is received, check if the attest transaction is for the block
+				proposed by this node.
+			*/
 
 			// Validate Txn
 			epochMetaData, err := metadata.GetEpochMetaData(p.db, p.blockBeingAttested.SlotNumber(),
 				p.blockBeingAttested.ParentHeaderHash())
-			if err != nil{
+			if err != nil {
 				log.Error("Error getting epochMetaData")
 				continue
 			}
@@ -412,13 +413,13 @@ func (p *POS) Stop() {
 }
 
 func NewPOS(srv *p2p.Server, chain *chain.Chain, db *db.DB) *POS {
-	pos := &POS {
-		config: config.GetConfig(),
-		srv: srv,
-		chain: chain,
-		db: db,
-		validators: make(map[string] *dilithium.Dilithium),
-		exit: make(chan struct{}),
+	pos := &POS{
+		config:     config.GetConfig(),
+		srv:        srv,
+		chain:      chain,
+		db:         db,
+		validators: make(map[string]*dilithium.Dilithium),
+		exit:       make(chan struct{}),
 
 		blockReceivedForAttestation: srv.GetBlockReceivedForAttestation(),
 		attestationReceivedForBlock: srv.GetAttestationReceivedForBlock(),
@@ -438,7 +439,12 @@ func NewPOS(srv *p2p.Server, chain *chain.Chain, db *db.DB) *POS {
 				log.Error("Error decoding Dilithium SK ", err.Error())
 				return nil
 			}
-			pos.validators[strPK] = dilithium.RecoverDilithium(pk, sk)
+
+			var pkSized [dilithium.PKSizePacked]uint8
+			var skSized [dilithium.SKSizePacked]uint8
+			copy(pkSized[:], pk)
+			copy(skSized[:], sk)
+			pos.validators[strPK] = dilithium.NewFromKeys(&pkSized, &skSized)
 		}
 	}
 

@@ -6,9 +6,10 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/theQRL/go-qrllib-crypto/dilithium"
+	"github.com/theQRL/go-qrllib/dilithium"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
+	"reflect"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -50,7 +51,9 @@ func (tx *Attest) Validate(stateContext *state.StateContext) bool {
 	messageSigned := tx.GetSigningHash(stateContext.PartialBlockSigningHash())
 	txHash := tx.TxHash(messageSigned)
 
-	if !dilithium.DilithiumVerify(tx.Signature(), tx.PK(), messageSigned) {
+	var pkSized [dilithium.PKSizePacked]uint8
+	copy(pkSized[:], tx.PK())
+	if !reflect.DeepEqual(dilithium.Open(tx.Signature(), &pkSized), messageSigned) {
 		log.Warn(fmt.Sprintf("Dilithium Signature Verification failed for Attest Txn %s",
 			hex.EncodeToString(txHash)))
 		return false
@@ -66,9 +69,9 @@ func (tx *Attest) Validate(stateContext *state.StateContext) bool {
 
 func (tx *Attest) ApplyStateChanges(stateContext *state.StateContext) error {
 	/*
-	For each attest add Points to stateContext to validate the
-	justification &finality
-	 */
+		For each attest add Points to stateContext to validate the
+		justification &finality
+	*/
 	return nil
 }
 
