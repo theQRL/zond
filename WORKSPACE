@@ -9,7 +9,7 @@ http_archive(
     ],
 )
 
-load("@io_bazel_rules_go//go:deps.bzl", "go_rules_dependencies", "go_register_toolchains")
+load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 
 go_rules_dependencies()
 
@@ -46,6 +46,13 @@ load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 gazelle_dependencies()
 
 go_repository(
+    name = "org_golang_x_term",
+    importpath = "golang.org/x/term",
+    sum = "h1:v+OssWQX+hTHEmOBgwxdZxK4zHq3yOs8F9J7mk0PY8E=",
+    version = "v0.0.0-20201126162022-7de9c90e9dd1",
+)
+
+go_repository(
     name = "org_golang_google_grpc",
     build_file_proto_mode = "disable",
     importpath = "google.golang.org/grpc",
@@ -56,15 +63,15 @@ go_repository(
 go_repository(
     name = "org_golang_x_net",
     importpath = "golang.org/x/net",
-    sum = "h1:vGXIOMxbNfDTk/aXCmfdLgkrSV+Z2tcbze+pEc3v5W4=",
-    version = "v0.0.0-20200625001655-4c5254603344",
+    sum = "h1:CIJ76btIcR3eFI5EgSo6k1qKw9KJexJuRLI9G7Hp5wE=",
+    version = "v0.0.0-20211112202133-69e39bad7dc2",
 )
 
 go_repository(
     name = "org_golang_x_text",
     importpath = "golang.org/x/text",
-    sum = "h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=",
-    version = "v0.3.2",
+    sum = "h1:aRYxNxv6iGQlyVaZmk6ZgYEDa+Jg18DxebPSrd6bg1M=",
+    version = "v0.3.6",
 )
 
 load("//:deps.bzl", "zond_deps")
@@ -319,8 +326,8 @@ go_repository(
 go_repository(
     name = "org_golang_x_crypto",
     importpath = "golang.org/x/crypto",
-    sum = "h1:psW17arqaxU48Z5kZ0CQnkZWQJsqcURM6tKiBApRjXI=",
-    version = "v0.0.0-20200622213623-75b288015ac9",
+    sum = "h1:sK3txAijHtOK88l68nt020reeT1ZdKLIYetKl95FzVY=",
+    version = "v0.0.0-20220622213112-05595931fe9d",
 )
 
 go_repository(
@@ -354,8 +361,8 @@ go_repository(
 go_repository(
     name = "org_golang_x_sys",
     importpath = "golang.org/x/sys",
-    sum = "h1:Ih9Yo4hSPImZOpfGuA4bR/ORKTAbhZo2AbWNRCnevdo=",
-    version = "v0.0.0-20200625212154-ddb9806d33ae",
+    sum = "h1:SrN+KX8Art/Sf4HNj6Zcz06G7VEz+7w9tdXTPOZ7+l4=",
+    version = "v0.0.0-20210615035016-665e8c7367d1",
 )
 
 go_repository(
@@ -487,8 +494,8 @@ go_repository(
 go_repository(
     name = "com_github_theqrl_go_qrllib",
     importpath = "github.com/theQRL/go-qrllib",
-    sum = "h1:9PxMLUTWxy1Y+pAxrLfzFkD+5LNpWtGIQ1Dt+167cVI=",
-    version = "v0.0.0-20220709170248-6c0e87493188",
+    sum = "h1:AfARzAbQmUDI+mrs8HAn95k6Qb17MeKvRWMIs3Yyz00=",
+    version = "v0.0.0-20220711105102-6d28b8ccf3c0",
 )
 
 go_repository(
@@ -497,7 +504,6 @@ go_repository(
     sum = "h1:cNx7H6HZD67ZBWlii8nnJbxW+exVt0SPTx7xuPwS36M=",
     version = "v0.0.0-20220709170510-5cc6ad1936fb",
 )
-
 
 go_repository(
     name = "in_gopkg_yaml_v3",
