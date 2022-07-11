@@ -28,7 +28,7 @@ var OTSKeyIndexFlag = &cli.UintFlag{
 var NetworkIDFlag = &cli.Uint64Flag{
 	Name:     "network-id",
 	Value:    1,
-	Required: true,
+	Required: false,
 }
 
 var NonceFlag = &cli.Uint64Flag{
