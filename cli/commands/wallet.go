@@ -23,7 +23,7 @@ func getWalletSubCommands() []*cli.Command {
 			Action: func(c *cli.Context) error {
 				hashType := xmss.SHA2_256
 				w := wallet.NewWallet(flags.WalletFile.Value)
-				w.Add(heightFlag.Value, hashType)
+				w.Add(uint8(heightFlag.Value), hashType)
 
 				fmt.Println("Wallet Created")
 				return nil
