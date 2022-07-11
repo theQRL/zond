@@ -52,20 +52,20 @@ func broadcastTransaction(transaction interface{}, url string, txHash []byte) er
 func getTransactionSubCommands() []*cli.Command {
 	return []*cli.Command{
 		{
-			Name: "stake",
+			Name:  "stake",
 			Usage: "Generates a signed stake transaction",
-			Flags: []cli.Flag {
+			Flags: []cli.Flag{
 				flags.WalletFile,
 				flags.XMSSIndexFlag,
 				flags.OTSKeyIndexFlag,
 				flags.NetworkIDFlag,
-				&cli.StringFlag {
-					Name: "dilithium-file",
+				&cli.StringFlag{
+					Name:  "dilithium-file",
 					Value: "dilithium_keys",
 				},
-				&cli.UintFlag {
-					Name: "dilithium-group-index",
-					Value: 1,
+				&cli.UintFlag{
+					Name:     "dilithium-group-index",
+					Value:    1,
 					Required: true,
 				},
 				flags.TransactionFeeFlag,
@@ -73,8 +73,8 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.TransactionStdOut,
 				flags.BroadcastFlag,
 				flags.RemoteAddrFlag,
-				&cli.StringFlag {
-					Name: "output",
+				&cli.StringFlag{
+					Name:  "output",
 					Value: "stake_transactions.json",
 				},
 			},
@@ -99,7 +99,7 @@ func getTransactionSubCommands() []*cli.Command {
 				if err != nil {
 					return err
 				}
-				xmss.SetOTSIndex(c.Uint(flags.OTSKeyIndexFlag.Name))
+				xmss.SetIndex(uint32(c.Uint(flags.OTSKeyIndexFlag.Name)))
 
 				dilithiumKeys := keys.NewDilithiumKeys(dilithiumFile)
 				dilithiumGroup, err := dilithiumKeys.GetDilithiumGroupByIndex(dilithiumGroupIndex)
@@ -114,8 +114,9 @@ func getTransactionSubCommands() []*cli.Command {
 					}
 					dilithiumPKs = append(dilithiumPKs, binDilithiumPk)
 				}
+				pk := xmss.GetPK()
 				tx := transactions.NewStake(c.Uint64(flags.NetworkIDFlag.Name), dilithiumPKs, true,
-					fee, c.Uint64("nonce"), xmss.PK(), nil)
+					fee, c.Uint64("nonce"), pk[:], nil)
 				tx.Sign(xmss, tx.GetSigningHash())
 
 				if len(output) > 0 {
@@ -145,9 +146,9 @@ func getTransactionSubCommands() []*cli.Command {
 			},
 		},
 		{
-			Name: "transfer",
+			Name:  "transfer",
 			Usage: "Generates a signed transfer transaction",
-			Flags: []cli.Flag {
+			Flags: []cli.Flag{
 				flags.WalletFile,
 				flags.XMSSIndexFlag,
 				flags.OTSKeyIndexFlag,
@@ -157,11 +158,11 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.BroadcastFlag,
 				flags.RemoteAddrFlag,
 				&cli.StringFlag{
-					Name: "address-to",
+					Name:  "address-to",
 					Value: "",
 				},
 				&cli.Uint64Flag{
-					Name: "amount",
+					Name:  "amount",
 					Value: 0,
 				},
 				flags.TransactionFeeFlag,
@@ -172,7 +173,7 @@ func getTransactionSubCommands() []*cli.Command {
 				if err != nil {
 					return err
 				}
-				xmss.SetOTSIndex(c.Uint(flags.OTSKeyIndexFlag.Name))
+				xmss.SetIndex(uint32(c.Uint(flags.OTSKeyIndexFlag.Name)))
 
 				addressTo := c.String("address-to")
 				stdOut := c.Bool(flags.TransactionStdOut.Name)
@@ -183,6 +184,7 @@ func getTransactionSubCommands() []*cli.Command {
 					return err
 				}
 
+				pk := xmss.GetPK()
 				tx := transactions.NewTransfer(
 					c.Uint64(flags.NetworkIDFlag.Name),
 					[][]byte{binAddressTo},
@@ -191,7 +193,7 @@ func getTransactionSubCommands() []*cli.Command {
 					nil,
 					nil,
 					c.Uint64(flags.NonceFlag.Name),
-					xmss.PK(),
+					pk[:],
 					nil)
 				tx.Sign(xmss, tx.GetSigningHash())
 
@@ -219,8 +221,8 @@ func getTransactionSubCommands() []*cli.Command {
 
 func AddTransactionCommand(app *cli.App) {
 	app.Commands = append(app.Commands, &cli.Command{
-		Name: "tx",
-		Usage: "Commands to generate tx",
+		Name:        "tx",
+		Usage:       "Commands to generate tx",
 		Subcommands: getTransactionSubCommands(),
 	})
 }
