@@ -205,7 +205,7 @@ func (s *StateContext) PrepareDilithiumMetaData(dilithiumPK string) error {
 
 	dilithiumMetaData, err := metadata.GetDilithiumMetaData(s.db, binDilithiumPK,
 		s.parentBlockHeaderHash, s.mainChainMetaData.FinalizedBlockHeaderHash())
-	if dilithiumMetaData == nil {
+	if err != nil {
 		return err
 	}
 	s.dilithiumState[strKey] = dilithiumMetaData

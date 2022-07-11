@@ -95,7 +95,7 @@ func (c *Chain) GetStartingNonFinalizedEpoch() (uint64, error) {
 		return 0, err
 	}
 	// Special condition for epoch 0, to start syncing from epoch 0
-	if mainChainMetaData.FinalizedBlockSlotNumber() < config.GetDevConfig().BlocksPerEpoch - 1 {
+	if mainChainMetaData.FinalizedBlockSlotNumber() < config.GetDevConfig().BlocksPerEpoch-1 {
 		return 0, nil
 	}
 	finalizedEpoch := mainChainMetaData.FinalizedBlockSlotNumber() / config.GetDevConfig().BlocksPerEpoch
@@ -151,7 +151,7 @@ func (c *Chain) GetSlotLeaderDilithiumPKBySlotNumber(slotNumber uint64,
 		return nil, err
 	}
 
-	slotLeaderIndex := epochMetaData.SlotInfo()[slotNumber % c.config.Dev.BlocksPerEpoch].SlotLeader
+	slotLeaderIndex := epochMetaData.SlotInfo()[slotNumber%c.config.Dev.BlocksPerEpoch].SlotLeader
 	return epochMetaData.Validators()[slotLeaderIndex], nil
 }
 
@@ -163,7 +163,7 @@ func (c *Chain) GetAttestorsBySlotNumber(slotNumber uint64,
 		return nil, err
 	}
 
-	attestorsIndex := epochMetaData.SlotInfo()[slotNumber % c.config.Dev.BlocksPerEpoch].Attestors
+	attestorsIndex := epochMetaData.SlotInfo()[slotNumber%c.config.Dev.BlocksPerEpoch].Attestors
 	validators := epochMetaData.Validators()
 
 	var attestors [][]byte
@@ -406,9 +406,9 @@ func (c *Chain) GetStateContext() (*state.StateContext, error) {
 
 	return state.
 		NewStateContext(c.state.DB(), lastBlock.SlotNumber(), nil,
-		finalizedHeaderHash, lastBlock.ParentHeaderHash(), lastBlock.HeaderHash(),
-		lastBlock.PartialBlockSigningHash(), lastBlock.BlockSigningHash(),
-		epochMetaData)
+			finalizedHeaderHash, lastBlock.ParentHeaderHash(), lastBlock.HeaderHash(),
+			lastBlock.PartialBlockSigningHash(), lastBlock.BlockSigningHash(),
+			epochMetaData)
 }
 
 func (c *Chain) GetStateContext2(slotNumber uint64, blockProposer []byte,
@@ -433,9 +433,9 @@ func (c *Chain) GetStateContext2(slotNumber uint64, blockProposer []byte,
 }
 
 func NewChain(s *state.State) *Chain {
-	return &Chain {
+	return &Chain{
 		config: config.GetConfig(),
-		state: s,
+		state:  s,
 		txPool: pool.CreateTransactionPool(),
 	}
 }
