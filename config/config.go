@@ -15,16 +15,16 @@ type Config struct {
 }
 
 type NodeConfig struct {
-	EnablePeerDiscovery      bool
-	PeerList                 []string
-	BindingIP                string
-	LocalPort                uint16
-	PublicPort               uint16
-	PeerRateLimit            uint64
-	BanMinutes               uint8
-	MaxPeersLimit            uint16
-	MaxPeersInPeerList       uint64
-	MaxRedundantConnections  int
+	EnablePeerDiscovery     bool
+	PeerList                []string
+	BindingIP               string
+	LocalPort               uint16
+	PublicPort              uint16
+	PeerRateLimit           uint64
+	BanMinutes              uint8
+	MaxPeersLimit           uint16
+	MaxPeersInPeerList      uint64
+	MaxRedundantConnections int
 }
 
 type NTPConfig struct {
@@ -41,7 +41,7 @@ type TransactionPoolConfig struct {
 }
 
 type StakeConfig struct {
-	EnableStaking bool
+	EnableStaking         bool
 	DilithiumKeysFileName string
 }
 
@@ -170,9 +170,8 @@ func GetConfig() *Config {
 
 func GetUserConfig() (userConf *UserConfig) {
 	node := &NodeConfig{
-		EnablePeerDiscovery: true,
-		PeerList: []string{
-		},
+		EnablePeerDiscovery:     true,
+		PeerList:                []string{},
 		BindingIP:               "0.0.0.0",
 		LocalPort:               15005,
 		PublicPort:              15005,
@@ -203,7 +202,6 @@ func GetUserConfig() (userConf *UserConfig) {
 		Threads:          1,
 		MaxConcurrentRPC: 100,
 	}
-
 
 	api := &API{
 		PublicAPI: publicAPI,
@@ -266,7 +264,7 @@ func GetDevConfig() (dev *DevConfig) {
 	if err != nil {
 		panic(fmt.Sprintf("Invalid CoinBaseAddress %v", err.Error()))
 	}
-	binFoundationXMSSAddress, err := hex.DecodeString("0005003a4d7fa2f8a30dec94363a45a412833eb1c2fc0a490333f10f4e8acb012552d1f11b15a1")
+	binFoundationXMSSAddress, err := hex.DecodeString("0005004010c7bca4f580b0369fa1c4fe62a44f719b7b6b88c23dcb467b881e650c8dcc15a7ca24")
 	if err != nil {
 		panic(fmt.Sprintf("Invalid FoundationAddress %v", err.Error()))
 	}
@@ -277,7 +275,7 @@ func GetDevConfig() (dev *DevConfig) {
 		GenesisDifficulty:     10000000,
 		CoinBaseAddress:       binCoinBaseAddress,
 		FoundationXMSSAddress: binFoundationXMSSAddress,
-		GenesisTimestamp:      1605185955,
+		GenesisTimestamp:      1657615048,
 	}
 	transaction := &TransactionConfig{
 		MultiOutputLimit: 100,
@@ -299,15 +297,15 @@ func GetDevConfig() (dev *DevConfig) {
 
 		ReorgLimit: 22000,
 
-		MessageQSize:		   300,
+		MessageQSize:          300,
 		MessageReceiptTimeout: 10,
 		MessageBufferSize:     64 * 1024 * 1024,
 
 		OTSBitFieldPerPage: 8192 / 8,
 
-		DefaultNonce:            0,
-		DefaultAccountBalance:   0,
-		BlockTime: 60,
+		DefaultNonce:          0,
+		DefaultAccountBalance: 0,
+		BlockTime:             60,
 
 		DBName:              "state",
 		PeersFilename:       "peers.json",
@@ -324,9 +322,9 @@ func GetDevConfig() (dev *DevConfig) {
 		ShorPerQuanta: 1000000000,
 
 		MaxReceivableBytes: 10 * 1024 * 1024,
-		ReservedQuota: 1024,
+		ReservedQuota:      1024,
 
-		BlockTimeSeriesSize: 1440,
+		BlockTimeSeriesSize:     1440,
 		RecordTransactionHashes: false,
 	}
 	dev.MaxBytesOut = dev.MaxReceivableBytes - dev.ReservedQuota
