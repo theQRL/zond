@@ -17,7 +17,7 @@ require (
 	github.com/sirupsen/logrus v1.6.0
 	github.com/stretchr/testify v1.6.1
 	github.com/theQRL/go-libp2p-qrl v0.0.0-20220709170510-5cc6ad1936fb
-	github.com/theQRL/go-qrllib v0.0.0-20220711105102-6d28b8ccf3c0
+	github.com/theQRL/go-qrllib v0.0.0-20220716113720-3982520a8a2e
 	github.com/urfave/cli/v2 v2.2.0
 	github.com/willf/bitset v1.1.11 // indirect
 	github.com/willf/bloom v2.0.3+incompatible
