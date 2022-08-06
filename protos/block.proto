@@ -12,7 +12,13 @@ import "protos/transaction.proto";
 message BlockHeader {
     uint64 timestamp_seconds = 1;
     uint64 slot_number = 2;
-    bytes parent_header_hash = 3;
+    bytes parent_hash = 3;
+
+    uint64 base_fee = 4;
+    uint64 gas_limit = 5;
+    uint64 gas_used = 6;
+
+    bytes root = 7;
 }
 
 message Block {
@@ -20,4 +26,3 @@ message Block {
     repeated ProtocolTransaction protocol_transactions = 2;
     repeated Transaction transactions = 3;
 }
-

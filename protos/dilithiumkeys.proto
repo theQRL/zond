@@ -9,14 +9,11 @@ package protos;
 
 message DilithiumKeys {
     string version = 1;
-    repeated DilithiumGroup dilithium_group = 2;
-}
-
-message DilithiumGroup {
-    repeated DilithiumInfo dilithium_info = 1;
+    repeated DilithiumInfo dilithium_info = 2;
 }
 
 message DilithiumInfo {
     string PK = 1;
     string SK = 2;
+    string hex_seed = 3;
 }

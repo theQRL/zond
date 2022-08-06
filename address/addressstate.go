@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/golang/protobuf/proto"
+	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/protos"
@@ -93,8 +94,8 @@ func NewAddressState(address []byte, nonce uint64, balance uint64) *AddressState
 	return a
 }
 
-func GetAddressState(db *db.DB, address []byte, lastBlockHeaderHash []byte,
-	finalizedHeaderHash []byte) (*AddressState, error) {
+func GetAddressState(db *db.DB, address []byte, lastBlockHeaderHash common.Hash,
+	finalizedHeaderHash common.Hash) (*AddressState, error) {
 	key := GetAddressStateKey(address)
 
 	data, err := metadata.GetDataByBucket(db, key, lastBlockHeaderHash, finalizedHeaderHash)

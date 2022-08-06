@@ -13,8 +13,8 @@ var WalletFile = &cli.StringFlag{
 	Value: "wallet.json", // TODO: Move this to Dev Config
 }
 
-var XMSSIndexFlag = &cli.UintFlag{
-	Name:     "xmss-index",
+var AccountIndexFlag = &cli.UintFlag{
+	Name:     "account-index",
 	Value:    1,
 	Required: true,
 }
@@ -28,6 +28,12 @@ var OTSKeyIndexFlag = &cli.UintFlag{
 var NetworkIDFlag = &cli.Uint64Flag{
 	Name:     "network-id",
 	Value:    1,
+	Required: false,
+}
+
+var DataFlag = &cli.StringFlag{
+	Name:     "data",
+	Value:    "",
 	Required: false,
 }
 
@@ -51,9 +57,22 @@ var RemoteAddrFlag = &cli.StringFlag{
 	Required: false,
 }
 
-var TransactionFeeFlag = &cli.Uint64Flag{
-	Name:  "fee",
-	Value: 0,
+var AmountFlag = &cli.Uint64Flag{
+	Name:     "amount",
+	Value:    0,
+	Required: true,
+}
+
+var GasFlag = &cli.Uint64Flag{
+	Name:     "gas",
+	Value:    0,
+	Required: true,
+}
+
+var GasPriceFlag = &cli.Uint64Flag{
+	Name:     "gasPrice",
+	Value:    0,
+	Required: true,
 }
 
 var TransactionStdOut = &cli.BoolFlag{

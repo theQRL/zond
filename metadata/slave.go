@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
+	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/protos"
 	"go.etcd.io/bbolt"
@@ -43,18 +44,18 @@ func (s *SlaveMetaData) Commit(b *bbolt.Bucket) error {
 }
 
 func NewSlaveMetaData(txHash []byte, address []byte, slavePK []byte) *SlaveMetaData {
-	pbData := &protos.SlaveMetaData {
-		TxHash: txHash,
+	pbData := &protos.SlaveMetaData{
+		TxHash:  txHash,
 		Address: address,
 		SlavePk: slavePK,
 	}
-	return &SlaveMetaData {
+	return &SlaveMetaData{
 		pbData: pbData,
 	}
 }
 
 func GetSlaveMetaData(db *db.DB, address []byte, slavePK []byte,
-	headerHash []byte, finalizedHeaderHash []byte) (*SlaveMetaData, error) {
+	headerHash common.Hash, finalizedHeaderHash common.Hash) (*SlaveMetaData, error) {
 	key := GetSlaveMetaDataKey(address, slavePK)
 
 	data, err := GetDataByBucket(db, key, headerHash, finalizedHeaderHash)

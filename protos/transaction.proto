@@ -10,15 +10,13 @@ package protos;
 // This transaction must be rejected if the number of
 // Dilithium pks is not proportional to the 10k funds
 message Stake {
-    repeated bytes dilithium_pks = 1;  // Max 100, each key will lock 10k funds
-    bool stake = 2;  // True when you want to stake the list of dilithium pks
+    uint64 amount = 1;
 }
 
 message Transfer {
-    repeated bytes addrs_to = 1;
-    repeated uint64 amounts = 2;
-    repeated bytes slave_pks = 3;
-    bytes message = 4;
+    bytes to = 1;
+    uint64 value = 2;
+    bytes data = 3;
 }
 
 message CoinBase {
@@ -30,11 +28,12 @@ message CoinBase {
 
 message Transaction {
     uint64 network_id = 1;
-    bytes master_addr = 2;
-    uint64 fee = 3;
-    uint64 nonce = 4;
-    bytes pk = 5;
-    bytes signature = 6;
+    uint64 nonce = 2;
+    bytes pk = 3;
+    bytes signature = 4;
+
+    uint64 gas = 5;
+    uint64 gas_price = 6;
 
     oneof type {
         Stake stake = 7;

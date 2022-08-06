@@ -13,14 +13,15 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
+	"github.com/theQRL/zond/block"
 	"github.com/theQRL/zond/chain"
-	"github.com/theQRL/zond/chain/block"
-	"github.com/theQRL/zond/chain/transactions"
+	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/p2p/messages"
 	"github.com/theQRL/zond/protos"
+	"github.com/theQRL/zond/transactions"
 	"github.com/willf/bloom"
 	"net"
 	"sync"
@@ -35,7 +36,7 @@ type conn struct {
 type peerDrop struct {
 	*Peer
 	err       error
-	requested bool  // true if signaled by the peer
+	requested bool // true if signaled by the peer
 }
 
 type PeerIPWithPLData struct {
@@ -91,55 +92,58 @@ func (srv *Server) GetAttestationReceivedForBlock() chan *transactions.Attest {
 }
 
 func (srv *Server) BroadcastBlock(block *block.Block) {
+	blockHash := block.Hash()
 	msg := &messages.RegisterMessage{
 		Msg: &protos.LegacyMessage{
 			FuncName: protos.LegacyMessage_BK,
-			Data: &protos.LegacyMessage_Block {
+			Data: &protos.LegacyMessage_Block{
 				Block: block.PBData(),
 			},
 		},
-		MsgHash: hex.EncodeToString(block.HeaderHash()),
+		MsgHash: hex.EncodeToString(blockHash[:]),
 	}
-	srv.registerAndBroadcastChan <-msg
+	srv.registerAndBroadcastChan <- msg
 }
 
 func (srv *Server) BroadcastBlockForAttestation(block *block.Block, signature []byte) {
+	partialBlockSigningHash := block.PartialBlockSigningHash()
 	msg := &messages.RegisterMessage{
 		Msg: &protos.LegacyMessage{
 			FuncName: protos.LegacyMessage_BA,
 			Data: &protos.LegacyMessage_BlockForAttestation{
 				BlockForAttestation: &protos.BlockForAttestation{
-					Block: block.PBData(),
+					Block:     block.PBData(),
 					Signature: signature,
 				},
 			},
 		},
-		MsgHash: hex.EncodeToString(block.PartialBlockSigningHash()),
+		MsgHash: hex.EncodeToString(partialBlockSigningHash[:]),
 	}
-	srv.registerAndBroadcastChan <-msg
+	srv.registerAndBroadcastChan <- msg
 }
 
 func (srv *Server) BroadcastAttestationTransaction(attestTx *transactions.Attest,
 	slotNumber uint64, blockProposer []byte,
-	parentHeaderHash []byte, partialBlockSigningHash []byte) {
+	parentHeaderHash common.Hash, partialBlockSigningHash common.Hash) {
+	txHash := attestTx.TxHash(attestTx.GetSigningHash(partialBlockSigningHash))
 	msg := &messages.RegisterMessage{
 		Msg: &protos.LegacyMessage{
 			FuncName: protos.LegacyMessage_AT,
 			Data: &protos.LegacyMessage_AtData{
 				AtData: &protos.ProtocolTransactionData{
-					Tx: attestTx.PBData(),
-					SlotNumber: slotNumber,
-					BlockProposer: blockProposer,
-					ParentHeaderHash: parentHeaderHash,
-					PartialBlockSigningHash: partialBlockSigningHash,
+					Tx:                      attestTx.PBData(),
+					SlotNumber:              slotNumber,
+					BlockProposer:           blockProposer,
+					ParentHeaderHash:        parentHeaderHash[:],
+					PartialBlockSigningHash: partialBlockSigningHash[:],
 				},
 			},
 		},
-		MsgHash: hex.EncodeToString(attestTx.TxHash(attestTx.GetSigningHash(partialBlockSigningHash))),
+		MsgHash: hex.EncodeToString(txHash[:]),
 	}
 	log.Info("[BroadcastAttestationTransaction] Broadcasting Attestation Txn ",
 		msg.MsgHash)
-	srv.registerAndBroadcastChan <-msg
+	srv.registerAndBroadcastChan <- msg
 }
 
 func (srv *Server) handleStream(s network.Stream) {
@@ -233,7 +237,7 @@ func (srv *Server) ConnectPeers() error {
 	peerList := make([]string, 0)
 	for {
 		select {
-		case <-time.After(15*time.Second):
+		case <-time.After(15 * time.Second):
 			srv.peerInfoLock.Lock()
 			if srv.inboundCount > srv.config.User.Node.MaxPeersLimit {
 				srv.peerInfoLock.Unlock()
@@ -301,7 +305,7 @@ func (srv *Server) startListening(keys crypto.PrivKey) error {
 		context.Background(),
 		libp2p.ListenAddrs(sourceMultiAddr),
 		libp2p.Identity(keys),
-		)
+	)
 	if err != nil {
 		return err
 	}
@@ -329,7 +333,7 @@ func (srv *Server) startListening(keys crypto.PrivKey) error {
 
 func (srv *Server) run() {
 	var (
-		peers        = make(map[string]*Peer)
+		peers = make(map[string]*Peer)
 	)
 
 	srv.loopWG.Add(1)
@@ -369,7 +373,7 @@ running:
 			if p.inbound {
 				srv.inboundCount++
 			}
-			
+
 			if srv.ipCount[ip] > srv.config.User.Node.MaxRedundantConnections {
 				p.Disconnect()
 				// TODO: Ban peer
@@ -410,11 +414,14 @@ running:
 			switch mrData.Type {
 			case protos.LegacyMessage_BA:
 				/*
-				1. Verify if Block Received for attestation is valid
-				2. Broadcast the block
-				3. Attest the block if Staking is Enabled on this node
-				 */
-				_, err := srv.chain.GetBlock(mrData.ParentHeaderHash)
+					1. Verify if Block Received for attestation is valid
+					2. Broadcast the block
+					3. Attest the block if Staking is Enabled on this node
+				*/
+				var parentHash common.Hash
+				copy(parentHash[:], mrData.ParentHeaderHash)
+
+				_, err := srv.chain.GetBlock(parentHash)
 				if err != nil {
 					log.Info("[BlockForAttestation] Missing Parent Block",
 						" #", mrData.SlotNumber,
@@ -443,11 +450,11 @@ running:
 				if err != nil {
 					log.Error("No Finalized Header Hash ", err)
 				}
-				if finalizedHeaderHash != nil {
+				if (finalizedHeaderHash != common.Hash{}) {
 					finalizedBlock, err := srv.chain.GetBlock(finalizedHeaderHash)
 					if err != nil {
 						log.Error("Failed to get finalized block ",
-							hex.EncodeToString(finalizedHeaderHash))
+							hex.EncodeToString(finalizedHeaderHash[:]))
 						break
 					}
 					// skip slot number beyond the Finalized slot Number
@@ -458,7 +465,10 @@ running:
 					}
 				}
 
-				_, err = srv.chain.GetBlock(mrData.ParentHeaderHash)
+				var parentHash common.Hash
+				copy(parentHash[:], mrData.ParentHeaderHash)
+
+				_, err = srv.chain.GetBlock(parentHash)
 				if err != nil {
 					log.Info("[BlockReceived] Missing Parent Block ",
 						" #", mrData.SlotNumber,
@@ -504,10 +514,10 @@ running:
 				continue
 			}
 			out := &Msg{
-				msg: &protos.LegacyMessage {
+				msg: &protos.LegacyMessage{
 					FuncName: protos.LegacyMessage_MR,
-					Data: &protos.LegacyMessage_MrData {
-						MrData: &protos.MRData {
+					Data: &protos.LegacyMessage_MrData{
+						MrData: &protos.MRData{
 							Hash: binMsgHash,
 							Type: registerAndBroadcast.Msg.FuncName,
 						},
@@ -517,12 +527,12 @@ running:
 			b := registerAndBroadcast.Msg.GetBlock()
 			if b != nil {
 				out.msg.GetMrData().SlotNumber = b.Header.SlotNumber
-				out.msg.GetMrData().ParentHeaderHash = b.Header.ParentHeaderHash
+				out.msg.GetMrData().ParentHeaderHash = b.Header.ParentHash
 			} else {
 				ba := registerAndBroadcast.Msg.GetBlockForAttestation()
 				if ba != nil {
 					out.msg.GetMrData().SlotNumber = ba.Block.Header.SlotNumber
-					out.msg.GetMrData().ParentHeaderHash = ba.Block.Header.ParentHeaderHash
+					out.msg.GetMrData().ParentHeaderHash = ba.Block.Header.ParentHash
 				}
 			}
 			ignorePeers := make(map[*Peer]bool, 0)
@@ -581,7 +591,7 @@ func (srv *Server) RequestFullMessage(mrData *protos.MRData) {
 		out := &Msg{}
 		out.msg = &protos.LegacyMessage{
 			FuncName: protos.LegacyMessage_SFM,
-			Data: &protos.LegacyMessage_MrData {
+			Data: &protos.LegacyMessage_MrData{
 				MrData: mrData,
 			},
 		}
@@ -592,10 +602,11 @@ func (srv *Server) RequestFullMessage(mrData *protos.MRData) {
 }
 
 func (srv *Server) BlockReceived(peer *Peer, b *block.Block) {
-	headerHash := hex.EncodeToString(b.HeaderHash())
+	blockHash := b.Hash()
+	headerHash := hex.EncodeToString(blockHash[:])
 	log.Info(">>> Received Block",
 		" #", b.SlotNumber(),
-		" HeaderHash ", headerHash)
+		" Hash ", headerHash)
 
 	// TODO: Trigger Syncing/Block downloader
 	select {
@@ -603,7 +614,7 @@ func (srv *Server) BlockReceived(peer *Peer, b *block.Block) {
 	case <-time.After(5 * time.Second):
 		log.Info("Timeout for Received Block",
 			"#", b.SlotNumber(),
-			"HeaderHash", headerHash)
+			"Hash", headerHash)
 	}
 }
 
@@ -641,22 +652,22 @@ func NewServer(chain *chain.Chain) (*Server, error) {
 		return nil, err
 	}
 	srv := &Server{
-		config: config.GetConfig(),
-		chain: chain,
-		ntp: ntp.GetNTP(),
-		peerData: peerData,
-		ipCount: make(map[string]int),
-		mr: CreateMR(),
+		config:     config.GetConfig(),
+		chain:      chain,
+		ntp:        ntp.GetNTP(),
+		peerData:   peerData,
+		ipCount:    make(map[string]int),
+		mr:         CreateMR(),
 		downloader: NewDownloader(chain),
 
-		exit: make(chan struct{}),
-		connectPeersExit: make(chan struct{}),
-		mrDataConn: make(chan *MRDataConn),
-		addPeerToPeerList: make(chan *PeerIPWithPLData),
-		blockAndPeerChan: make(chan *BlockAndPeer),
-		addPeer: make(chan *conn),
-		delPeer: make(chan *peerDrop),
-		registerAndBroadcastChan: make(chan *messages.RegisterMessage, 100),
+		exit:                        make(chan struct{}),
+		connectPeersExit:            make(chan struct{}),
+		mrDataConn:                  make(chan *MRDataConn),
+		addPeerToPeerList:           make(chan *PeerIPWithPLData),
+		blockAndPeerChan:            make(chan *BlockAndPeer),
+		addPeer:                     make(chan *conn),
+		delPeer:                     make(chan *peerDrop),
+		registerAndBroadcastChan:    make(chan *messages.RegisterMessage, 100),
 		blockReceivedForAttestation: make(chan *block.Block),
 		attestationReceivedForBlock: make(chan *transactions.Attest),
 

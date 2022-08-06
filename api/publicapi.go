@@ -8,6 +8,7 @@ import (
 	"github.com/rs/cors"
 	"github.com/theQRL/zond/api/view"
 	"github.com/theQRL/zond/chain"
+	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/p2p/messages"
@@ -61,7 +62,7 @@ func (p *PublicAPIServer) Start() error {
 	co := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"}, //you service is available and allowed for this base url
 		AllowedMethods: []string{
-			http.MethodGet,//http methods for your app
+			http.MethodGet, //http methods for your app
 			http.MethodPost,
 			http.MethodPut,
 			http.MethodPatch,
@@ -74,7 +75,7 @@ func (p *PublicAPIServer) Start() error {
 		},
 
 		AllowedHeaders: []string{
-			"*",//or you can your header key values which you are using in your application
+			"*", //or you can your header key values which you are using in your application
 
 		},
 	})
@@ -88,9 +89,9 @@ func (p *PublicAPIServer) Start() error {
 
 func (p *PublicAPIServer) prepareResponse(errorCode uint, errorMessage string, data interface{}) *Response {
 	r := &Response{
-		Error: errorCode,
+		Error:        errorCode,
 		ErrorMessage: errorMessage,
-		Data: data,
+		Data:         data,
 	}
 	return r
 }
@@ -110,7 +111,7 @@ func (p *PublicAPIServer) GetVersion(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(429)
 		return
 	}
-	fmt.Println("Get version called");
+	fmt.Println("Get version called")
 	getVersionResponse := &GetVersionResponse{
 		Version: p.config.Dev.Version,
 	}
@@ -131,7 +132,10 @@ func (p *PublicAPIServer) GetBlockByHash(w http.ResponseWriter, r *http.Request)
 			nil))
 		return
 	}
-	headerHash, err := hex.DecodeString(hash)
+	binData, err := hex.DecodeString(hash)
+	var headerHash common.Hash
+	copy(headerHash[:], binData)
+
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			fmt.Sprintf("Error Decoding headerHash\n %s", err.Error()),
@@ -146,7 +150,7 @@ func (p *PublicAPIServer) GetBlockByHash(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	response := &view.PlainBlock{}
-	response.BlockFromPBData(b.PBData(), b.HeaderHash())
+	response.BlockFromPBData(b.PBData(), b.Hash())
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",
 		response))
@@ -161,7 +165,7 @@ func (p *PublicAPIServer) GetLastBlock(w http.ResponseWriter, r *http.Request) {
 	b := p.chain.GetLastBlock()
 
 	response := &view.PlainBlock{}
-	response.BlockFromPBData(b.PBData(), b.HeaderHash())
+	response.BlockFromPBData(b.PBData(), b.Hash())
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",
 		response))
@@ -175,22 +179,30 @@ func (p *PublicAPIServer) GetAddressState(w http.ResponseWriter, r *http.Request
 	}
 	vars := mux.Vars(r)
 	address := vars["address"]
-	binAddress, err := hex.DecodeString(address)
+	binData, err := hex.DecodeString(address)
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			fmt.Sprintf("Error Decoding address %s\n %s", address, err.Error()),
 			nil))
 		return
 	}
-	addressState, err := p.chain.GetAddressState(binAddress)
+
+	var binAddress common.Address
+	copy(binAddress[:], binData)
+
+	statedb, err := p.chain.AccountDB()
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			fmt.Sprintf("Error loading address State %s\n %s", address, err.Error()),
+			fmt.Sprintf("Failed to get statedb %s\n %s", address, err.Error()),
 			nil))
 		return
 	}
+
+	balance := statedb.GetBalance(binAddress).Uint64()
+	nonce := statedb.GetNonce(binAddress)
+
 	response := &view.PlainAddressState{}
-	response.AddressStateFromPBData(addressState.PBData())
+	response.FromData(binAddress, balance, nonce)
 
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",
@@ -205,22 +217,29 @@ func (p *PublicAPIServer) GetBalance(w http.ResponseWriter, r *http.Request) {
 	}
 	vars := mux.Vars(r)
 	address := vars["address"]
-	binAddress, err := hex.DecodeString(address)
+	binData, err := hex.DecodeString(address)
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			fmt.Sprintf("Error Decoding address %s\n %s", address, err.Error()),
 			nil))
 		return
 	}
-	addressState, err := p.chain.GetAddressState(binAddress)
+
+	var binAddress common.Address
+	copy(binAddress[:], binData)
+
+	statedb, err := p.chain.AccountDB()
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			fmt.Sprintf("Error loading address state %s\n %s", address, err.Error()),
+			fmt.Sprintf("Failed to get statedb %s\n %s", address, err.Error()),
 			nil))
 		return
 	}
+
+	balance := statedb.GetBalance(binAddress).Uint64()
+
 	response := view.PlainBalance{}
-	response.Balance = strconv.FormatUint(addressState.Balance(), 10)
+	response.Balance = strconv.FormatUint(balance, 10)
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",
 		response))
@@ -232,7 +251,7 @@ func (p *PublicAPIServer) GetHeight(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(429)
 		return
 	}
-	response := &GetHeightResponse{Height:p.chain.Height()}
+	response := &GetHeightResponse{Height: p.chain.Height()}
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",
 		response))
@@ -253,7 +272,7 @@ func (p *PublicAPIServer) GetEstimatedNetworkFee(w http.ResponseWriter, r *http.
 		return
 	}
 	// TODO: Fee needs to be calcuated by mean, median or mode
-	response := &GetEstimatedNetworkFeeResponse{Fee:"1"}
+	response := &GetEstimatedNetworkFeeResponse{Fee: "1"}
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",
 		response))
@@ -281,27 +300,14 @@ func (p *PublicAPIServer) BroadcastStakeTx(w http.ResponseWriter, r *http.Reques
 			nil))
 		return
 	}
-	sc, err := p.chain.GetStateContext()
-	if err != nil {
-		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			"Error getting state context for transaction validation",
-			nil))
-		return
-	}
-	if err := tx.SetAffectedAddress(sc); err != nil {
-		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			"Error setting affected address into state context for transaction validation",
-			nil))
-		return
-	}
-	if !tx.Validate(sc) {
+	if !p.chain.ValidateTransaction(tx.PBData()) {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			"Transaction Validation Failed",
 			nil))
 		return
 	}
 
-	txHash := tx.TxHash(tx.GetSigningHash())
+	txHash := tx.Hash()
 	err = p.chain.GetTransactionPool().Add(
 		tx,
 		txHash,
@@ -314,18 +320,18 @@ func (p *PublicAPIServer) BroadcastStakeTx(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	registerMessage := &messages.RegisterMessage {
-		Msg:&protos.LegacyMessage{
+	registerMessage := &messages.RegisterMessage{
+		Msg: &protos.LegacyMessage{
 			Data: &protos.LegacyMessage_StData{
-				StData:tx.PBData(),
+				StData: tx.PBData(),
 			},
-			FuncName:protos.LegacyMessage_ST,
+			FuncName: protos.LegacyMessage_ST,
 		},
-		MsgHash: hex.EncodeToString(txHash),
+		MsgHash: hex.EncodeToString(txHash[:]),
 	}
 	select {
 	case p.registerAndBroadcastChan <- registerMessage:
-	case <-time.After(10*time.Second):
+	case <-time.After(10 * time.Second):
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			"Transaction Broadcast Timeout",
 			nil))
@@ -333,7 +339,7 @@ func (p *PublicAPIServer) BroadcastStakeTx(w http.ResponseWriter, r *http.Reques
 	}
 
 	response := &BroadcastTransactionResponse{
-		TransactionHash: hex.EncodeToString(txHash),
+		TransactionHash: hex.EncodeToString(txHash[:]),
 	}
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",
@@ -362,27 +368,15 @@ func (p *PublicAPIServer) BroadcastTransferTx(w http.ResponseWriter, r *http.Req
 			nil))
 		return
 	}
-	sc, err := p.chain.GetStateContext()
-	if err != nil {
-		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			"Error getting state context for transaction validation",
-			nil))
-		return
-	}
-	if err := tx.SetAffectedAddress(sc); err != nil {
-		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			"Error setting affected address into state context for transaction validation",
-			nil))
-		return
-	}
-	if !tx.Validate(sc) {
+
+	if !p.chain.ValidateTransaction(tx.PBData()) {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			"Transaction Validation Failed",
 			nil))
 		return
 	}
 
-	txHash := tx.TxHash(tx.GetSigningHash())
+	txHash := tx.Hash()
 	err = p.chain.GetTransactionPool().Add(
 		tx,
 		txHash,
@@ -395,25 +389,25 @@ func (p *PublicAPIServer) BroadcastTransferTx(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	registerMessage := &messages.RegisterMessage {
-		Msg:&protos.LegacyMessage{
+	registerMessage := &messages.RegisterMessage{
+		Msg: &protos.LegacyMessage{
 			Data: &protos.LegacyMessage_TtData{
-				TtData:tx.PBData(),
+				TtData: tx.PBData(),
 			},
-			FuncName:protos.LegacyMessage_TT,
+			FuncName: protos.LegacyMessage_TT,
 		},
-		MsgHash: hex.EncodeToString(txHash),
+		MsgHash: hex.EncodeToString(txHash[:]),
 	}
 	select {
 	case p.registerAndBroadcastChan <- registerMessage:
-	case <-time.After(10*time.Second):
+	case <-time.After(10 * time.Second):
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			"Transaction Broadcast Timeout",
 			nil))
 		return
 	}
 	response := &BroadcastTransactionResponse{
-		TransactionHash: hex.EncodeToString(txHash),
+		TransactionHash: hex.EncodeToString(txHash[:]),
 	}
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",
