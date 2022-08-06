@@ -4,11 +4,11 @@ import (
 	"encoding/hex"
 	"github.com/deckarep/golang-set"
 	log "github.com/sirupsen/logrus"
+	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/protos"
 	"sync"
 )
-
 
 type OrderedMap struct {
 	mapping map[string]*MessageRequest
@@ -26,7 +26,7 @@ func (o *OrderedMap) Get(k string) *MessageRequest {
 
 func (o *OrderedMap) Delete(k string) {
 	delete(o.mapping, k)
-	o.order = o.order[1:]  // TODO: Need Optimization
+	o.order = o.order[1:] // TODO: Need Optimization
 }
 
 type MessageReceipt struct {
@@ -41,7 +41,7 @@ type MessageReceipt struct {
 	requestedHash      map[string]*MessageRequest
 	requestedHashOrder []string
 
-	c   *config.Config
+	c *config.Config
 }
 
 func (mr *MessageReceipt) addPeer(mrData *protos.MRData, peer *Peer) {
@@ -68,11 +68,11 @@ func (mr *MessageReceipt) addPeer(mrData *protos.MRData, peer *Peer) {
 	}
 }
 
-func (mr *MessageReceipt) IsRequested(msgHashBytes []byte, peer *Peer) bool {
+func (mr *MessageReceipt) IsRequested(msgHashBytes common.Hash, peer *Peer) bool {
 	mr.lock.Lock()
 	defer mr.lock.Unlock()
 
-	msgHash := hex.EncodeToString(msgHashBytes)
+	msgHash := hex.EncodeToString(msgHashBytes[:])
 	if requestedHash, ok := mr.requestedHash[msgHash]; ok {
 		if _, ok := requestedHash.peers[peer]; ok {
 			return true
@@ -171,34 +171,34 @@ func CreateMR() (mr *MessageReceipt) {
 	allowedTypes.Add(protos.LegacyMessage_ST)
 	allowedTypes.Add(protos.LegacyMessage_AT)
 
-	servicesArgs := &map[protos.LegacyMessage_FuncName] string {
-		protos.LegacyMessage_VE: "veData",  // Version Data
-		protos.LegacyMessage_PL: "plData",  // Peer List Data
+	servicesArgs := &map[protos.LegacyMessage_FuncName]string{
+		protos.LegacyMessage_VE:   "veData", // Version Data
+		protos.LegacyMessage_PL:   "plData", // Peer List Data
 		protos.LegacyMessage_PONG: "pongData",
 
-		protos.LegacyMessage_MR: "mrData",  // Message Receipt Data
+		protos.LegacyMessage_MR:  "mrData", // Message Receipt Data
 		protos.LegacyMessage_SFM: "mrData", // Message Response Data
 
-		protos.LegacyMessage_BA: "baData",  // Block For Attestation
+		protos.LegacyMessage_BA: "baData", // Block For Attestation
 		protos.LegacyMessage_BK: "block",
-		protos.LegacyMessage_FB: "fbData",  // Fetch Block Data
-		protos.LegacyMessage_PB: "pbData",  // Push Block Data
+		protos.LegacyMessage_FB: "fbData", // Fetch Block Data
+		protos.LegacyMessage_PB: "pbData", // Push Block Data
 
-		protos.LegacyMessage_TT: "ttData",  // Transfer Transaction
-		protos.LegacyMessage_ST: "stData",  // Stake Transaction
-		protos.LegacyMessage_AT: "atData",  // Attest Transaction
+		protos.LegacyMessage_TT: "ttData", // Transfer Transaction
+		protos.LegacyMessage_ST: "stData", // Stake Transaction
+		protos.LegacyMessage_AT: "atData", // Attest Transaction
 
 		protos.LegacyMessage_SYNC: "syncData",
 	}
 
-	mr = &MessageReceipt {
-		allowedTypes: allowedTypes,
-		hashMsg: make(map[string]*protos.LegacyMessage),
-		hashMsgOrder: make([]string, 1),
-		requestedHash: make(map[string]*MessageRequest),
+	mr = &MessageReceipt{
+		allowedTypes:       allowedTypes,
+		hashMsg:            make(map[string]*protos.LegacyMessage),
+		hashMsgOrder:       make([]string, 1),
+		requestedHash:      make(map[string]*MessageRequest),
 		requestedHashOrder: make([]string, 1),
-		servicesArgs: servicesArgs,
-		c: config.GetConfig(),
+		servicesArgs:       servicesArgs,
+		c:                  config.GetConfig(),
 	}
 
 	return

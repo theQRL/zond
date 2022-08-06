@@ -9,11 +9,12 @@ package protos;
 
 message Wallet {
     string version = 1;
-    repeated XMSSInfo xmss_info = 2;
+    repeated Info info = 2;
 }
 
-message XMSSInfo {
+message Info {
     string address = 1;
     string hex_seed = 2;
     string mnemonic = 3;
+    uint32 type = 4;
 }

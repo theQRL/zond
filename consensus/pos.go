@@ -3,19 +3,18 @@ package consensus
 import (
 	"encoding/hex"
 	log "github.com/sirupsen/logrus"
+	common2 "github.com/theQRL/go-qrllib/common"
 	"github.com/theQRL/go-qrllib/dilithium"
-	"github.com/theQRL/zond/address"
+	"github.com/theQRL/zond/block"
 	"github.com/theQRL/zond/chain"
-	"github.com/theQRL/zond/chain/block"
-	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/keys"
-	"github.com/theQRL/zond/metadata"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/p2p"
 	"github.com/theQRL/zond/protos"
-	"github.com/theQRL/zond/state"
+	"github.com/theQRL/zond/transactions"
 	"reflect"
 	"sync"
 	"time"
@@ -27,7 +26,11 @@ type POS struct {
 	chain  *chain.Chain
 	db     *db.DB
 
-	// Dilithium PK is the key of this map
+	/*
+		validators stores the dilithium based on seed available
+		in the local storage for staking.Dilithium PK is the key
+		of this map
+	*/
 	validators map[string]*dilithium.Dilithium
 
 	exit                        chan struct{}
@@ -143,7 +146,7 @@ running:
 
 				slotNumber := p.GetCurrentSlot()
 				slotLeader, err := p.chain.GetSlotLeaderDilithiumPKBySlotNumber(slotNumber,
-					lastBlock.HeaderHash(), lastBlock.SlotNumber())
+					lastBlock.Hash(), lastBlock.SlotNumber())
 
 				if err != nil {
 					log.Error("Error getting SlotLeader Dilithium PK By Slot Number ", err.Error())
@@ -153,17 +156,14 @@ running:
 				if !ok {
 					continue
 				}
-				mainChainMetaData, err := metadata.GetMainChainMetaData(p.db)
+
+				statedb, err := p.chain.AccountDB()
 				if err != nil {
-					log.Error("Failed to Get MainChainMetaData ", err)
+					log.Error("failed to get statedb")
 					continue
 				}
-				coinBaseState, err := address.GetAddressState(p.db, config.GetDevConfig().Genesis.CoinBaseAddress,
-					lastBlock.HeaderHash(), mainChainMetaData.FinalizedBlockHeaderHash())
-				if err != nil {
-					log.Error("Error getting CoinBase Address state ", err.Error())
-					continue
-				}
+				coinBaseAddressNonce := statedb.GetNonce(config.GetDevConfig().Genesis.CoinBaseAddress)
+
 				log.Info("Minting Block #", slotNumber)
 				txPool := p.chain.GetTransactionPool()
 				txs := make([]*protos.Transaction, 0)
@@ -175,8 +175,9 @@ running:
 					}
 					txInterface := txInfo.Transaction()
 					txPBData := txInterface.PBData()
-					strTxHash := hex.EncodeToString(txInterface.TxHash(txInterface.GetSigningHash()))
-					if p.chain.ValidateTransaction(txInterface) != nil {
+					txHash := txInterface.Hash()
+					strTxHash := hex.EncodeToString(txHash[:])
+					if !p.chain.ValidateTransaction(txPBData) {
 						log.Error("Transaction validation failed for ",
 							strTxHash)
 						continue
@@ -187,11 +188,10 @@ running:
 				}
 				pk := proposerD.GetPK()
 				b := block.NewBlock(0, ntp.GetNTP().Time(), pk[:], slotNumber,
-					lastBlock.HeaderHash(), txs, nil, coinBaseState.Nonce())
+					lastBlock.Hash(), txs, nil, coinBaseAddressNonce)
 
-				header := b.Header()
-				attestors, err := p.chain.GetAttestorsBySlotNumber(header.SlotNumber,
-					header.ParentHeaderHash, lastBlock.SlotNumber())
+				attestors, err := p.chain.GetAttestorsBySlotNumber(b.SlotNumber(),
+					b.ParentHash(), lastBlock.SlotNumber())
 				if err != nil {
 					log.Error("Error while getting Attestors by Slot Number ", err.Error())
 					continue
@@ -236,7 +236,7 @@ running:
 				*/
 				partialBlockSigningHash := b.PartialBlockSigningHash()
 				log.Info("Broadcasting Block #", slotNumber, " for attestation")
-				p.srv.BroadcastBlockForAttestation(b, proposerD.Sign(partialBlockSigningHash))
+				p.srv.BroadcastBlockForAttestation(b, proposerD.Sign(partialBlockSigningHash[:]))
 
 			} else {
 				// TODO:
@@ -284,29 +284,43 @@ running:
 				Don't accept Block for attestation after certain threshold
 			*/
 
-			if !reflect.DeepEqual(b.ParentHeaderHash(), p.chain.GetLastBlock().HeaderHash()) {
+			lastBlock := p.chain.GetLastBlock()
+			if !reflect.DeepEqual(b.ParentHash(), lastBlock.Hash()) {
 				continue
 			}
 
 			if p.blockBeingAttested != nil && p.blockBeingAttested.SlotNumber() == b.SlotNumber() {
 				continue
 			}
-			header := b.Header()
-			parentBlock, err := p.chain.GetBlock(header.ParentHeaderHash)
+
+			parentBlock, err := p.chain.GetBlock(b.ParentHash())
 			if err != nil {
 				log.Error("Failed to Get Parent Block ", err.Error())
 				continue
 			}
-			attestors, err := p.chain.GetAttestorsBySlotNumber(header.SlotNumber,
-				header.ParentHeaderHash, parentBlock.SlotNumber())
+			attestors, err := p.chain.GetAttestorsBySlotNumber(b.SlotNumber(),
+				b.ParentHash(), parentBlock.SlotNumber())
 			if err != nil {
 				log.Error("Error while getting Attestors by Slot Number ", err.Error())
 				continue
 			}
+			blockProposerPK := b.ProtocolTransactions()[0].GetPk()
+			slotLeader, err := p.chain.GetSlotLeaderDilithiumPKBySlotNumber(b.SlotNumber(),
+				lastBlock.Hash(), lastBlock.SlotNumber())
+
+			if !reflect.DeepEqual(blockProposerPK, slotLeader) {
+				expectedDilithiumAddress := dilithium.GetDilithiumAddressFromPK(misc.UnSizedDilithiumPKToSizedPK(slotLeader))
+				foundDilithiumAddress := dilithium.GetDilithiumAddressFromPK(misc.UnSizedDilithiumPKToSizedPK(blockProposerPK))
+
+				log.Error("Block received for attestation by unexpected slotLeader/blockProposer ")
+				log.Error("Expected Slot Leader ", expectedDilithiumAddress)
+				log.Error("Found Slot Leader ", foundDilithiumAddress)
+				continue
+			}
+
 			p.blockBeingAttested = b
 			log.Info("Block #", b.SlotNumber(), " received for attestation")
 			partialBlockSigningHash := b.PartialBlockSigningHash()
-			blockProposer := b.ProtocolTransactions()[0].GetPk()
 			for _, dilithiumPK := range attestors {
 				strDilithiumPK := hex.EncodeToString(dilithiumPK)
 				d, ok := p.validators[strDilithiumPK]
@@ -316,11 +330,12 @@ running:
 				attestTx, err := b.Attest(0, d)
 				if err != nil {
 					log.Error("Error while Attesting ", err.Error())
+					continue
 				}
 				p.srv.BroadcastAttestationTransaction(attestTx,
 					b.SlotNumber(),
-					blockProposer,
-					b.ParentHeaderHash(),
+					blockProposerPK,
+					b.ParentHash(),
 					partialBlockSigningHash)
 			}
 		case tx := <-p.attestationReceivedForBlock:
@@ -336,35 +351,38 @@ running:
 			*/
 
 			// Validate Txn
-			epochMetaData, err := metadata.GetEpochMetaData(p.db, p.blockBeingAttested.SlotNumber(),
-				p.blockBeingAttested.ParentHeaderHash())
-			if err != nil {
-				log.Error("Error getting epochMetaData")
-				continue
-			}
-			finalizedHeaderHash, err := p.chain.GetFinalizedHeaderHash()
-			if err != nil {
-				log.Error("[POS] Failed to GetFinalizedHeaderHash ", err.Error())
-				continue
-			}
+			//epochMetaData, err := metadata.GetEpochMetaData(p.db, p.blockBeingAttested.SlotNumber(),
+			//	p.blockBeingAttested.ParentHash())
+			//if err != nil {
+			//	log.Error("Error getting epochMetaData")
+			//	continue
+			//}
+			//finalizedHeaderHash, err := p.chain.GetFinalizedHeaderHash()
+			//if err != nil {
+			//	log.Error("[POS] Failed to GetFinalizedHeaderHash ", err.Error())
+			//	continue
+			//}
 			partialBlockSigningHash := p.blockBeingAttested.PartialBlockSigningHash()
-			sc, err := state.NewStateContext(p.db, p.blockBeingAttested.SlotNumber(),
-				p.blockBeingAttested.ProtocolTransactions()[0].Pk,
-				finalizedHeaderHash,
-				p.blockBeingAttested.ParentHeaderHash(),
-				p.blockBeingAttested.HeaderHash(),
-				partialBlockSigningHash,
-				nil,
-				epochMetaData)
+			//sc, err := state.NewStateContext(p.db, p.blockBeingAttested.SlotNumber(),
+			//	p.blockBeingAttested.ProtocolTransactions()[0].Pk,
+			//	finalizedHeaderHash,
+			//	p.blockBeingAttested.ParentHash(),
+			//	p.blockBeingAttested.Hash(),
+			//	partialBlockSigningHash,
+			//	common.Hash{},
+			//	epochMetaData)
+			//if err != nil {
+			//	log.Error("Error creating NewStateContext")
+			//	continue
+			//}
+
+			validatorsType, err := p.chain.GetValidatorsBySlotNumber(p.blockBeingAttested.SlotNumber(), p.blockBeingAttested.ParentHash(), p.blockBeingAttested.SlotNumber())
 			if err != nil {
-				log.Error("Error creating NewStateContext")
+				log.Error("Error getting validators type")
 				continue
 			}
-			if err := tx.SetAffectedAddress(sc); err != nil {
-				log.Error("Failed to set Affected Address")
-				continue
-			}
-			if !tx.Validate(sc) {
+
+			if !p.chain.ValidateAttestTransaction(tx.PBData(), validatorsType, p.blockBeingAttested.PartialBlockSigningHash()) {
 				log.Warn("Attestor transaction validation failed")
 				continue
 			}
@@ -382,8 +400,9 @@ running:
 			}
 
 			p.attestations = append(p.attestations, tx)
+			txHash := tx.TxHash(tx.GetSigningHash(partialBlockSigningHash))
 			log.Info("Received Attest Transaction ",
-				hex.EncodeToString(tx.TxHash(tx.GetSigningHash(partialBlockSigningHash))),
+				hex.EncodeToString(txHash[:]),
 				" for block #", p.blockBeingAttested.SlotNumber())
 
 			// Add received attestation into block
@@ -426,25 +445,40 @@ func NewPOS(srv *p2p.Server, chain *chain.Chain, db *db.DB) *POS {
 	}
 
 	dk := keys.NewDilithiumKeys(pos.config.User.Stake.DilithiumKeysFileName)
-	for _, group := range dk.GetDilithiumGroup() {
-		for _, dilithiumInfo := range group.DilithiumInfo {
-			strPK := dilithiumInfo.PK
-			pk, err := hex.DecodeString(dilithiumInfo.PK)
-			if err != nil {
-				log.Error("Error decoding Dilithium PK ", err.Error())
-				return nil
-			}
-			sk, err := hex.DecodeString(dilithiumInfo.SK)
-			if err != nil {
-				log.Error("Error decoding Dilithium SK ", err.Error())
-				return nil
-			}
+	for i, dilithiumInfo := range dk.GetDilithiumInfo() {
+		strPK := dilithiumInfo.PK
+		pk, err := hex.DecodeString(dilithiumInfo.PK)
+		if err != nil {
+			log.Error("Error decoding Dilithium PK ", err.Error())
+			return nil
+		}
+		sk, err := hex.DecodeString(dilithiumInfo.SK)
+		if err != nil {
+			log.Error("Error decoding Dilithium SK ", err.Error())
+			return nil
+		}
 
-			var pkSized [dilithium.PKSizePacked]uint8
-			var skSized [dilithium.SKSizePacked]uint8
-			copy(pkSized[:], pk)
-			copy(skSized[:], sk)
-			pos.validators[strPK] = dilithium.NewFromKeys(&pkSized, &skSized)
+		var pkSized [dilithium.PKSizePacked]uint8
+		var skSized [dilithium.SKSizePacked]uint8
+		copy(pkSized[:], pk)
+		copy(skSized[:], sk)
+
+		binData, err := hex.DecodeString(dilithiumInfo.HexSeed)
+		var binSeed [common2.SeedSize]uint8
+		copy(binSeed[:], binData)
+
+		if err != nil {
+			log.Errorf("failed to decode hex seed for dilithium at index %d", i)
+			return nil
+		}
+		pos.validators[strPK] = dilithium.NewDilithiumFromSeed(binSeed)
+		if !reflect.DeepEqual(pos.validators[strPK].GetPK(), pk) {
+			log.Error("dilithium pk mismatch")
+			return nil
+		}
+		if !reflect.DeepEqual(pos.validators[strPK].GetSK(), sk) {
+			log.Error("dilithium sk mismatch")
+			return nil
 		}
 	}
 

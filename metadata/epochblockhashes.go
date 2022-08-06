@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
+	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/protos"
@@ -37,10 +38,10 @@ func (e *EpochBlockHashes) DeSerialize(data []byte) error {
 	return proto.Unmarshal(data, e.pbData)
 }
 
-func (e *EpochBlockHashes) AddHeaderHashBySlotNumber(headerHash []byte,
+func (e *EpochBlockHashes) AddHeaderHashBySlotNumber(headerHash common.Hash,
 	slotNumber uint64) error {
 	c := config.GetDevConfig()
-	if slotNumber / c.BlocksPerEpoch != e.Epoch() {
+	if slotNumber/c.BlocksPerEpoch != e.Epoch() {
 		return errors.New(
 			fmt.Sprintf("SlotNumber %d doesn't belong to epoch %d",
 				slotNumber, e.Epoch()))
@@ -58,11 +59,11 @@ func (e *EpochBlockHashes) AddHeaderHashBySlotNumber(headerHash []byte,
 		if reflect.DeepEqual(storedHeaderHash, headerHash) {
 			return errors.New(
 				fmt.Sprintf("Headerhash %s already exists",
-					hex.EncodeToString(headerHash)))
+					hex.EncodeToString(headerHash[:])))
 		}
 	}
 	e.BlockHashesBySlotNumber()[index].HeaderHashes = append(
-		e.BlockHashesBySlotNumber()[index].HeaderHashes, headerHash)
+		e.BlockHashesBySlotNumber()[index].HeaderHashes, headerHash[:])
 
 	return nil
 }
@@ -76,18 +77,18 @@ func (e *EpochBlockHashes) Commit(b *bbolt.Bucket) error {
 }
 
 func NewEpochBlockHashes(epoch uint64) *EpochBlockHashes {
-	pbData := &protos.EpochBlockHashesMetaData {
+	pbData := &protos.EpochBlockHashesMetaData{
 		Epoch: epoch,
 	}
 	startSlotNumber := epoch * config.GetDevConfig().BlocksPerEpoch
 	for i := uint64(0); i < config.GetDevConfig().BlocksPerEpoch; i++ {
-		blockHashesBySlotNumber := &protos.BlockHashesBySlotNumber {
+		blockHashesBySlotNumber := &protos.BlockHashesBySlotNumber{
 			SlotNumber: startSlotNumber + i,
 		}
 		pbData.BlockHashesBySlotNumber = append(
 			pbData.BlockHashesBySlotNumber, blockHashesBySlotNumber)
 	}
-	return &EpochBlockHashes {
+	return &EpochBlockHashes{
 		pbData: pbData,
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/theQRL/zond/protos"
 	"google.golang.org/protobuf/encoding/protojson"
 	"io/ioutil"
+	"reflect"
 )
 
 type DilithiumKeys struct {
@@ -17,33 +18,42 @@ type DilithiumKeys struct {
 	pbData *protos.DilithiumKeys
 }
 
-func (dk *DilithiumKeys) GetDilithiumGroup() []*protos.DilithiumGroup {
-	return dk.pbData.DilithiumGroup
+func (dk *DilithiumKeys) GetDilithiumInfo() []*protos.DilithiumInfo {
+	return dk.pbData.DilithiumInfo
 }
 
-func (dk *DilithiumKeys) Add(dilithiumGroup *protos.DilithiumGroup) {
-	d := dilithium.New()
-	pk := d.GetPK()
-	sk := d.GetSK()
-	dilithiumInfo := &protos.DilithiumInfo{
-		PK: hex.EncodeToString(pk[:]),
-		SK: hex.EncodeToString(sk[:]),
+func (dk *DilithiumKeys) Add(dilithiumAccount *dilithium.Dilithium) {
+	pk := dilithiumAccount.GetPK()
+	strPK := hex.EncodeToString(pk[:])
+	sk := dilithiumAccount.GetSK()
+	strSK := hex.EncodeToString(sk[:])
+	hexSeed := dilithiumAccount.GetHexSeed()
+
+	found := false
+	for _, info := range dk.pbData.DilithiumInfo {
+		if reflect.DeepEqual(info.PK, strPK) {
+			found = true
+		}
 	}
-	dilithiumGroup.DilithiumInfo = append(dilithiumGroup.DilithiumInfo, dilithiumInfo)
 
-	fmt.Println("Added New Dilithium Address")
-}
+	if found {
+		fmt.Println("Dilithium Key already exists")
+		return
+	}
 
-func (dk *DilithiumKeys) AddGroup(dilithiumGroup *protos.DilithiumGroup) {
-	dk.pbData.DilithiumGroup = append(dk.pbData.DilithiumGroup, dilithiumGroup)
+	dk.pbData.DilithiumInfo = append(dk.pbData.DilithiumInfo, &protos.DilithiumInfo{
+		PK:      strPK,
+		SK:      strSK,
+		HexSeed: hexSeed,
+	})
+
+	fmt.Println("Added Dilithium Key")
 	dk.Save()
 }
 
 func (dk *DilithiumKeys) List() {
-	for i, dilithiumGroup := range dk.pbData.DilithiumGroup {
-		for _, dilithiumInfo := range dilithiumGroup.DilithiumInfo {
-			fmt.Println(fmt.Sprintf("Group #%d\tPK: %s\tSK: %s", i, dilithiumInfo.PK, dilithiumInfo.SK))
-		}
+	for i, dilithiumInfo := range dk.pbData.DilithiumInfo {
+		fmt.Println(fmt.Sprintf("Index #%d\tPK: %s\tSK: %s", i, dilithiumInfo.PK, dilithiumInfo.SK))
 	}
 }
 
@@ -66,11 +76,11 @@ func (dk *DilithiumKeys) Save() {
 	return
 }
 
-func (dk *DilithiumKeys) GetDilithiumGroupByIndex(index uint) (*protos.DilithiumGroup, error) {
-	if int(index) > len(dk.pbData.DilithiumGroup) {
+func (dk *DilithiumKeys) GetDilithiumByIndex(index uint) (*protos.DilithiumInfo, error) {
+	if int(index) > len(dk.pbData.DilithiumInfo) {
 		return nil, errors.New(fmt.Sprintf("Invalid Dilithium Group Index"))
 	}
-	return dk.pbData.DilithiumGroup[index-1], nil
+	return dk.pbData.DilithiumInfo[index-1], nil
 }
 
 func (dk *DilithiumKeys) Load() {

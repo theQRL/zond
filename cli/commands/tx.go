@@ -7,17 +7,19 @@ import (
 	"fmt"
 	"github.com/theQRL/zond/api"
 	"github.com/theQRL/zond/api/view"
-	"github.com/theQRL/zond/chain/transactions"
 	"github.com/theQRL/zond/cli/flags"
+	"github.com/theQRL/zond/common"
+	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/keys"
 	"github.com/theQRL/zond/misc"
+	"github.com/theQRL/zond/transactions"
 	"github.com/theQRL/zond/wallet"
 	"github.com/urfave/cli/v2"
 	"io/ioutil"
 	"net/http"
 )
 
-func broadcastTransaction(transaction interface{}, url string, txHash []byte) error {
+func broadcastTransaction(transaction interface{}, url string, txHash common.Hash) error {
 	responseBody := new(bytes.Buffer)
 	err := json.NewEncoder(responseBody).Encode(transaction)
 	if err != nil {
@@ -43,7 +45,7 @@ func broadcastTransaction(transaction interface{}, url string, txHash []byte) er
 	err = json.Unmarshal(bodyBytes, &response)
 
 	responseData := response.Data.(map[string]interface{})
-	if responseData["transactionHash"].(string) == hex.EncodeToString(txHash) {
+	if responseData["transactionHash"].(string) == hex.EncodeToString(txHash[:]) {
 		fmt.Println("Transaction successfully broadcasted")
 	}
 	return nil
@@ -53,22 +55,18 @@ func getTransactionSubCommands() []*cli.Command {
 	return []*cli.Command{
 		{
 			Name:  "stake",
-			Usage: "Generates a signed stake transaction",
+			Usage: "Generates a signed stake transaction using Dilithium account",
 			Flags: []cli.Flag{
 				flags.WalletFile,
-				flags.XMSSIndexFlag,
-				flags.OTSKeyIndexFlag,
+				flags.AccountIndexFlag,
 				flags.NetworkIDFlag,
 				&cli.StringFlag{
 					Name:  "dilithium-file",
 					Value: "dilithium_keys",
 				},
-				&cli.UintFlag{
-					Name:     "dilithium-group-index",
-					Value:    1,
-					Required: true,
-				},
-				flags.TransactionFeeFlag,
+				flags.AmountFlag,
+				flags.GasFlag,
+				flags.GasPriceFlag,
 				flags.NonceFlag,
 				flags.TransactionStdOut,
 				flags.BroadcastFlag,
@@ -87,37 +85,35 @@ func getTransactionSubCommands() []*cli.Command {
 					5. Form the Stake transaction and sign it by XMSS
 				*/
 				dilithiumFile := c.String("dilithium-file")
-				dilithiumGroupIndex := c.Uint("dilithium-group-index")
-				fee := c.Uint64(flags.TransactionFeeFlag.Name)
+				stakeAmount := c.Uint64(flags.AmountFlag.Name) * config.GetDevConfig().ShorPerQuanta
+				minStakeAmount := config.GetDevConfig().StakeAmount
+				if stakeAmount != 0 && stakeAmount < minStakeAmount {
+					fmt.Println("stake amount must be greater than or equals to ",
+						minStakeAmount/config.GetDevConfig().ShorPerQuanta)
+				}
+
 				output := c.String("output")
 				stdOut := c.Bool(flags.TransactionStdOut.Name)
 				broadcastFlag := c.Bool(flags.BroadcastFlag.Name)
 				remoteAddr := c.String(flags.RemoteAddrFlag.Name)
 
-				w := wallet.NewWallet(c.String("wallet-file"))
-				xmss, err := w.GetXMSSByIndex(c.Uint("xmss-index"))
+				w := wallet.NewWallet(c.String(flags.WalletFile.Name))
+				a, err := w.GetDilithiumAccountByIndex(c.Uint(flags.AccountIndexFlag.Name))
 				if err != nil {
 					return err
 				}
-				xmss.SetIndex(uint32(c.Uint(flags.OTSKeyIndexFlag.Name)))
 
 				dilithiumKeys := keys.NewDilithiumKeys(dilithiumFile)
-				dilithiumGroup, err := dilithiumKeys.GetDilithiumGroupByIndex(dilithiumGroupIndex)
-				if err != nil {
-					return err
-				}
-				var dilithiumPKs [][]byte
-				for _, dilithiumInfo := range dilithiumGroup.DilithiumInfo {
-					binDilithiumPk, err := hex.DecodeString(dilithiumInfo.PK)
-					if err != nil {
-						return err
-					}
-					dilithiumPKs = append(dilithiumPKs, binDilithiumPk)
-				}
-				pk := xmss.GetPK()
-				tx := transactions.NewStake(c.Uint64(flags.NetworkIDFlag.Name), dilithiumPKs, true,
-					fee, c.Uint64("nonce"), pk[:], nil)
-				tx.Sign(xmss, tx.GetSigningHash())
+				dilithiumKeys.Add(a)
+
+				pk := a.GetPK()
+				tx := transactions.NewStake(c.Uint64(flags.NetworkIDFlag.Name),
+					stakeAmount,
+					c.Uint64(flags.GasFlag.Name),
+					c.Uint64(flags.GasPriceFlag.Name),
+					c.Uint64(flags.NonceFlag.Name),
+					pk[:])
+				tx.SignDilithium(a, tx.GetSigningHash())
 
 				if len(output) > 0 {
 					tl := misc.NewTransactionList(output)
@@ -135,24 +131,26 @@ func getTransactionSubCommands() []*cli.Command {
 				}
 
 				if broadcastFlag {
+					txHash := tx.Hash()
 					stake := view.PlainStakeTransaction{}
-					stake.TransactionFromPBData(tx.PBData(), tx.TxHash(tx.GetSigningHash()))
+					stake.TransactionFromPBData(tx.PBData(), txHash[:])
 
 					url := fmt.Sprintf("http://%s/api/broadcast/stake", remoteAddr)
-					return broadcastTransaction(stake, url, tx.TxHash(tx.GetSigningHash()))
+					return broadcastTransaction(stake, url, txHash)
 
 				}
 				return nil
 			},
 		},
 		{
-			Name:  "transfer",
-			Usage: "Generates a signed transfer transaction",
+			Name:  "transferFromXMSS",
+			Usage: "Generates a signed transfer transaction using XMSS account",
 			Flags: []cli.Flag{
 				flags.WalletFile,
-				flags.XMSSIndexFlag,
+				flags.AccountIndexFlag,
 				flags.OTSKeyIndexFlag,
 				flags.NetworkIDFlag,
+				flags.DataFlag,
 				flags.NonceFlag,
 				flags.TransactionStdOut,
 				flags.BroadcastFlag,
@@ -161,19 +159,23 @@ func getTransactionSubCommands() []*cli.Command {
 					Name:  "address-to",
 					Value: "",
 				},
-				&cli.Uint64Flag{
-					Name:  "amount",
-					Value: 0,
-				},
-				flags.TransactionFeeFlag,
+				flags.AmountFlag,
+				flags.GasFlag,
+				flags.GasPriceFlag,
 			},
 			Action: func(c *cli.Context) error {
+				data, err := hex.DecodeString(flags.DataFlag.Name)
+				if err != nil {
+					fmt.Println("error decoding data")
+					return err
+				}
+
 				w := wallet.NewWallet(c.String(flags.WalletFile.Name))
-				xmss, err := w.GetXMSSByIndex(c.Uint(flags.XMSSIndexFlag.Name))
+				a, err := w.GetXMSSAccountByIndex(c.Uint(flags.AccountIndexFlag.Name))
 				if err != nil {
 					return err
 				}
-				xmss.SetIndex(uint32(c.Uint(flags.OTSKeyIndexFlag.Name)))
+				a.SetIndex(uint32(c.Uint(flags.OTSKeyIndexFlag.Name)))
 
 				addressTo := c.String("address-to")
 				stdOut := c.Bool(flags.TransactionStdOut.Name)
@@ -184,18 +186,17 @@ func getTransactionSubCommands() []*cli.Command {
 					return err
 				}
 
-				pk := xmss.GetPK()
+				pk := a.GetPK()
 				tx := transactions.NewTransfer(
 					c.Uint64(flags.NetworkIDFlag.Name),
-					[][]byte{binAddressTo},
-					[]uint64{c.Uint64("amount")},
-					c.Uint64("fee"),
-					nil,
-					nil,
+					binAddressTo,
+					c.Uint64(flags.AmountFlag.Name),
+					c.Uint64(flags.GasFlag.Name),
+					c.Uint64(flags.GasPriceFlag.Name),
+					data,
 					c.Uint64(flags.NonceFlag.Name),
-					pk[:],
-					nil)
-				tx.Sign(xmss, tx.GetSigningHash())
+					pk[:])
+				tx.SignXMSS(a, tx.GetSigningHash())
 
 				if stdOut {
 					jsonData, err := tx.ToJSON()
@@ -207,11 +208,86 @@ func getTransactionSubCommands() []*cli.Command {
 				}
 
 				if broadcastFlag {
+					txHash := tx.Hash()
 					transfer := view.PlainTransferTransaction{}
-					transfer.TransactionFromPBData(tx.PBData(), tx.TxHash(tx.GetSigningHash()))
+					transfer.TransactionFromPBData(tx.PBData(), txHash[:])
 
 					url := fmt.Sprintf("http://%s/api/broadcast/transfer", remoteAddr)
-					return broadcastTransaction(transfer, url, tx.TxHash(tx.GetSigningHash()))
+					return broadcastTransaction(transfer, url, txHash)
+				}
+				return nil
+			},
+		},
+		{
+			Name:  "transferFromDilithium",
+			Usage: "Generates a signed transfer transaction using Dilithium account",
+			Flags: []cli.Flag{
+				flags.WalletFile,
+				flags.AccountIndexFlag,
+				flags.NetworkIDFlag,
+				flags.DataFlag,
+				flags.NonceFlag,
+				flags.TransactionStdOut,
+				flags.BroadcastFlag,
+				flags.RemoteAddrFlag,
+				&cli.StringFlag{
+					Name:  "address-to",
+					Value: "",
+				},
+				flags.AmountFlag,
+				flags.GasFlag,
+				flags.GasPriceFlag,
+			},
+			Action: func(c *cli.Context) error {
+				data, err := hex.DecodeString(flags.DataFlag.Name)
+				if err != nil {
+					fmt.Println("error decoding data")
+					return err
+				}
+
+				w := wallet.NewWallet(c.String(flags.WalletFile.Name))
+				a, err := w.GetDilithiumAccountByIndex(c.Uint(flags.AccountIndexFlag.Name))
+				if err != nil {
+					return err
+				}
+
+				addressTo := c.String("address-to")
+				stdOut := c.Bool(flags.TransactionStdOut.Name)
+				broadcastFlag := c.Bool(flags.BroadcastFlag.Name)
+				remoteAddr := c.String(flags.RemoteAddrFlag.Name)
+				binAddressTo, err := hex.DecodeString(addressTo)
+				if err != nil {
+					return err
+				}
+
+				pk := a.GetPK()
+				tx := transactions.NewTransfer(
+					c.Uint64(flags.NetworkIDFlag.Name),
+					binAddressTo,
+					c.Uint64(flags.AmountFlag.Name),
+					c.Uint64(flags.GasFlag.Name),
+					c.Uint64(flags.GasPriceFlag.Name),
+					data,
+					c.Uint64(flags.NonceFlag.Name),
+					pk[:])
+				tx.SignDilithium(a, tx.GetSigningHash())
+
+				if stdOut {
+					jsonData, err := tx.ToJSON()
+					if err != nil {
+						fmt.Println("Error: ", err)
+						return err
+					}
+					fmt.Println(misc.BytesToString(jsonData))
+				}
+
+				if broadcastFlag {
+					txHash := tx.Hash()
+					transfer := view.PlainTransferTransaction{}
+					transfer.TransactionFromPBData(tx.PBData(), txHash[:])
+
+					url := fmt.Sprintf("http://%s/api/broadcast/transfer", remoteAddr)
+					return broadcastTransaction(transfer, url, txHash)
 				}
 				return nil
 			},

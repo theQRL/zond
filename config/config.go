@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/theQRL/zond/common"
 	"os/user"
 	"path"
 	"sync"
@@ -114,6 +115,8 @@ type DevConfig struct {
 	BlockTime             uint64
 
 	DBName              string
+	DB2Name             string
+	DB2FreezerName      string
 	PeersFilename       string
 	WalletDatFilename   string
 	BannedPeersFilename string
@@ -135,7 +138,7 @@ type DevConfig struct {
 
 	RecordTransactionHashes bool // True will enable recording of transaction hashes into address state
 
-	MinStakeAmount uint64
+	StakeAmount uint64
 }
 
 type TransactionConfig struct {
@@ -143,13 +146,13 @@ type TransactionConfig struct {
 }
 
 type GenesisConfig struct {
-	GenesisPrevHeaderHash []byte
-	MaxCoinSupply         uint64
-	SuppliedCoins         uint64
-	GenesisDifficulty     uint64
-	CoinBaseAddress       []byte
-	FoundationXMSSAddress []byte
-	GenesisTimestamp      uint64
+	GenesisPrevHeaderHash      []byte
+	MaxCoinSupply              uint64
+	SuppliedCoins              uint64
+	GenesisDifficulty          uint64
+	CoinBaseAddress            common.Address
+	FoundationDilithiumAddress common.Address
+	GenesisTimestamp           uint64
 }
 
 var once sync.Once
@@ -260,22 +263,28 @@ func (u *UserConfig) GetLogFileName() string {
 }
 
 func GetDevConfig() (dev *DevConfig) {
-	binCoinBaseAddress, err := hex.DecodeString("0000000000000000000000000000000000000000000000000000000000000000")
+	var coinBaseAddress common.Address
+	binCoinBaseAddress, err := hex.DecodeString("0000000000000000000000000000000000000000")
+	copy(coinBaseAddress[:], binCoinBaseAddress)
 	if err != nil {
 		panic(fmt.Sprintf("Invalid CoinBaseAddress %v", err.Error()))
 	}
-	binFoundationXMSSAddress, err := hex.DecodeString("0005004010c7bca4f580b0369fa1c4fe62a44f719b7b6b88c23dcb467b881e650c8dcc15a7ca24")
+
+	var foundationDilithiumAddress common.Address
+	binFoundationDilithiumAddress, err := hex.DecodeString("0005004010c7bca4f580b0369fa1c4fe62a44f719b7b6b88c23dcb467b881e650c8dcc15a7ca24")
 	if err != nil {
 		panic(fmt.Sprintf("Invalid FoundationAddress %v", err.Error()))
 	}
+	copy(foundationDilithiumAddress[:], binFoundationDilithiumAddress)
+
 	genesis := &GenesisConfig{
-		GenesisPrevHeaderHash: []byte("Outside Context Problem"),
-		MaxCoinSupply:         105000000000000000,
-		SuppliedCoins:         65000000000000000,
-		GenesisDifficulty:     10000000,
-		CoinBaseAddress:       binCoinBaseAddress,
-		FoundationXMSSAddress: binFoundationXMSSAddress,
-		GenesisTimestamp:      1657615048,
+		GenesisPrevHeaderHash:      []byte("Outside Context Problem"),
+		MaxCoinSupply:              105000000000000000,
+		SuppliedCoins:              65000000000000000,
+		GenesisDifficulty:          10000000,
+		CoinBaseAddress:            coinBaseAddress,
+		FoundationDilithiumAddress: foundationDilithiumAddress,
+		GenesisTimestamp:           1657615048,
 	}
 	transaction := &TransactionConfig{
 		MultiOutputLimit: 100,
@@ -308,6 +317,8 @@ func GetDevConfig() (dev *DevConfig) {
 		BlockTime:             60,
 
 		DBName:              "state",
+		DB2Name:             "state2",
+		DB2FreezerName:      "ancient",
 		PeersFilename:       "peers.json",
 		WalletDatFilename:   "wallet.json",
 		BannedPeersFilename: "banned_peers",
@@ -328,6 +339,6 @@ func GetDevConfig() (dev *DevConfig) {
 		RecordTransactionHashes: false,
 	}
 	dev.MaxBytesOut = dev.MaxReceivableBytes - dev.ReservedQuota
-	dev.MinStakeAmount = 10000 * dev.ShorPerQuanta
+	dev.StakeAmount = 10000 * dev.ShorPerQuanta
 	return dev
 }

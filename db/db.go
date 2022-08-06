@@ -27,7 +27,7 @@ func NewDB(directory string, filename string) (*DB, error) {
 		return nil, err
 	}
 	err = db.Update(func(tx *bbolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte("DB"))  // TODO: Move this Bucket name to appropriate place
+		_, err := tx.CreateBucketIfNotExists([]byte("DB")) // TODO: Move this Bucket name to appropriate place
 		if err != nil {
 			return fmt.Errorf("could not create DB %v", err)
 		}
@@ -36,7 +36,7 @@ func NewDB(directory string, filename string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DB {
+	return &DB{
 		filename: filename,
 		db:       db,
 	}, nil
@@ -91,7 +91,6 @@ func (db *DB) Close() {
 	} else {
 		log.Error("Failed to close BoltDB", "err", err)
 	}
-
 }
 
 func (db *DB) DB() *bbolt.DB {

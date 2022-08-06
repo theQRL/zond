@@ -43,6 +43,7 @@ message BlockMetaData {
     bytes finalized_child_header_hash = 5;
 
     bytes total_stake_amount = 6;
+    bytes trie_root = 7;
 }
 
 message EpochMetaData {

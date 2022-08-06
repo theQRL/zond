@@ -3,91 +3,64 @@ package view
 import (
 	"encoding/hex"
 	"errors"
-	"github.com/theQRL/zond/chain/transactions"
-	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
+	"github.com/theQRL/zond/transactions"
 )
 
 type PlainTransferTransaction struct {
 	NetworkID       uint64 `json:"networkID"`
-	MasterAddress   string `json:"masterAddress"`
-	Fee             uint64 `json:"fee"`
+	Gas             uint64 `json:"gas"`
+	GasPrice        uint64 `json:"gasPrice"`
 	PublicKey       string `json:"publicKey"`
 	Signature       string `json:"signature"`
 	Nonce           uint64 `json:"nonce"`
 	TransactionHash string `json:"transactionHash"`
 	TransactionType string `json:"transactionType"`
 
-	AddressesTo []string `json:"addressesTo"`
-	Amounts     []uint64 `json:"amounts"`
-	SlavePks    []string `json:"slavePks"`
-	Message     string   `json:"message"`
+	To    string `json:"to"`
+	Value uint64 `json:"value"`
+	Data  string `json:"data"`
 }
 
 func (t *PlainTransferTransaction) TransactionFromPBData(tx *protos.Transaction, txHash []byte) {
 	t.NetworkID = tx.NetworkId
-	if tx.MasterAddr != nil {
-		t.MasterAddress = hex.EncodeToString(tx.MasterAddr)
-	}
-	t.Fee = tx.Fee
+	t.Gas = tx.Gas
+	t.GasPrice = tx.GasPrice
 	t.PublicKey = hex.EncodeToString(tx.Pk)
 	t.Signature = hex.EncodeToString(tx.Signature)
 	t.Nonce = tx.Nonce
 	t.TransactionHash = hex.EncodeToString(txHash)
 	t.TransactionType = "transfer"
 
-	t.AddressesTo = misc.Bin2Addresses(tx.GetTransfer().AddrsTo)
-	t.Amounts = tx.GetTransfer().Amounts
-	for _, slavePk := range tx.GetTransfer().SlavePks {
-		t.SlavePks = append(t.SlavePks, hex.EncodeToString(slavePk))
-	}
-	t.Message = string(tx.GetTransfer().Message)
+	t.To = hex.EncodeToString(tx.GetTransfer().To)
+	t.Value = tx.GetTransfer().Value
+	t.Data = string(tx.GetTransfer().Data)
 }
 
 func (t *PlainTransferTransaction) ToTransferTransactionObject() (*transactions.Transfer, error) {
-	addrsTo, err := misc.StringAddressToBytesArray(t.AddressesTo)
+	to, err := hex.DecodeString(t.To)
 	if err != nil {
 		return nil, err
 	}
-	xmssPK, err := hex.DecodeString(t.PublicKey)
+	pk, err := hex.DecodeString(t.PublicKey)
 	if err != nil {
 		return nil, err
 	}
-	var masterAddr []byte
-	var slavePks [][]byte
-	var message []byte
+	var data []byte
 
-	if len(t.MasterAddress) > 0 {
-		masterAddr, err = hex.DecodeString(t.MasterAddress)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if len(t.SlavePks) > 0 {
-		for _, slavePk := range t.SlavePks {
-			binSlavePk, err := hex.DecodeString(slavePk)
-			if err != nil {
-				return nil, err
-			}
-			slavePks = append(slavePks, binSlavePk)
-		}
-	}
-
-	if len(t.Message) > 0 {
-		message = []byte(t.Message)
+	if len(t.Data) > 0 {
+		data = []byte(t.Data)
 	}
 
 	transferTx := transactions.NewTransfer(
 		t.NetworkID,
-		addrsTo,
-		t.Amounts,
-		t.Fee,
-		slavePks,
-		message,
+		to,
+		t.Value,
+		t.Gas,
+		t.GasPrice,
+		data,
 		t.Nonce,
-		xmssPK,
-		masterAddr)
+		pk)
 
 	if transferTx == nil {
 		return nil, errors.New("error parsing transfer transaction")

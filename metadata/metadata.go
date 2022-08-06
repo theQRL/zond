@@ -1,15 +1,16 @@
 package metadata
 
 import (
+	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/db"
 	"reflect"
 )
 
-func GetDataByBucket(db *db.DB, key []byte, headerHash []byte, finalizedHeaderHash []byte) ([]byte, error) {
+func GetDataByBucket(db *db.DB, key []byte, headerHash common.Hash, finalizedHeaderHash common.Hash) ([]byte, error) {
 	var data []byte
 	var err error
 
-	for ; !reflect.DeepEqual(headerHash, finalizedHeaderHash); {
+	for !reflect.DeepEqual(headerHash, finalizedHeaderHash) {
 		bucketName := GetBlockBucketName(headerHash)
 		data, err = db.GetFromBucket(key, bucketName)
 		if err == nil {

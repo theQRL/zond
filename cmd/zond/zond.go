@@ -67,10 +67,10 @@ func CreateDirectoryIfNotExists(dir string) error {
 
 func SetLogOutput() error {
 	rotateFileHook, err := misc.NewRotateFileHook(misc.RotateFileConfig{
-		Filename: config.GetUserConfig().GetLogFileName(),
-		MaxSize: 50,
+		Filename:   config.GetUserConfig().GetLogFileName(),
+		MaxSize:    50,
 		MaxBackups: 3,
-		MaxAge: 28,
+		MaxAge:     28,
 		Formatter: &log.JSONFormatter{
 			TimestampFormat: time.RFC3339,
 		},
@@ -147,6 +147,7 @@ func main() {
 		log.Error("Error while loading state ", err.Error())
 		return
 	}
+
 	c := chain.NewChain(s)
 	if err := c.Load(); err != nil {
 		log.Error("Error loading chain state ", err.Error())
@@ -159,9 +160,9 @@ func main() {
 	}
 
 	/*
-	1. Peer Tries to Connect 10 peer ips 10 with a delay of 10 seconds until max peer limit is reached
-	2. OnConnection the ip address is checked in the map, if exists, then close the connection
-	3. 
-	 */
+		1. Peer Tries to Connect 10 peer ips 10 with a delay of 10 seconds until max peer limit is reached
+		2. OnConnection the ip address is checked in the map, if exists, then close the connection
+		3.
+	*/
 	log.Info("Shutting Down Node")
 }

@@ -3,6 +3,7 @@ package metadata
 import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
+	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/protos"
 	"go.etcd.io/bbolt"
@@ -12,16 +13,20 @@ type MainChainMetaData struct {
 	pbData *protos.MainChainMetaData
 }
 
-func (m *MainChainMetaData) FinalizedBlockHeaderHash() []byte {
-	return m.pbData.FinalizedBlockHeaderHash
+func (m *MainChainMetaData) FinalizedBlockHeaderHash() common.Hash {
+	var hash common.Hash
+	copy(hash[:], m.pbData.FinalizedBlockHeaderHash)
+	return hash
 }
 
 func (m *MainChainMetaData) FinalizedBlockSlotNumber() uint64 {
 	return m.pbData.FinalizedBlockSlotNumber
 }
 
-func (m *MainChainMetaData) LastBlockHeaderHash() []byte {
-	return m.pbData.LastBlockHeaderHash
+func (m *MainChainMetaData) LastBlockHeaderHash() common.Hash {
+	var hash common.Hash
+	copy(hash[:], m.pbData.LastBlockHeaderHash)
+	return hash
 }
 
 func (m *MainChainMetaData) LastBlockSlotNumber() uint64 {
@@ -44,28 +49,28 @@ func (m *MainChainMetaData) Commit(b *bbolt.Bucket) error {
 	return b.Put(GetMainChainMetaDataKey(), data)
 }
 
-func (m *MainChainMetaData) UpdateFinalizedBlockData(finalizedBlockHeaderHash []byte,
+func (m *MainChainMetaData) UpdateFinalizedBlockData(finalizedBlockHeaderHash common.Hash,
 	finalizedBlockSlotNumber uint64) {
-	m.pbData.FinalizedBlockHeaderHash = finalizedBlockHeaderHash
+	m.pbData.FinalizedBlockHeaderHash = finalizedBlockHeaderHash[:]
 	m.pbData.FinalizedBlockSlotNumber = finalizedBlockSlotNumber
 }
 
-func (m *MainChainMetaData) UpdateLastBlockData(lastBlockHeaderHash []byte,
+func (m *MainChainMetaData) UpdateLastBlockData(lastBlockHeaderHash common.Hash,
 	lastBlockSlotNumber uint64) {
-	m.pbData.LastBlockHeaderHash = lastBlockHeaderHash
+	m.pbData.LastBlockHeaderHash = lastBlockHeaderHash[:]
 	m.pbData.LastBlockSlotNumber = lastBlockSlotNumber
 }
 
-func NewMainChainMetaData(finalizedBlockHeaderHash []byte, finalizedBlockSlotNumber uint64,
-	lastBlockHeaderHash []byte, lastBlockSlotNumber uint64) *MainChainMetaData {
-	pbData := &protos.MainChainMetaData {
-		FinalizedBlockHeaderHash: finalizedBlockHeaderHash,
+func NewMainChainMetaData(finalizedBlockHeaderHash common.Hash, finalizedBlockSlotNumber uint64,
+	lastBlockHeaderHash common.Hash, lastBlockSlotNumber uint64) *MainChainMetaData {
+	pbData := &protos.MainChainMetaData{
+		FinalizedBlockHeaderHash: finalizedBlockHeaderHash[:],
 		FinalizedBlockSlotNumber: finalizedBlockSlotNumber,
 
-		LastBlockHeaderHash: lastBlockHeaderHash,
+		LastBlockHeaderHash: lastBlockHeaderHash[:],
 		LastBlockSlotNumber: lastBlockSlotNumber,
 	}
-	return &MainChainMetaData {
+	return &MainChainMetaData{
 		pbData: pbData,
 	}
 }

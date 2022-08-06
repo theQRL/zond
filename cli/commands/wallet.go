@@ -15,7 +15,7 @@ func getWalletSubCommands() []*cli.Command {
 	}
 	return []*cli.Command{
 		{
-			Name:  "add",
+			Name:  "add-xmss",
 			Usage: "Adds a new XMSS address into the Wallet",
 			Flags: []cli.Flag{
 				heightFlag,
@@ -23,7 +23,19 @@ func getWalletSubCommands() []*cli.Command {
 			Action: func(c *cli.Context) error {
 				hashType := xmss.SHA2_256
 				w := wallet.NewWallet(flags.WalletFile.Value)
-				w.Add(uint8(heightFlag.Value), hashType)
+				w.AddXMSS(uint8(heightFlag.Value), hashType)
+
+				fmt.Println("Wallet Created")
+				return nil
+			},
+		},
+		{
+			Name:  "add-dilithium",
+			Usage: "Adds a new Dilithium address into the Wallet",
+			Flags: []cli.Flag{},
+			Action: func(c *cli.Context) error {
+				w := wallet.NewWallet(flags.WalletFile.Value)
+				w.AddDilithium()
 
 				fmt.Println("Wallet Created")
 				return nil

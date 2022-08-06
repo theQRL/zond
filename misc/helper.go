@@ -4,8 +4,12 @@ import (
 	"bytes"
 	"container/list"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
+	common2 "github.com/theQRL/go-qrllib/common"
+	"github.com/theQRL/go-qrllib/dilithium"
 	"github.com/theQRL/go-qrllib/xmss"
+	"github.com/theQRL/zond/common"
 	"math"
 	"os"
 	"strconv"
@@ -97,12 +101,53 @@ func StringAddressToBytesArray(addrs []string) ([][]byte, error) {
 	return bytesAddrs, nil
 }
 
-func UnSizedPKToSizedPK(pk []byte) (pkSized [xmss.ExtendedPKSize]uint8) {
+func UnSizedXMSSPKToSizedPK(pk []byte) (pkSized [xmss.ExtendedPKSize]uint8) {
 	copy(pkSized[:], pk)
 	return
 }
 
-func UnSizedXMSSAddressToSizedXMSSAddress(addr []byte) (addrSized [xmss.AddressSize]uint8) {
+func UnSizedDilithiumPKToSizedPK(pk []byte) (pkSized [dilithium.PKSizePacked]uint8) {
+	copy(pkSized[:], pk)
+	return
+}
+
+func UnSizedAddressToSizedAddress(addr []byte) (addrSized [common2.AddressSize]uint8) {
 	copy(addrSized[:], addr)
 	return
+}
+
+func GetMaxOTSBitfieldSizeFromAddress(addr common.Address) uint64 {
+	height := (addr[1] & 0xf) << 1
+	maxOTS := 2 << height
+	maxOTSBitfieldSize := uint64(math.Ceil(float64(maxOTS) / 8.0))
+	return maxOTSBitfieldSize
+}
+
+func GetOTSIndexFromSignature(signature []byte) uint64 {
+	return uint64(binary.BigEndian.Uint32(signature[0:4]))
+}
+
+func IsUsedOTSIndex(otsIndex uint64, otsBitfield [][8]byte) bool {
+	offset := otsIndex << 3
+	if offset >= uint64(len(otsBitfield)) {
+		return true
+	}
+
+	relative := otsIndex / 8
+
+	return otsBitfield[offset][relative] == 1
+}
+
+func GetSignatureType(addr common.Address) common2.SignatureType {
+	return common2.SignatureType(addr[0])
+}
+
+func GetWalletTypeFromPK(pk []byte) common2.SignatureType {
+	if len(pk) == dilithium.PKSizePacked {
+		return common2.DilithiumSig
+	} else if len(pk) == xmss.ExtendedPKSize {
+		return common2.XMSSSig
+	} else {
+		panic("invalid signature type")
+	}
 }

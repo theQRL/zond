@@ -1,9 +1,0 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
-
-go_library(
-    name = "go_default_library",
-    srcs = ["block.go"],
-    importpath = "github.com/theQRL/zond/chain/rewards",
-    visibility = ["//visibility:public"],
-    deps = ["//config:go_default_library"],
-)
