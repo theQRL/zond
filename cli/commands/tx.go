@@ -85,7 +85,7 @@ func getTransactionSubCommands() []*cli.Command {
 					5. Form the Stake transaction and sign it by XMSS
 				*/
 				dilithiumFile := c.String("dilithium-file")
-				stakeAmount := c.Uint64(flags.AmountFlag.Name) * config.GetDevConfig().ShorPerQuanta
+				stakeAmount := c.Uint64(flags.AmountFlag.Name)
 				minStakeAmount := config.GetDevConfig().StakeAmount
 				if stakeAmount != 0 && stakeAmount < minStakeAmount {
 					fmt.Println("stake amount must be greater than or equals to ",
