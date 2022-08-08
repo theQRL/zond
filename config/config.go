@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/theQRL/zond/common"
+	"math/big"
 	"os/user"
 	"path"
 	"sync"
@@ -89,6 +90,8 @@ type APIConfig struct {
 }
 
 type DevConfig struct {
+	ChainID *big.Int
+
 	Genesis *GenesisConfig
 
 	ProtocolID protocol.ID
@@ -146,7 +149,7 @@ type TransactionConfig struct {
 }
 
 type GenesisConfig struct {
-	GenesisPrevHeaderHash      []byte
+	GenesisPrevHeaderHash      common.Hash
 	MaxCoinSupply              uint64
 	SuppliedCoins              uint64
 	GenesisDifficulty          uint64
@@ -277,8 +280,12 @@ func GetDevConfig() (dev *DevConfig) {
 	}
 	copy(foundationDilithiumAddress[:], binFoundationDilithiumAddress)
 
+	genPrevHeaderHash := []byte("Outside Context Problem")
+	var genesisPrevHeaderHash common.Hash
+	copy(genesisPrevHeaderHash[:], genPrevHeaderHash[:])
+
 	genesis := &GenesisConfig{
-		GenesisPrevHeaderHash:      []byte("Outside Context Problem"),
+		GenesisPrevHeaderHash:      genesisPrevHeaderHash,
 		MaxCoinSupply:              105000000000000000,
 		SuppliedCoins:              65000000000000000,
 		GenesisDifficulty:          10000000,
@@ -291,6 +298,7 @@ func GetDevConfig() (dev *DevConfig) {
 	}
 
 	dev = &DevConfig{
+		ChainID: big.NewInt(0),
 		Genesis: genesis,
 
 		ProtocolID: "/zond/0.0.1",
