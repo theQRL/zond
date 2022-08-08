@@ -193,7 +193,7 @@ func (w *Wallet) GetXMSSAccountByIndex(index uint) (*xmss.XMSS, error) {
 }
 
 func (w *Wallet) GetDilithiumAccountByIndex(index uint) (*dilithium.Dilithium, error) {
-	if int(index) > len(w.pbData.Info) {
+	if index == 0 || int(index) > len(w.pbData.Info) {
 		return nil, errors.New(fmt.Sprintf("Invalid Wallet Index"))
 	}
 

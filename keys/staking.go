@@ -12,17 +12,17 @@ import (
 	"reflect"
 )
 
-type DilithiumKeys struct {
+type StakingKeys struct {
 	outFileName string
 
-	pbData *protos.DilithiumKeys
+	pbData *protos.StakingKeys
 }
 
-func (dk *DilithiumKeys) GetDilithiumInfo() []*protos.DilithiumInfo {
+func (dk *StakingKeys) GetDilithiumInfo() []*protos.DilithiumInfo {
 	return dk.pbData.DilithiumInfo
 }
 
-func (dk *DilithiumKeys) Add(dilithiumAccount *dilithium.Dilithium) {
+func (dk *StakingKeys) Add(dilithiumAccount *dilithium.Dilithium) {
 	pk := dilithiumAccount.GetPK()
 	strPK := hex.EncodeToString(pk[:])
 	sk := dilithiumAccount.GetSK()
@@ -51,18 +51,18 @@ func (dk *DilithiumKeys) Add(dilithiumAccount *dilithium.Dilithium) {
 	dk.Save()
 }
 
-func (dk *DilithiumKeys) List() {
+func (dk *StakingKeys) List() {
 	for i, dilithiumInfo := range dk.pbData.DilithiumInfo {
 		fmt.Println(fmt.Sprintf("Index #%d\tPK: %s\tSK: %s", i, dilithiumInfo.PK, dilithiumInfo.SK))
 	}
 }
 
-func (dk *DilithiumKeys) Remove() {
+func (dk *StakingKeys) Remove() {
 
 	dk.Save()
 }
 
-func (dk *DilithiumKeys) Save() {
+func (dk *StakingKeys) Save() {
 	jsonData, err := protojson.Marshal(dk.pbData)
 	if err != nil {
 		fmt.Println("Error: ", err)
@@ -76,15 +76,15 @@ func (dk *DilithiumKeys) Save() {
 	return
 }
 
-func (dk *DilithiumKeys) GetDilithiumByIndex(index uint) (*protos.DilithiumInfo, error) {
+func (dk *StakingKeys) GetDilithiumByIndex(index uint) (*protos.DilithiumInfo, error) {
 	if int(index) > len(dk.pbData.DilithiumInfo) {
 		return nil, errors.New(fmt.Sprintf("Invalid Dilithium Group Index"))
 	}
 	return dk.pbData.DilithiumInfo[index-1], nil
 }
 
-func (dk *DilithiumKeys) Load() {
-	dk.pbData = &protos.DilithiumKeys{}
+func (dk *StakingKeys) Load() {
+	dk.pbData = &protos.StakingKeys{}
 
 	if !misc.FileExists(dk.outFileName) {
 		return
@@ -101,8 +101,8 @@ func (dk *DilithiumKeys) Load() {
 	}
 }
 
-func NewDilithiumKeys(outFileName string) *DilithiumKeys {
-	w := &DilithiumKeys{
+func NewDilithiumKeys(outFileName string) *StakingKeys {
+	w := &StakingKeys{
 		outFileName: outFileName,
 	}
 	w.Load()
