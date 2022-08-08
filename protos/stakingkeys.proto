@@ -7,7 +7,7 @@ option go_package = "github.com/theQRL/zond/protos";
 
 package protos;
 
-message DilithiumKeys {
+message StakingKeys {
     string version = 1;
     repeated DilithiumInfo dilithium_info = 2;
 }
