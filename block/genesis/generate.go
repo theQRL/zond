@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/ghodss/yaml"
 	"github.com/theQRL/zond/block"
-	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
@@ -13,7 +12,7 @@ import (
 	"os"
 )
 
-func GeneratePreState(transactions []*protos.Transaction, outputFile string) error {
+func GeneratePreState(transactions []*protos.Transaction) *protos.PreState {
 	preState := &protos.PreState{}
 
 	preState.Transactions = transactions
@@ -32,29 +31,17 @@ func GeneratePreState(transactions []*protos.Transaction, outputFile string) err
 	preState.AddressBalance = append(preState.AddressBalance, coinBaseAddressBalance)
 	//preState.AddressBalance = append(preState.AddressBalance, xmssAddressBalance)
 
-	jsonData, err := protojson.Marshal(preState)
-	if err != nil {
-		fmt.Println("Error: ", err.Error())
-		return err
-	}
+	return preState
+}
 
-	yamlData, err := yaml.JSONToYAML(jsonData)
-	if err != nil {
-		fmt.Println("Error: ", err.Error())
-		return err
-	}
+func NewGenesisBlock(networkID uint64, txs []*protos.Transaction,
+	foundationDilithiumPK []byte) (*block.Block, error) {
 
-	f, err := os.Create(outputFile)
-	if err != nil {
-		fmt.Println("Error: ", err.Error())
-		return err
-	}
-	defer f.Close()
-	f.Write(yamlData)
+	c := config.GetDevConfig()
 
-	f.Sync()
-
-	return nil
+	b := block.NewBlock(networkID, c.Genesis.GenesisTimestamp, foundationDilithiumPK,
+		0, c.Genesis.GenesisPrevHeaderHash, txs, nil, 0)
+	return b, nil
 }
 
 func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
@@ -75,7 +62,14 @@ func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
 	tl := misc.NewTransactionList(stakeTransactionsFile)
 	transactions := tl.GetTransactions()
 
-	if err := GeneratePreState(transactions, preStateFilename); err != nil {
+	preState := GeneratePreState(transactions)
+	preStateJSON, err := protojson.Marshal(preState)
+	if err != nil {
+		fmt.Println("Error: ", err.Error())
+		return err
+	}
+	err = WriteYML(preStateJSON, preStateFilename)
+	if err != nil {
 		return err
 	}
 
@@ -84,11 +78,8 @@ func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
 		return err
 	}
 
-	var genesisPrevHeaderHash common.Hash
-	copy(genesisPrevHeaderHash[:], c.Genesis.GenesisPrevHeaderHash)
-
 	b := block.NewBlock(networkID, c.Genesis.GenesisTimestamp, binDilithiumPK,
-		0, genesisPrevHeaderHash, transactions, nil, 0)
+		0, c.Genesis.GenesisPrevHeaderHash, transactions, nil, 0)
 
 	//for i := 0; i < len(dilithiumGroup); i++ {
 	//	for j := 0; j < len(dilithiumGroup[i].DilithiumInfo); j++ {
@@ -124,27 +115,38 @@ func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
 	//d := dilithium.RecoverDilithium(binDilithiumPK, binDilithiumSK)
 	//b.SignByProposer(d)
 
-	jsonData, err := protojson.Marshal(b.PBData())
+	genesisBlockJSON, err := protojson.Marshal(b.PBData())
 	if err != nil {
 		fmt.Println("Error: ", err.Error())
 		return err
 	}
 
+	err = WriteYML(genesisBlockJSON, genesisFilename)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func WriteYML(jsonData []byte, filename string) error {
 	yamlData, err := yaml.JSONToYAML(jsonData)
 	if err != nil {
 		fmt.Println("Error: ", err.Error())
 		return err
 	}
 
-	f, err := os.Create(genesisFilename)
+	f, err := os.Create(filename)
 	if err != nil {
 		fmt.Println("Error: ", err.Error())
 		return err
 	}
 	defer f.Close()
-	f.Write(yamlData)
 
-	f.Sync()
+	_, err = f.Write(yamlData)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return f.Sync()
 }

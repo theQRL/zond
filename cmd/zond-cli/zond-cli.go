@@ -16,11 +16,12 @@ func info() {
 }
 
 func initCommands() {
-	app.Commands = []*cli.Command {}
+	app.Commands = []*cli.Command{}
 	commands.AddWalletCommand(app)
 	commands.AddDilithiumKeyCommand(app)
 	commands.AddTransactionCommand(app)
 	commands.AddGenesisCommand(app)
+	commands.AddDevCommand(app)
 }
 
 func main() {

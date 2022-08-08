@@ -791,7 +791,7 @@ func (p *Peer) SendVersion() {
 	out := &Msg{}
 	veData := &protos.VEData{
 		Version:         p.config.Dev.Version,
-		GenesisPrevHash: p.config.Dev.Genesis.GenesisPrevHeaderHash,
+		GenesisPrevHash: p.config.Dev.Genesis.GenesisPrevHeaderHash[:],
 		RateLimit:       p.config.User.Node.PeerRateLimit,
 	}
 	out.msg = &protos.LegacyMessage{
