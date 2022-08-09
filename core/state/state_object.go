@@ -104,6 +104,12 @@ func newObject(db *StateDB, address common.Address, data types.StateAccount) *st
 	if data.Balance == nil {
 		data.Balance = new(big.Int)
 	}
+	if data.StakeBalance == nil {
+		data.StakeBalance = new(big.Int)
+	}
+	if data.PendingStakeBalance == nil {
+		data.PendingStakeBalance = new(big.Int)
+	}
 	if data.CodeHash == nil {
 		data.CodeHash = emptyCodeHash
 	}
