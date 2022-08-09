@@ -134,7 +134,7 @@ func (tx *ProtocolTransaction) GenerateUnSignedTxHash(hashableBytes []byte) []by
 }
 
 func (tx *ProtocolTransaction) Sign(dilithium *dilithium.Dilithium, message []byte) {
-	tx.pbData.Signature = dilithium.Seal(message)
+	tx.pbData.Signature = dilithium.Sign(message)
 	pk := dilithium.GetPK()
 	tx.pbData.Pk = pk[:]
 }
