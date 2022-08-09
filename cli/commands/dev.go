@@ -37,12 +37,13 @@ func getDevSubCommands() []*cli.Command {
 
 				walletFoundation := wallet.NewWallet(path.Join("bootstrap", "foundation-wallet.json"))
 				walletFoundation.AddDilithium()
-				foundationDilithiumAccount, err := walletStake.GetDilithiumAccountByIndex(1)
+				foundationDilithiumAccount, err := walletFoundation.GetDilithiumAccountByIndex(1)
 				if err != nil {
 					log.Error("failed to get dilithium account by index")
 					return nil
 				}
 				foundationDilithiumPK := foundationDilithiumAccount.GetPK()
+				foundationAccountNonce := uint64(0)
 
 				stakeAmount := 110000 * config.GetDevConfig().ShorPerQuanta
 				gas := uint64(30000)
@@ -70,11 +71,24 @@ func getDevSubCommands() []*cli.Command {
 						gas,
 						gasPrice,
 						nil,
-						uint64(i),
+						foundationAccountNonce,
 						foundationDilithiumPK[:])
 					tx.SignDilithium(foundationDilithiumAccount, tx.GetSigningHash())
 					tl.Add(tx.PBData())
+
+					foundationAccountNonce += 1
 				}
+
+				// Adding foundation stake tx into the transaction list
+				foundationStakeTx := transactions.NewStake(config.GetDevConfig().ChainID.Uint64(),
+					config.GetDevConfig().StakeAmount,
+					gas,
+					gasPrice,
+					foundationAccountNonce,
+					foundationDilithiumPK[:])
+				foundationStakeTx.SignDilithium(foundationDilithiumAccount, foundationStakeTx.GetSigningHash())
+				foundationAccountNonce += 1
+				tl.Add(foundationStakeTx.PBData())
 
 				for i := uint(0); i < 200; i++ {
 					stakeDilithiumAccount, err := walletStake.GetDilithiumAccountByIndex(i + 1)
@@ -89,7 +103,7 @@ func getDevSubCommands() []*cli.Command {
 						config.GetDevConfig().StakeAmount,
 						gas,
 						gasPrice,
-						uint64(i),
+						0,
 						stakeDilithiumPK[:])
 					tx.SignDilithium(stakeDilithiumAccount, tx.GetSigningHash())
 					tl.Add(tx.PBData())
@@ -99,6 +113,8 @@ func getDevSubCommands() []*cli.Command {
 
 				genesisBlock, err := genesis.NewGenesisBlock(config.GetDevConfig().ChainID.Uint64(),
 					txs, foundationDilithiumPK[:])
+
+				genesisBlock.SignByProposer(foundationDilithiumAccount)
 
 				preState := genesis.GeneratePreState(txs)
 
