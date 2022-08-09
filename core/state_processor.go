@@ -65,11 +65,17 @@ func (p *StateProcessor) ProcessGenesisPreState(preState *protos.PreState, b *bl
 		return err
 	}
 
-	blockProposerDilithiumAddress := dilithium.GetDilithiumAddressFromPK(misc.UnSizedDilithiumPKToSizedPK(b.ProtocolTransactions()[0].GetPk()))
+	blockProposerDilithiumAddress := misc.GetDilithiumAddressFromUnSizedPK(b.ProtocolTransactions()[0].GetPk())
 	statedb.GetOrNewStateObject(blockProposerDilithiumAddress).SetBalance(big.NewInt(int64(config.GetDevConfig().Genesis.SuppliedCoins)))
 
 	if !reflect.DeepEqual(blockProposerDilithiumAddress, config.GetDevConfig().Genesis.FoundationDilithiumAddress) {
+		expectedFoundationDilithiumAddress := hex.EncodeToString(config.GetDevConfig().Genesis.FoundationDilithiumAddress[:])
+		foundFoundationDilithiumAddress := hex.EncodeToString(config.GetDevConfig().Genesis.FoundationDilithiumAddress[:])
+
 		log.Warn("block proposer dilithium address is not matching with the foundation dilithium address in config")
+		log.Warn("expected foundation dilithium address ", expectedFoundationDilithiumAddress)
+		log.Warn("found foundation dilithium address ", foundFoundationDilithiumAddress)
+		fmt.Println(blockProposerDilithiumAddress == config.GetDevConfig().Genesis.FoundationDilithiumAddress)
 		return fmt.Errorf("failed to process genesis pre state")
 	}
 
@@ -83,7 +89,7 @@ func (p *StateProcessor) ProcessGenesisPreState(preState *protos.PreState, b *bl
 }
 
 func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, stateContext *state2.StateContext, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
-	var validatorsType map[string]uint8
+	validatorsType := make(map[string]uint8)
 
 	blockProposerDilithiumPK := b.ProtocolTransactions()[0].GetPk()
 	validatorsType[hex.EncodeToString(blockProposerDilithiumPK)] = 1
@@ -435,10 +441,11 @@ func applyStakeTransaction(gp *GasPool, statedb *state.StateDB, blockNumber *big
 	statedb.Finalise(true)
 
 	// TODO: remove hardcoded fixed gas for the stake transaction
-	*usedGas += 1000
+	StakeTxGas := uint64(1000)
+	*usedGas += StakeTxGas
 
 	/* -- Stake Transaction changes starts -- */
-	address := dilithium.GetDilithiumAddressFromPK(misc.UnSizedDilithiumPKToSizedPK(tx.PK()))
+	address := misc.GetDilithiumAddressFromUnSizedPK(tx.PK())
 	accountState := statedb.GetOrNewStateObject(address)
 
 	accountState.SetNonce(tx.Nonce())
@@ -463,7 +470,7 @@ func applyStakeTransaction(gp *GasPool, statedb *state.StateDB, blockNumber *big
 	// add gas fee to the block proposer address
 	statedb.AddBalance(*minter, big.NewInt(int64((*usedGas)*tx.GasPrice())))
 
-	if err := gp.SubGas(*usedGas); err != nil {
+	if err := gp.SubGas(StakeTxGas); err != nil {
 		return nil, err
 	}
 	/* -- Stake Transaction changes ends -- */
@@ -491,7 +498,7 @@ func applyCoinBaseTransaction(statedb *state.StateDB, stateContext *state2.State
 	statedb.Finalise(true)
 
 	/* -- Coinbase Transaction changes starts -- */
-	address := dilithium.GetDilithiumAddressFromPK(misc.UnSizedDilithiumPKToSizedPK(tx.PK()))
+	address := misc.GetDilithiumAddressFromUnSizedPK(tx.PK())
 	accountState := statedb.GetOrNewStateObject(address)
 
 	if err := stateContext.ProcessBlockProposerFlag(tx.PK(), accountState.StakeBalance()); err != nil {
@@ -509,7 +516,7 @@ func applyCoinBaseTransaction(statedb *state.StateDB, stateContext *state2.State
 		if err != nil {
 			return nil, err
 		}
-		accountState := statedb.GetOrNewStateObject(dilithium.GetDilithiumAddressFromPK(misc.UnSizedDilithiumPKToSizedPK(validatorDilithiumPK)))
+		accountState := statedb.GetOrNewStateObject(misc.GetDilithiumAddressFromUnSizedPK(validatorDilithiumPK))
 
 		if strValidatorDilithiumPK == strBlockProposerDilithiumPK {
 			accountState.AddBalance(big.NewInt(int64(tx.BlockProposerReward())))
@@ -552,7 +559,7 @@ func applyAttestTransaction(statedb *state.StateDB, stateContext *state2.StateCo
 	signedMessage := tx.GetSigningHash(stateContext.PartialBlockSigningHash())
 	txHash := tx.TxHash(signedMessage)
 
-	address := dilithium.GetDilithiumAddressFromPK(misc.UnSizedDilithiumPKToSizedPK(tx.PK()))
+	address := misc.GetDilithiumAddressFromUnSizedPK(tx.PK())
 	accountState := statedb.GetOrNewStateObject(address)
 
 	if err := stateContext.ProcessAttestorsFlag(tx.PK(), accountState.StakeBalance()); err != nil {
@@ -633,16 +640,17 @@ func ValidateTransferTxn(tx *transactions.Transfer, statedb *state.StateDB) bool
 		return false
 	}
 
+	signingHash := tx.GetSigningHash()
 	if len(tx.PK()) == dilithium.PKSizePacked {
 		pk := misc.UnSizedDilithiumPKToSizedPK(tx.PK())
 		// Dilithium Signature Verification
-		if !dilithium.Verify(tx.GetSigningHash(), tx.Signature(), &pk) {
+		if !dilithium.Verify(signingHash[:], tx.Signature(), &pk) {
 			log.Warn("Dilithium Signature Verification Failed")
 			return false
 		}
 	} else if len(tx.PK()) == xmss.ExtendedPKSize {
 		// XMSS Signature Verification
-		if !xmss.Verify(tx.GetSigningHash(), tx.Signature(), misc.UnSizedXMSSPKToSizedPK(tx.PK())) {
+		if !xmss.Verify(signingHash[:], tx.Signature(), misc.UnSizedXMSSPKToSizedPK(tx.PK())) {
 			log.Warn("XMSS Verification Failed")
 			return false
 		}
@@ -696,8 +704,9 @@ func ValidateStakeTxn(tx *transactions.Stake, statedb *state.StateDB) bool {
 	}
 
 	pk := misc.UnSizedDilithiumPKToSizedPK(tx.PK())
+	signingHash := tx.GetSigningHash()
 	// Dilithium Signature Verification
-	if !dilithium.Verify(tx.GetSigningHash(), tx.Signature(), &pk) {
+	if !dilithium.Verify(signingHash[:], tx.Signature(), &pk) {
 		log.Warn("Dilithium Signature Verification Failed")
 		return false
 	}
@@ -729,7 +738,7 @@ func ValidateAttestTx(tx *transactions.Attest, statedb *state.StateDB, validator
 		return false
 	}
 
-	accountState := statedb.GetOrNewStateObject(dilithium.GetDilithiumAddressFromPK(misc.UnSizedDilithiumPKToSizedPK(tx.PK())))
+	accountState := statedb.GetOrNewStateObject(misc.GetDilithiumAddressFromUnSizedPK(tx.PK()))
 	if accountState.StakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
 		return false
 	}
