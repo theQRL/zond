@@ -150,6 +150,18 @@ func (c *Chain) Load() error {
 			return err
 		}
 
+		stateProcessor := core.NewStateProcessor(&params.ChainConfig{ChainID: c.config.Dev.ChainID}, c.GetBlockHashBySlotNumber)
+
+		preState, err := genesis.LoadPreState()
+		if err != nil {
+			log.Error("failed to load PreState file")
+			return err
+		}
+		if err := stateProcessor.ProcessGenesisPreState(preState, b, db, statedb); err != nil {
+			log.Error("failed to process pre-state")
+			return err
+		}
+
 		//blockProposerDilithiumAddress := config.GetDevConfig().Genesis.FoundationDilithiumAddress
 		blockHeader := b.Header()
 		blockHeaderHash := b.Hash()
@@ -163,18 +175,6 @@ func (c *Chain) Load() error {
 			b.PartialBlockSigningHash(), b.BlockSigningHash(), epochMetaData)
 
 		if err != nil {
-			return err
-		}
-
-		stateProcessor := core.NewStateProcessor(&params.ChainConfig{ChainID: c.config.Dev.ChainID}, c.GetBlockHashBySlotNumber)
-
-		preState, err := genesis.LoadPreState()
-		if err != nil {
-			log.Error("failed to load PreState file")
-			return err
-		}
-		if err := stateProcessor.ProcessGenesisPreState(preState, b, db, statedb); err != nil {
-			log.Error("failed to process pre-state")
 			return err
 		}
 
