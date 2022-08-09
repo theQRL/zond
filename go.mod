@@ -28,7 +28,7 @@ require (
 	github.com/stretchr/testify v1.7.2
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
 	github.com/theQRL/go-libp2p-qrl v0.0.0-20220806153848-7dfc75fcfade
-	github.com/theQRL/go-qrllib v0.0.0-20220726101856-31bf184f4dc5
+	github.com/theQRL/go-qrllib v0.0.0-20220809144012-a93c711979b0
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
 	github.com/urfave/cli/v2 v2.2.0
 	github.com/willf/bitset v1.1.11 // indirect
