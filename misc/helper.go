@@ -151,3 +151,19 @@ func GetWalletTypeFromPK(pk []byte) common2.SignatureType {
 		panic("invalid signature type")
 	}
 }
+
+func GetDilithiumAddressFromUnSizedPK(pk []byte) common.Address {
+	addrOutput := dilithium.GetDilithiumAddressFromPK(UnSizedDilithiumPKToSizedPK(pk))
+	var address common.Address
+	copy(address[:], addrOutput[:])
+
+	return address
+}
+
+func GetXMSSAddressFromUnSizedPK(pk []byte) common.Address {
+	addrOutput := xmss.GetXMSSAddressFromPK(UnSizedXMSSPKToSizedPK(pk))
+	var address common.Address
+	copy(address[:], addrOutput[:])
+
+	return address
+}
