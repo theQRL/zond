@@ -75,10 +75,10 @@ type TransactionInterface interface {
 
 	GetSlave() []byte
 
-	GetSigningHash() []byte
+	GetSigningHash() common.Hash
 
-	SignXMSS(xmss *xmss.XMSS, message []byte)
-	SignDilithium(d *dilithium.Dilithium, message []byte)
+	SignXMSS(xmss *xmss.XMSS, signingHash common.Hash)
+	SignDilithium(d *dilithium.Dilithium, signingHash common.Hash)
 
 	ApplyStateChanges(stateContext *state.StateContext) error
 
@@ -152,7 +152,7 @@ func (tx *Transaction) Signature() []byte {
 }
 
 func (tx *Transaction) Hash() common.Hash {
-	return tx.GenerateTxHash()
+	panic("not implemented")
 }
 
 func (tx *Transaction) SetNonce(n uint64) {
@@ -161,9 +161,9 @@ func (tx *Transaction) SetNonce(n uint64) {
 
 func (tx *Transaction) AddrFrom() common.Address {
 	if len(tx.PK()) == xmss.ExtendedPKSize {
-		return xmss.GetXMSSAddressFromPK(misc.UnSizedXMSSPKToSizedPK(tx.PK()))
+		return misc.GetXMSSAddressFromUnSizedPK(tx.PK())
 	} else if len(tx.PK()) == dilithium.PKSizePacked {
-		return dilithium.GetDilithiumAddressFromPK(misc.UnSizedDilithiumPKToSizedPK(tx.PK()))
+		return misc.GetDilithiumAddressFromUnSizedPK(tx.PK())
 	}
 	panic(fmt.Sprintf("invalid PK size %d | PK: %v ", len(tx.PK()), tx.PK()))
 }
@@ -171,9 +171,9 @@ func (tx *Transaction) AddrFrom() common.Address {
 func (tx *Transaction) AddrFromPK() string {
 	var address common.Address
 	if len(tx.PK()) == xmss.ExtendedPKSize {
-		address = xmss.GetXMSSAddressFromPK(misc.UnSizedXMSSPKToSizedPK(tx.PK()))
+		address = misc.GetXMSSAddressFromUnSizedPK(tx.PK())
 	} else if len(tx.PK()) == dilithium.PKSizePacked {
-		address = dilithium.GetDilithiumAddressFromPK(misc.UnSizedDilithiumPKToSizedPK(tx.PK()))
+		address = misc.GetDilithiumAddressFromUnSizedPK(tx.PK())
 	} else {
 		panic(fmt.Sprintf("invalid PK size %d | PK: %v ", len(tx.PK()), tx.PK()))
 	}
@@ -194,7 +194,7 @@ func (tx *Transaction) FromPBData(pbData *protos.Transaction) {
 }
 
 func (tx *Transaction) GetSlave() []byte {
-	address := xmss.GetXMSSAddressFromPK(misc.UnSizedXMSSPKToSizedPK(tx.PK()))
+	address := misc.GetXMSSAddressFromUnSizedPK(tx.PK())
 
 	if !reflect.DeepEqual(address, tx.AddrFrom()) {
 		return address[:]
@@ -203,14 +203,13 @@ func (tx *Transaction) GetSlave() []byte {
 	return nil
 }
 
-func (tx *Transaction) GetSigningHash() []byte {
+func (tx *Transaction) GetSigningHash() common.Hash {
 	panic("Not Implemented")
 }
 
-func (tx *Transaction) GenerateTxHash() common.Hash {
-	signingHash := tx.GetSigningHash()
+func (tx *Transaction) generateTxHash(signingHash common.Hash) common.Hash {
 	tmp := new(bytes.Buffer)
-	tmp.Write(signingHash)
+	tmp.Write(signingHash[:])
 	tmp.Write(tx.Signature())
 	tmp.Write(tx.PK())
 
@@ -224,16 +223,16 @@ func (tx *Transaction) GenerateTxHash() common.Hash {
 	return hash
 }
 
-func (tx *Transaction) SignXMSS(x *xmss.XMSS, message []byte) {
-	signature, err := x.Sign(message)
+func (tx *Transaction) SignXMSS(x *xmss.XMSS, signingHash common.Hash) {
+	signature, err := x.Sign(signingHash[:])
 	if err != nil {
 		panic("Failed To Sign")
 	}
 	tx.pbData.Signature = signature
 }
 
-func (tx *Transaction) SignDilithium(d *dilithium.Dilithium, message []byte) {
-	signature := d.Sign(message)
+func (tx *Transaction) SignDilithium(d *dilithium.Dilithium, signingHash common.Hash) {
+	signature := d.Sign(signingHash[:])
 	tx.pbData.Signature = signature
 }
 

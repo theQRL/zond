@@ -21,6 +21,10 @@ func (tx *Transfer) Type() uint8 {
 	return 0
 }
 
+func (tx *Transfer) Hash() common.Hash {
+	return tx.GenerateTxHash()
+}
+
 func (tx *Transfer) To() *common.Address {
 	to := misc.UnSizedAddressToSizedAddress(tx.pbData.GetTransfer().To)
 	return (*common.Address)(&to)
@@ -34,7 +38,7 @@ func (tx *Transfer) Data() []byte {
 	return tx.pbData.GetTransfer().Data
 }
 
-func (tx *Transfer) GetSigningHash() []byte {
+func (tx *Transfer) GetSigningHash() common.Hash {
 	tmp := new(bytes.Buffer)
 	binary.Write(tmp, binary.BigEndian, tx.NetworkID())
 	binary.Write(tmp, binary.BigEndian, tx.Nonce())
@@ -53,7 +57,15 @@ func (tx *Transfer) GetSigningHash() []byte {
 	h := sha256.New()
 	h.Write(tmp.Bytes())
 
-	return h.Sum(nil)
+	output := h.Sum(nil)
+	var hash common.Hash
+	copy(hash[:], output)
+
+	return hash
+}
+
+func (tx *Transfer) GenerateTxHash() common.Hash {
+	return tx.generateTxHash(tx.GetSigningHash())
 }
 
 func (tx *Transfer) validateData(stateContext *state.StateContext) bool {

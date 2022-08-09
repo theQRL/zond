@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 )
@@ -16,11 +17,15 @@ func (tx *Stake) Type() uint8 {
 	return 1
 }
 
+func (tx *Stake) Hash() common.Hash {
+	return tx.GenerateTxHash()
+}
+
 func (tx *Stake) Amount() uint64 {
 	return tx.pbData.GetStake().Amount
 }
 
-func (tx *Stake) GetSigningHash() []byte {
+func (tx *Stake) GetSigningHash() common.Hash {
 	tmp := new(bytes.Buffer)
 	binary.Write(tmp, binary.BigEndian, tx.NetworkID())
 	binary.Write(tmp, binary.BigEndian, tx.Nonce())
@@ -33,7 +38,15 @@ func (tx *Stake) GetSigningHash() []byte {
 	h := sha256.New()
 	h.Write(tmp.Bytes())
 
-	return h.Sum(nil)
+	output := h.Sum(nil)
+	var hash common.Hash
+	copy(hash[:], output)
+
+	return hash
+}
+
+func (tx *Stake) GenerateTxHash() common.Hash {
+	return tx.generateTxHash(tx.GetSigningHash())
 }
 
 func (tx *Stake) validateData(stateContext *state.StateContext) bool {
