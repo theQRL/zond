@@ -309,8 +309,8 @@ running:
 				lastBlock.Hash(), lastBlock.SlotNumber())
 
 			if !reflect.DeepEqual(blockProposerPK, slotLeader) {
-				expectedDilithiumAddress := dilithium.GetDilithiumAddressFromPK(misc.UnSizedDilithiumPKToSizedPK(slotLeader))
-				foundDilithiumAddress := dilithium.GetDilithiumAddressFromPK(misc.UnSizedDilithiumPKToSizedPK(blockProposerPK))
+				expectedDilithiumAddress := misc.GetDilithiumAddressFromUnSizedPK(slotLeader)
+				foundDilithiumAddress := misc.GetDilithiumAddressFromUnSizedPK(blockProposerPK)
 
 				log.Error("Block received for attestation by unexpected slotLeader/blockProposer ")
 				log.Error("Expected Slot Leader ", expectedDilithiumAddress)
