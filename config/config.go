@@ -101,6 +101,7 @@ type DevConfig struct {
 	BlocksPerEpoch       uint64
 	BlockLeadTimestamp   uint32
 	BlockMaxDrift        uint16
+	BlockGasLimit        uint64
 	MaxFutureBlockLength uint16
 	MaxMarginBlockNumber uint16
 	MinMarginBlockNumber uint16
@@ -274,7 +275,7 @@ func GetDevConfig() (dev *DevConfig) {
 	}
 
 	var foundationDilithiumAddress common.Address
-	binFoundationDilithiumAddress, err := hex.DecodeString("0005004010c7bca4f580b0369fa1c4fe62a44f719b7b6b88c23dcb467b881e650c8dcc15a7ca24")
+	binFoundationDilithiumAddress, err := hex.DecodeString("20e76bb23dea1fd77b29c34a3028e1a6f95a65eb")
 	if err != nil {
 		panic(fmt.Sprintf("Invalid FoundationAddress %v", err.Error()))
 	}
@@ -291,7 +292,7 @@ func GetDevConfig() (dev *DevConfig) {
 		GenesisDifficulty:          10000000,
 		CoinBaseAddress:            coinBaseAddress,
 		FoundationDilithiumAddress: foundationDilithiumAddress,
-		GenesisTimestamp:           1657615048,
+		GenesisTimestamp:           1660057040,
 	}
 	transaction := &TransactionConfig{
 		MultiOutputLimit: 100,
@@ -308,6 +309,7 @@ func GetDevConfig() (dev *DevConfig) {
 		BlocksPerEpoch:       100,
 		BlockLeadTimestamp:   30,
 		BlockMaxDrift:        15,
+		BlockGasLimit:        100000000,
 		MaxFutureBlockLength: 256,
 		MaxMarginBlockNumber: 32,
 		MinMarginBlockNumber: 7,
