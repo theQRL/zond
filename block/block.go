@@ -129,7 +129,15 @@ func (b *Block) Serialize() ([]byte, error) {
 }
 
 func (b *Block) DeSerialize(data []byte) error {
-	return proto.Unmarshal(data, b.pbData)
+	b.pbData = &protos.Block{}
+	b.header = &Header{}
+
+	if err := proto.Unmarshal(data, b.pbData); err != nil {
+		return err
+	}
+
+	b.Header().pbData = b.pbData.Header
+	return nil
 }
 
 func (b *Block) PartialBlockSigningHash() common.Hash {
@@ -170,6 +178,10 @@ func (b *Block) BlockSigningHash() common.Hash {
 	tmp := new(bytes.Buffer)
 	binary.Write(tmp, binary.BigEndian, b.Timestamp())
 	binary.Write(tmp, binary.BigEndian, b.Header().Number().Uint64())
+	binary.Write(tmp, binary.BigEndian, b.Header().BaseFee())
+	binary.Write(tmp, binary.BigEndian, b.Header().GasLimit())
+	binary.Write(tmp, binary.BigEndian, b.Header().GasUsed())
+
 	pHash := b.Header().ParentHash()
 	tmp.Write(pHash[:])
 
@@ -266,8 +278,10 @@ func NewBlock(networkId uint64, timestamp uint64, proposerDilithiumPK []byte, sl
 	blockHeader.TimestampSeconds = timestamp
 	blockHeader.SlotNumber = slotNumber
 	blockHeader.ParentHash = parentHeaderHash[:]
+	blockHeader.GasLimit = config.GetDevConfig().BlockGasLimit
 
 	b.pbData.Header = blockHeader
+	b.header = &Header{blockHeader}
 
 	feeReward := uint64(0)
 	for _, tx := range txs {
@@ -471,9 +485,7 @@ func GetBlock(db *db.DB, blockHeaderHash common.Hash) (*Block, error) {
 		return nil, err
 	}
 
-	b := &Block{
-		pbData: &protos.Block{},
-	}
+	b := &Block{}
 	return b, b.DeSerialize(data)
 }
 
