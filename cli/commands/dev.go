@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/theQRL/zond/block/genesis"
 	"github.com/theQRL/zond/config"
+	"github.com/theQRL/zond/keys"
 	"github.com/theQRL/zond/log"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/transactions"
@@ -29,19 +30,29 @@ func getDevSubCommands() []*cli.Command {
 					return nil
 				}
 
-				walletStake := wallet.NewWallet(path.Join("bootstrap", "stake-wallet.json"))
-				for i := 0; i < 200; i++ {
-					walletStake.AddDilithium()
-				}
-				fmt.Println("Successfully generated 200 dilithium address for staking")
+				dk := keys.NewDilithiumKeys(path.Join("bootstrap", "dilithium_keys"))
 
 				walletFoundation := wallet.NewWallet(path.Join("bootstrap", "foundation-wallet.json"))
 				walletFoundation.AddDilithium()
 				foundationDilithiumAccount, err := walletFoundation.GetDilithiumAccountByIndex(1)
 				if err != nil {
-					log.Error("failed to get dilithium account by index")
+					log.Error("failed to get foundation dilithium account by index")
 					return nil
 				}
+				dk.Add(foundationDilithiumAccount)
+
+				walletStake := wallet.NewWallet(path.Join("bootstrap", "wallet.json"))
+				for i := uint(0); i < 200; i++ {
+					walletStake.AddDilithium()
+					stakeDilithiumAccount, err := walletStake.GetDilithiumAccountByIndex(i + 1)
+					if err != nil {
+						log.Error("failed to get dilithium account by index")
+						return nil
+					}
+					dk.Add(stakeDilithiumAccount)
+				}
+				fmt.Println("Successfully generated 200 dilithium address for staking")
+
 				foundationDilithiumPK := foundationDilithiumAccount.GetPK()
 				foundationAccountNonce := uint64(0)
 
