@@ -437,7 +437,7 @@ func (s *stateObject) SetStakeBalance(amount *big.Int) {
 		account: &s.address,
 		prev:    new(big.Int).Set(s.data.StakeBalance),
 	})
-	s.setBalance(amount)
+	s.setStakeBalance(amount)
 }
 
 func (s *stateObject) SetPendingStakeBalance(amount *big.Int) {
@@ -445,7 +445,7 @@ func (s *stateObject) SetPendingStakeBalance(amount *big.Int) {
 		account: &s.address,
 		prev:    new(big.Int).Set(s.data.PendingStakeBalance),
 	})
-	s.setBalance(amount)
+	s.setPendingStakeBalance(amount)
 }
 
 func (s *stateObject) setBalance(amount *big.Int) {
