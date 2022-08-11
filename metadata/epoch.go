@@ -19,6 +19,10 @@ type EpochMetaData struct {
 	pbData *protos.EpochMetaData
 }
 
+func (e *EpochMetaData) PBData() *protos.EpochMetaData {
+	return e.pbData
+}
+
 func (e *EpochMetaData) Epoch() uint64 {
 	return e.pbData.Epoch
 }
