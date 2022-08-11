@@ -720,13 +720,13 @@ func (p *Peer) HandleAttestTransaction(msg *Msg, txData *protos.ProtocolTransact
 		return nil
 	}
 
-	validatorsType, err := p.chain.GetValidatorsBySlotNumber(txData.SlotNumber, parentBlockHash, parentMetaData.SlotNumber())
+	slotValidatorsMetaData, err := p.chain.GetSlotValidatorsMetaDataBySlotNumber(parentMetaData.TrieRoot(), txData.SlotNumber, parentBlockHash)
 	if err != nil {
 		log.Error("Error getting validators type")
 		return nil
 	}
 
-	if !p.chain.ValidateAttestTransaction(pbData, validatorsType, partialBlockSigningHash) {
+	if !p.chain.ValidateAttestTransaction(pbData, slotValidatorsMetaData, partialBlockSigningHash) {
 		log.Error("[HandleAttestTransaction] Attest Transaction Validation Failed")
 		return nil
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/keys"
+	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/p2p"
@@ -38,7 +39,8 @@ type POS struct {
 	blockReceivedForAttestation chan *block.Block
 	attestationReceivedForBlock chan *transactions.Attest
 
-	blockBeingAttested *block.Block // Block being proposed by this node and
+	blockBeingAttested     *block.Block // Block being proposed by this node and
+	slotValidatorsMetaData *metadata.SlotValidatorsMetaData
 	// awaiting for the attestations
 	attestors    [][]byte
 	attestations []*transactions.Attest
@@ -143,10 +145,15 @@ running:
 			}
 			if p.blockBeingAttested == nil {
 				lastBlock := p.chain.GetLastBlock()
+				lastBlockMetaData, err := p.chain.GetBlockMetaData(lastBlock.Hash())
+				if err != nil {
+					log.Error("Failed to get last block metadata")
+					continue
+				}
 
 				slotNumber := p.GetCurrentSlot()
-				slotLeader, err := p.chain.GetSlotLeaderDilithiumPKBySlotNumber(slotNumber,
-					lastBlock.Hash(), lastBlock.SlotNumber())
+				slotLeader, err := p.chain.GetSlotLeaderDilithiumPKBySlotNumber(lastBlockMetaData.TrieRoot(),
+					slotNumber, lastBlock.Hash())
 
 				if err != nil {
 					log.Error("Error getting SlotLeader Dilithium PK By Slot Number ", err.Error())
@@ -157,7 +164,7 @@ running:
 					continue
 				}
 
-				statedb, err := p.chain.AccountDB()
+				statedb, err := p.chain.AccountDBForTrie(lastBlockMetaData.TrieRoot())
 				if err != nil {
 					log.Error("failed to get statedb")
 					continue
@@ -190,8 +197,7 @@ running:
 				b := block.NewBlock(0, ntp.GetNTP().Time(), pk[:], slotNumber,
 					lastBlock.Hash(), txs, nil, coinBaseAddressNonce)
 
-				attestors, err := p.chain.GetAttestorsBySlotNumber(b.SlotNumber(),
-					b.ParentHash(), lastBlock.SlotNumber())
+				attestors, err := p.chain.GetAttestorsBySlotNumber(lastBlockMetaData.TrieRoot(), b.SlotNumber(), b.ParentHash())
 				if err != nil {
 					log.Error("Error while getting Attestors by Slot Number ", err.Error())
 					continue
@@ -213,7 +219,7 @@ running:
 				}
 
 				// In case of all attestors for this slot belongs to same node
-				// then we already have all attestors and we should broadcast
+				// then we already have all attestors, and we should broadcast
 				// the block
 				if len(p.attestations) == len(attestors) {
 					p.blockBeingAttested.SignByProposer(proposerD)
@@ -293,23 +299,33 @@ running:
 				continue
 			}
 
-			parentBlock, err := p.chain.GetBlock(b.ParentHash())
+			parentBlockMetaData, err := p.chain.GetBlockMetaData(b.ParentHash())
+			if err != nil {
+				log.Error("Failed to Get Parent Block Metadata ", err.Error())
+				continue
+			}
+
+			//parentBlock, err := p.chain.GetBlock(b.ParentHash())
+			//if err != nil {
+			//	log.Error("Failed to Get Parent Block ", err.Error())
+			//	continue
+			//}
+			//attestors, err := p.chain.GetAttestorsBySlotNumber(b.SlotNumber(), b.ParentHash())
+			//if err != nil {
+			//	log.Error("Error while getting Attestors by Slot Number ", err.Error())
+			//	continue
+			//}
+			blockProposerPK := b.ProtocolTransactions()[0].GetPk()
+			//slotLeader, err := p.chain.GetSlotLeaderDilithiumPKBySlotNumber(b.SlotNumber(), lastBlock.Hash())
+
+			slotValidatorsMetaData, err := p.chain.GetSlotValidatorsMetaDataBySlotNumber(parentBlockMetaData.TrieRoot(), b.SlotNumber(), b.ParentHash())
 			if err != nil {
 				log.Error("Failed to Get Parent Block ", err.Error())
 				continue
 			}
-			attestors, err := p.chain.GetAttestorsBySlotNumber(b.SlotNumber(),
-				b.ParentHash(), parentBlock.SlotNumber())
-			if err != nil {
-				log.Error("Error while getting Attestors by Slot Number ", err.Error())
-				continue
-			}
-			blockProposerPK := b.ProtocolTransactions()[0].GetPk()
-			slotLeader, err := p.chain.GetSlotLeaderDilithiumPKBySlotNumber(b.SlotNumber(),
-				lastBlock.Hash(), lastBlock.SlotNumber())
 
-			if !reflect.DeepEqual(blockProposerPK, slotLeader) {
-				expectedDilithiumAddress := misc.GetDilithiumAddressFromUnSizedPK(slotLeader)
+			if !slotValidatorsMetaData.IsSlotLeader(hex.EncodeToString(blockProposerPK)) {
+				expectedDilithiumAddress := misc.GetDilithiumAddressFromUnSizedPK(slotValidatorsMetaData.GetSlotLeaderPK())
 				foundDilithiumAddress := misc.GetDilithiumAddressFromUnSizedPK(blockProposerPK)
 
 				log.Error("Block received for attestation by unexpected slotLeader/blockProposer ")
@@ -319,12 +335,11 @@ running:
 			}
 
 			p.blockBeingAttested = b
+			p.slotValidatorsMetaData = slotValidatorsMetaData
 			log.Info("Block #", b.SlotNumber(), " received for attestation")
 			partialBlockSigningHash := b.PartialBlockSigningHash()
-			for _, dilithiumPK := range attestors {
-				strDilithiumPK := hex.EncodeToString(dilithiumPK)
-				d, ok := p.validators[strDilithiumPK]
-				if !ok {
+			for strDilithiumPK, d := range p.validators {
+				if !slotValidatorsMetaData.IsAttestor(strDilithiumPK) {
 					continue
 				}
 				attestTx, err := b.Attest(0, d)
@@ -376,13 +391,7 @@ running:
 			//	continue
 			//}
 
-			validatorsType, err := p.chain.GetValidatorsBySlotNumber(p.blockBeingAttested.SlotNumber(), p.blockBeingAttested.ParentHash(), p.blockBeingAttested.SlotNumber())
-			if err != nil {
-				log.Error("Error getting validators type")
-				continue
-			}
-
-			if !p.chain.ValidateAttestTransaction(tx.PBData(), validatorsType, p.blockBeingAttested.PartialBlockSigningHash()) {
+			if !p.chain.ValidateAttestTransaction(tx.PBData(), p.slotValidatorsMetaData, p.blockBeingAttested.PartialBlockSigningHash()) {
 				log.Warn("Attestor transaction validation failed")
 				continue
 			}
@@ -472,11 +481,11 @@ func NewPOS(srv *p2p.Server, chain *chain.Chain, db *db.DB) *POS {
 			return nil
 		}
 		pos.validators[strPK] = dilithium.NewDilithiumFromSeed(binSeed)
-		if !reflect.DeepEqual(pos.validators[strPK].GetPK(), pk) {
+		if !reflect.DeepEqual(pos.validators[strPK].GetPK(), pkSized) {
 			log.Error("dilithium pk mismatch")
 			return nil
 		}
-		if !reflect.DeepEqual(pos.validators[strPK].GetSK(), sk) {
+		if !reflect.DeepEqual(pos.validators[strPK].GetSK(), skSized) {
 			log.Error("dilithium sk mismatch")
 			return nil
 		}
