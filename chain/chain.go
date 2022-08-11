@@ -1,6 +1,8 @@
 package chain
 
 import (
+	"crypto/md5"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -48,6 +50,15 @@ func (c *Chain) AccountDB() (*state2.StateDB, error) {
 	}
 
 	s2, err := state2.New(bm.TrieRoot(), c.db2, nil)
+	if err != nil {
+		log.Error("Failed to create state2")
+		return nil, err
+	}
+	return s2, nil
+}
+
+func (c *Chain) AccountDBForTrie(trieRoot common.Hash) (*state2.StateDB, error) {
+	s2, err := state2.New(trieRoot, c.db2, nil)
 	if err != nil {
 		log.Error("Failed to create state2")
 		return nil, err
@@ -169,6 +180,9 @@ func (c *Chain) Load() error {
 		blockProposerDilithiumPK := b.ProtocolTransactions()[0].GetPk()
 
 		epochMetaData := metadata.NewEpochMetaData(0, b.ParentHash(), make([][]byte, 0))
+		epochPBData := epochMetaData.PBData()
+		epochPBData.SlotInfo = append(epochPBData.SlotInfo, &protos.SlotInfo{SlotLeader: 0})
+		epochMetaData.AddValidators(blockProposerDilithiumPK)
 
 		stateContext, err := state.NewStateContext(db, blockHeader.Number().Uint64(), blockProposerDilithiumPK,
 			blockHeader.ParentHash(), blockHeader.ParentHash(), blockHeaderHash,
@@ -213,10 +227,15 @@ func (c *Chain) Load() error {
 	return nil
 }
 
-func (c *Chain) GetSlotLeaderDilithiumPKBySlotNumber(slotNumber uint64,
-	parentHeaderHash common.Hash, parentSlotNumber uint64) ([]byte, error) {
-	epochMetaData, err := block.CalculateEpochMetaData(c.state.DB(),
-		slotNumber, parentHeaderHash, parentSlotNumber)
+func (c *Chain) GetSlotLeaderDilithiumPKBySlotNumber(trieRoot common.Hash,
+	slotNumber uint64, parentHeaderHash common.Hash) ([]byte, error) {
+
+	statedb, err := c.AccountDBForTrie(trieRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	epochMetaData, err := c.CalculateEpochMetaData(statedb, slotNumber, parentHeaderHash)
 	if err != nil {
 		return nil, err
 	}
@@ -225,10 +244,14 @@ func (c *Chain) GetSlotLeaderDilithiumPKBySlotNumber(slotNumber uint64,
 	return epochMetaData.Validators()[slotLeaderIndex], nil
 }
 
-func (c *Chain) GetAttestorsBySlotNumber(slotNumber uint64,
-	parentHeaderHash common.Hash, parentSlotNumber uint64) ([][]byte, error) {
-	epochMetaData, err := block.CalculateEpochMetaData(c.state.DB(), slotNumber,
-		parentHeaderHash, parentSlotNumber)
+func (c *Chain) GetAttestorsBySlotNumber(trieRoot common.Hash,
+	slotNumber uint64, parentHeaderHash common.Hash) ([][]byte, error) {
+	statedb, err := c.AccountDBForTrie(trieRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	epochMetaData, err := c.CalculateEpochMetaData(statedb, slotNumber, parentHeaderHash)
 	if err != nil {
 		return nil, err
 	}
@@ -244,29 +267,35 @@ func (c *Chain) GetAttestorsBySlotNumber(slotNumber uint64,
 	return attestors, nil
 }
 
-// GetValidatorsBySlotNumber returns a map of all the validators for a specific slot number.
+// GetSlotValidatorsMetaDataBySlotNumber returns a map of all the validators for a specific slot number.
 // The value of map is 1 for slot leader and 0 for the attestors.
-func (c *Chain) GetValidatorsBySlotNumber(slotNumber uint64,
-	parentHeaderHash common.Hash, parentSlotNumber uint64) (map[string]uint8, error) {
-	epochMetaData, err := block.CalculateEpochMetaData(c.state.DB(),
-		slotNumber, parentHeaderHash, parentSlotNumber)
+func (c *Chain) GetSlotValidatorsMetaDataBySlotNumber(trieRoot common.Hash,
+	slotNumber uint64, parentHeaderHash common.Hash) (*metadata.SlotValidatorsMetaData, error) {
+
+	statedb, err := c.AccountDBForTrie(trieRoot)
 	if err != nil {
 		return nil, err
 	}
 
-	slotLeaderIndex := epochMetaData.SlotInfo()[slotNumber%c.config.Dev.BlocksPerEpoch].SlotLeader
-	attestorsIndex := epochMetaData.SlotInfo()[slotNumber%c.config.Dev.BlocksPerEpoch].Attestors
-	validators := epochMetaData.Validators()
-
-	validatorsType := make(map[string]uint8)
-	slotLeaderPK := epochMetaData.Validators()[slotLeaderIndex]
-	validatorsType[hex.EncodeToString(slotLeaderPK[:])] = 1
-
-	for _, attestorIndex := range attestorsIndex {
-		validatorPK := validators[attestorIndex]
-		validatorsType[hex.EncodeToString(validatorPK[:])] = 0
+	epochMetaData, err := c.CalculateEpochMetaData(statedb, slotNumber, parentHeaderHash)
+	if err != nil {
+		return nil, err
 	}
-	return validatorsType, nil
+
+	slotValidatorsMetaData := metadata.NewSlotValidatorsMetaData(slotNumber, epochMetaData)
+	//slotLeaderIndex := epochMetaData.SlotInfo()[slotNumber%c.config.Dev.BlocksPerEpoch].SlotLeader
+	//attestorsIndex := epochMetaData.SlotInfo()[slotNumber%c.config.Dev.BlocksPerEpoch].Attestors
+	//validators := epochMetaData.Validators()
+	//
+	//validatorsType := make(map[string]uint8)
+	//slotLeaderPK := epochMetaData.Validators()[slotLeaderIndex]
+	//validatorsType[hex.EncodeToString(slotLeaderPK[:])] = 1
+	//
+	//for _, attestorIndex := range attestorsIndex {
+	//	validatorPK := validators[attestorIndex]
+	//	validatorsType[hex.EncodeToString(validatorPK[:])] = 0
+	//}
+	return slotValidatorsMetaData, nil
 }
 
 func (c *Chain) GetBlockMetaData(headerHash common.Hash) (*metadata.BlockMetaData, error) {
@@ -421,16 +450,16 @@ func (c *Chain) ValidateTransaction(protoTx *protos.Transaction) bool {
 	return core.ValidateTransaction(protoTx, statedb)
 }
 
-func (c *Chain) ValidateProtocolTransaction(protoTx *protos.ProtocolTransaction, validatorsType map[string]uint8, blockSigningHash common.Hash, isGenesis bool) bool {
+func (c *Chain) ValidateProtocolTransaction(protoTx *protos.ProtocolTransaction, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, isGenesis bool) bool {
 	statedb, err := c.AccountDB()
 	if err != nil {
 		log.Error("failed to get statedb, cannot verify protocol transaction")
 		return false
 	}
-	return core.ValidateProtocolTransaction(protoTx, statedb, validatorsType, blockSigningHash, isGenesis)
+	return core.ValidateProtocolTransaction(protoTx, statedb, slotValidatorsMetaData, blockSigningHash, isGenesis)
 }
 
-func (c *Chain) ValidateCoinBaseTransaction(protoTx *protos.ProtocolTransaction, validatorsType map[string]uint8, blockSigningHash common.Hash, isGenesis bool) bool {
+func (c *Chain) ValidateCoinBaseTransaction(protoTx *protos.ProtocolTransaction, validatorsType *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, isGenesis bool) bool {
 	statedb, err := c.AccountDB()
 	if err != nil {
 		log.Error("failed to get statedb, cannot verify protocol transaction")
@@ -440,7 +469,7 @@ func (c *Chain) ValidateCoinBaseTransaction(protoTx *protos.ProtocolTransaction,
 	return core.ValidateCoinBaseTx(tx, statedb, validatorsType, blockSigningHash, isGenesis)
 }
 
-func (c *Chain) ValidateAttestTransaction(protoTx *protos.ProtocolTransaction, validatorsType map[string]uint8, partialBlockSigningHash common.Hash) bool {
+func (c *Chain) ValidateAttestTransaction(protoTx *protos.ProtocolTransaction, validatorsType *metadata.SlotValidatorsMetaData, partialBlockSigningHash common.Hash) bool {
 	statedb, err := c.AccountDB()
 	if err != nil {
 		log.Error("failed to get statedb, cannot verify protocol transaction")
@@ -491,15 +520,18 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 		log.Error("[AddBlock] Failed to get Parent Block MetaData")
 		return false
 	}
-	epochMetaData, err := block.CalculateEpochMetaData(c.state.DB(), b.Number(),
-		b.ParentHash(), parentBlockMetaData.SlotNumber())
+
+	trieRoot := parentBlockMetaData.TrieRoot()
+	statedb, err := state2.New(parentBlockMetaData.TrieRoot(), c.db2, nil)
+
+	epochMetaData, err := c.CalculateEpochMetaData(statedb, b.Number(), b.ParentHash())
 	if err != nil {
 		log.Error("[AddBlock] Failed to Calculate Epoch MetaData")
 		return false
 	}
 
 	bHash := b.Hash()
-	validators, err := c.GetValidatorsBySlotNumber(b.SlotNumber(), b.ParentHash(), parentBlockMetaData.SlotNumber())
+	validators, err := c.GetSlotValidatorsMetaDataBySlotNumber(trieRoot, b.SlotNumber(), b.ParentHash())
 	if err != nil {
 		log.Error(fmt.Sprintf("failed to get validatorsBySlotNumber block #%d %s | Error %s", b.SlotNumber(),
 			hex.EncodeToString(bHash[:]), err.Error()))
@@ -510,8 +542,6 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 	stateContext, err := state.NewStateContext(c.state.DB(), b.Number(), blockProposerDilithiumPK,
 		mainChainMetaData.FinalizedBlockHeaderHash(), b.ParentHash(), b.Hash(),
 		b.PartialBlockSigningHash(), b.BlockSigningHash(), epochMetaData)
-
-	statedb, err := state2.New(parentBlockMetaData.TrieRoot(), c.db2, nil)
 
 	// TODO: chain id is currently hardcoded to 0, need to be loaded based on Network type
 	stateProcessor := core.NewStateProcessor(&params.ChainConfig{ChainID: c.config.Dev.ChainID}, c.GetBlockHashBySlotNumber)
@@ -605,4 +635,90 @@ func NewChain(s *state.State) *Chain {
 		db2:    nil,
 		txPool: pool.CreateTransactionPool(),
 	}
+}
+
+func (c *Chain) CalculateEpochMetaData(statedb *state2.StateDB, slotNumber uint64,
+	parentHeaderHash common.Hash) (*metadata.EpochMetaData, error) {
+
+	db := c.state.DB()
+	blocksPerEpoch := config.GetDevConfig().BlocksPerEpoch
+	parentBlockMetaData, err := metadata.GetBlockMetaData(db, parentHeaderHash)
+	if err != nil {
+		return nil, err
+	}
+	parentEpoch := parentBlockMetaData.SlotNumber() / blocksPerEpoch
+	epoch := slotNumber / blocksPerEpoch
+
+	if parentEpoch == epoch {
+		return metadata.GetEpochMetaData(db, slotNumber, parentHeaderHash)
+	}
+
+	epoch = parentEpoch
+	var pathToFirstBlockOfEpoch []common.Hash
+	if parentBlockMetaData.SlotNumber() == 0 {
+		pathToFirstBlockOfEpoch = append(pathToFirstBlockOfEpoch, parentBlockMetaData.HeaderHash())
+	} else {
+		for epoch == parentEpoch {
+			pathToFirstBlockOfEpoch = append(pathToFirstBlockOfEpoch, parentBlockMetaData.HeaderHash())
+			if parentBlockMetaData.SlotNumber() == 0 {
+				break
+			}
+			parentBlockMetaData, err = metadata.GetBlockMetaData(db, parentBlockMetaData.ParentHeaderHash())
+			if err != nil {
+				return nil, err
+			}
+			parentEpoch = parentBlockMetaData.SlotNumber() / blocksPerEpoch
+		}
+	}
+
+	lenPathToFirstBlockOfEpoch := len(pathToFirstBlockOfEpoch)
+	if lenPathToFirstBlockOfEpoch == 0 {
+		return nil, errors.New("lenPathToFirstBlockOfEpoch is 0")
+	}
+
+	firstBlockOfEpochHeaderHash := pathToFirstBlockOfEpoch[lenPathToFirstBlockOfEpoch-1]
+	blockMetaData, err := metadata.GetBlockMetaData(db, firstBlockOfEpochHeaderHash)
+	if err != nil {
+		return nil, err
+	}
+
+	epochMetaData, err := metadata.GetEpochMetaData(db, blockMetaData.SlotNumber(),
+		blockMetaData.ParentHeaderHash())
+
+	if err != nil {
+		return nil, err
+	}
+
+	validatorsStakeAmount := make(map[string]uint64)
+	totalStakeAmountAlloted := uint64(len(epochMetaData.Validators())) * config.GetDevConfig().StakeAmount
+	epochMetaData.UpdatePrevEpochStakeData(0,
+		totalStakeAmountAlloted)
+
+	validatorsStateChanged := make(map[string]bool)
+	for i := lenPathToFirstBlockOfEpoch - 1; i >= 0; i-- {
+		b, err := block.GetBlock(db, pathToFirstBlockOfEpoch[i])
+		if err != nil {
+			return nil, err
+		}
+		err = core.ProcessEpochMetaData(b, statedb, epochMetaData, validatorsStakeAmount, validatorsStateChanged)
+		if err != nil {
+			return nil, err
+		}
+		// TODO: Calculate RandomSeed
+	}
+
+	// TODO: load accountState of all the dilithium pk in validatorsStateChanged
+	// then update the stake balance, pending stake balance and the balance
+	// accountState must be loaded based on the trie of parentHeaderHash
+
+	// TODO: Temporary random seed calculation
+	var randomSeed int64
+	h := md5.New()
+	h.Write(parentHeaderHash[:])
+	randomSeed = int64(binary.BigEndian.Uint64(h.Sum(nil)))
+
+	currentEpoch := slotNumber / blocksPerEpoch
+	epochMetaData.AllotSlots(randomSeed, currentEpoch, parentHeaderHash)
+
+	return epochMetaData, nil
 }

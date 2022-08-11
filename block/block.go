@@ -2,11 +2,9 @@ package block
 
 import (
 	"bytes"
-	"crypto/md5"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
@@ -235,38 +233,6 @@ func (b *Block) SignByProposer(d *dilithium.Dilithium) {
 	b.ProtocolTransactions()[0] = coinbaseTx.PBData()
 }
 
-func (b *Block) ProcessEpochMetaData(epochMetaData *metadata.EpochMetaData,
-	validatorsStakeAmount map[string]uint64, validatorsStateChanged map[string]bool) error {
-
-	for _, pbData := range b.Transactions() {
-		switch pbData.Type.(type) {
-		case *protos.Transaction_Stake:
-			// TODO: Need to add this address into the epoch metadata, if it doesn't exist
-			// add existing stake amount to balance
-			// then set stake amount equal to tx.Amount
-			// finally set the pendingStakeBalance to 0 for all the validators
-
-			tx := transactions.ProtoToTransaction(pbData)
-			if pbData.GetStake().Amount > 0 {
-				epochMetaData.AddValidators(tx.PK())
-				validatorsStateChanged[hex.EncodeToString(tx.PK())] = true
-			} else {
-				epochMetaData.RemoveValidators(tx.PK())
-				validatorsStateChanged[hex.EncodeToString(tx.PK())] = false
-			}
-		}
-	}
-	for _, pbData := range b.ProtocolTransactions() {
-		strPK := hex.EncodeToString(pbData.Pk)
-		amount, ok := validatorsStakeAmount[strPK]
-		if !ok {
-			return errors.New(fmt.Sprintf("balance not loaded for the validator %s", strPK))
-		}
-		epochMetaData.AddTotalStakeAmountFound(amount)
-	}
-	return nil
-}
-
 func NewBlock(networkId uint64, timestamp uint64, proposerDilithiumPK []byte, slotNumber uint64,
 	parentHeaderHash common.Hash, txs []*protos.Transaction, protocolTxs []*protos.ProtocolTransaction,
 	lastCoinBaseNonce uint64) *Block {
@@ -388,91 +354,6 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 	}
 
 	return stateContext.Finalize(blockMetaDataPathForFinalization)
-}
-
-func CalculateEpochMetaData(db *db.DB, slotNumber uint64,
-	parentHeaderHash common.Hash, parentSlotNumber uint64) (*metadata.EpochMetaData, error) {
-
-	blocksPerEpoch := config.GetDevConfig().BlocksPerEpoch
-	parentBlockMetaData, err := metadata.GetBlockMetaData(db, parentHeaderHash)
-	if err != nil {
-		return nil, err
-	}
-	parentEpoch := parentBlockMetaData.SlotNumber() / blocksPerEpoch
-	epoch := slotNumber / blocksPerEpoch
-
-	if parentEpoch == epoch {
-		return metadata.GetEpochMetaData(db, slotNumber, parentHeaderHash)
-	}
-
-	epoch = parentEpoch
-	var pathToFirstBlockOfEpoch []common.Hash
-	if parentBlockMetaData.SlotNumber() == 0 {
-		pathToFirstBlockOfEpoch = append(pathToFirstBlockOfEpoch, parentBlockMetaData.HeaderHash())
-	} else {
-		for epoch == parentEpoch {
-			pathToFirstBlockOfEpoch = append(pathToFirstBlockOfEpoch, parentBlockMetaData.HeaderHash())
-			if parentBlockMetaData.SlotNumber() == 0 {
-				break
-			}
-			parentBlockMetaData, err = metadata.GetBlockMetaData(db, parentBlockMetaData.ParentHeaderHash())
-			if err != nil {
-				return nil, err
-			}
-			parentEpoch = parentBlockMetaData.SlotNumber() / blocksPerEpoch
-		}
-	}
-
-	lenPathToFirstBlockOfEpoch := len(pathToFirstBlockOfEpoch)
-	if lenPathToFirstBlockOfEpoch == 0 {
-		return nil, errors.New("lenPathToFirstBlockOfEpoch is 0")
-	}
-
-	firstBlockOfEpochHeaderHash := pathToFirstBlockOfEpoch[lenPathToFirstBlockOfEpoch-1]
-	blockMetaData, err := metadata.GetBlockMetaData(db, firstBlockOfEpochHeaderHash)
-	if err != nil {
-		return nil, err
-	}
-
-	epochMetaData, err := metadata.GetEpochMetaData(db, blockMetaData.SlotNumber(),
-		blockMetaData.ParentHeaderHash())
-
-	if err != nil {
-		return nil, err
-	}
-
-	validatorsStakeAmount := make(map[string]uint64)
-	totalStakeAmountAlloted := uint64(len(epochMetaData.Validators())) * config.GetDevConfig().StakeAmount
-	epochMetaData.UpdatePrevEpochStakeData(0,
-		totalStakeAmountAlloted)
-
-	validatorsStateChanged := make(map[string]bool)
-	for i := lenPathToFirstBlockOfEpoch - 1; i >= 0; i-- {
-		b, err := GetBlock(db, pathToFirstBlockOfEpoch[i])
-		if err != nil {
-			return nil, err
-		}
-		err = b.ProcessEpochMetaData(epochMetaData, validatorsStakeAmount, validatorsStateChanged)
-		if err != nil {
-			return nil, err
-		}
-		// TODO: Calculate RandomSeed
-	}
-
-	// TODO: load accountState of all the dilithium pk in validatorsStateChanged
-	// then update the stake balance, pending stake balance and the balance
-	// accountState must be loaded based on the trie of parentHeaderHash
-
-	// TODO: Temporary random seed calculation
-	var randomSeed int64
-	h := md5.New()
-	h.Write(parentHeaderHash[:])
-	randomSeed = int64(binary.BigEndian.Uint64(h.Sum(nil)))
-
-	currentEpoch := slotNumber / blocksPerEpoch
-	epochMetaData.AllotSlots(randomSeed, currentEpoch, parentHeaderHash)
-
-	return epochMetaData, nil
 }
 
 func GetBlockStorageKey(blockHeaderHash common.Hash) []byte {
