@@ -15,6 +15,8 @@ import (
 	"github.com/theQRL/zond/core/rawdb"
 	state2 "github.com/theQRL/zond/core/state"
 	"github.com/theQRL/zond/core/vm"
+	"github.com/theQRL/zond/core/vm/runtime"
+	"github.com/theQRL/zond/crypto"
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/params"
@@ -22,10 +24,12 @@ import (
 	"github.com/theQRL/zond/state"
 	"github.com/theQRL/zond/transactions"
 	"github.com/theQRL/zond/transactions/pool"
+	"math"
 	"math/big"
 	"path"
 	"reflect"
 	"sync"
+	"time"
 )
 
 type Chain struct {
@@ -40,6 +44,57 @@ type Chain struct {
 	txPool *pool.TransactionPool
 
 	lastBlock *block.Block
+}
+
+// setDefaults to be removed after figuring out better way to call
+// runtime vmenv
+func setDefaults(cfg *runtime.Config) {
+	if cfg.ChainConfig == nil {
+		cfg.ChainConfig = &params.ChainConfig{
+			ChainID:             big.NewInt(1),
+			HomesteadBlock:      new(big.Int),
+			DAOForkBlock:        new(big.Int),
+			DAOForkSupport:      false,
+			EIP150Block:         new(big.Int),
+			EIP150Hash:          common.Hash{},
+			EIP155Block:         new(big.Int),
+			EIP158Block:         new(big.Int),
+			ByzantiumBlock:      new(big.Int),
+			ConstantinopleBlock: new(big.Int),
+			PetersburgBlock:     new(big.Int),
+			IstanbulBlock:       new(big.Int),
+			MuirGlacierBlock:    new(big.Int),
+			BerlinBlock:         new(big.Int),
+			LondonBlock:         new(big.Int),
+		}
+	}
+
+	if cfg.Difficulty == nil {
+		cfg.Difficulty = new(big.Int)
+	}
+	if cfg.Time == nil {
+		cfg.Time = big.NewInt(time.Now().Unix())
+	}
+	if cfg.GasLimit == 0 {
+		cfg.GasLimit = math.MaxUint64
+	}
+	if cfg.GasPrice == nil {
+		cfg.GasPrice = new(big.Int)
+	}
+	if cfg.Value == nil {
+		cfg.Value = new(big.Int)
+	}
+	if cfg.BlockNumber == nil {
+		cfg.BlockNumber = new(big.Int)
+	}
+	if cfg.GetHashFn == nil {
+		cfg.GetHashFn = func(n uint64) common.Hash {
+			return common.BytesToHash(crypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
+		}
+	}
+	if cfg.BaseFee == nil {
+		cfg.BaseFee = big.NewInt(params.InitialBaseFee)
+	}
 }
 
 func (c *Chain) AccountDB() (*state2.StateDB, error) {
@@ -64,6 +119,29 @@ func (c *Chain) AccountDBForTrie(trieRoot common.Hash) (*state2.StateDB, error) 
 		return nil, err
 	}
 	return s2, nil
+}
+
+func (c *Chain) EVMCall(contractAddress common.Address, data []byte) ([]byte, error) {
+	cfg := new(runtime.Config)
+	setDefaults(cfg)
+	statedb, err := c.AccountDB()
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.State = statedb
+	vmenv := runtime.NewEnv(cfg)
+	sender := vm.AccountRef(cfg.Origin)
+
+	ret, _, err := vmenv.Call(
+		sender,
+		contractAddress,
+		data,
+		cfg.GasLimit,
+		cfg.Value,
+	)
+
+	return ret, err
 }
 
 func (c *Chain) GetMaxPossibleSlotNumber() uint64 {
@@ -447,6 +525,14 @@ func (c *Chain) ValidateTransaction(protoTx *protos.Transaction) bool {
 		log.Error("failed to get statedb, cannot verify transaction")
 		return false
 	}
+	//dec, err := hex.DecodeString("6EDEA5b4fBAd96789433675c49a120b537413296")
+	//if err != nil {
+	//	log.Error("error decoding string")
+	//
+	//}
+	//var a common.Address
+	//copy(a[:], dec)
+	//fmt.Println(" >> code >> ", statedb.GetCodeSize(a))
 	return core.ValidateTransaction(protoTx, statedb)
 }
 
