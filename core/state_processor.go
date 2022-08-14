@@ -450,7 +450,7 @@ func applyStakeTransaction(gp *GasPool, statedb *state.StateDB, blockNumber *big
 	address := misc.GetDilithiumAddressFromUnSizedPK(tx.PK())
 	accountState := statedb.GetOrNewStateObject(address)
 
-	accountState.SetNonce(tx.Nonce())
+	accountState.SetNonce(statedb.GetNonce(address) + 1)
 
 	// Calculate and Subtract Fee
 	fee := tx.Gas() * tx.GasPrice()
@@ -507,8 +507,6 @@ func applyCoinBaseTransaction(statedb *state.StateDB, stateContext *state2.State
 		return nil, fmt.Errorf("failed to process block proposer %s | Reason: %w", hex.EncodeToString(tx.PK()), err)
 	}
 
-	accountState.SetNonce(tx.Nonce())
-
 	validatorsFlag := stateContext.ValidatorsFlag()
 
 	strBlockProposerDilithiumPK := hex.EncodeToString(stateContext.BlockProposer())
@@ -528,9 +526,11 @@ func applyCoinBaseTransaction(statedb *state.StateDB, stateContext *state2.State
 		}
 	}
 
-	coinBaseAccountState := statedb.GetOrNewStateObject(config.GetDevConfig().Genesis.CoinBaseAddress)
+	coinBaseAddress := config.GetDevConfig().Genesis.CoinBaseAddress
+	coinBaseAccountState := statedb.GetOrNewStateObject(coinBaseAddress)
 	// len(validatorsFlag) - 1 is the number of attestors, as one of the validator is block proposer
 	coinBaseAccountState.SubBalance(big.NewInt(int64(tx.TotalRewardExceptFeeReward(uint64(len(validatorsFlag) - 1)))))
+	coinBaseAccountState.SetNonce(statedb.GetNonce(coinBaseAddress) + 1)
 
 	signedMessage := tx.GetSigningHash(stateContext.BlockSigningHash())
 	txHash := tx.TxHash(signedMessage)
@@ -616,13 +616,18 @@ func ValidateTransferTxn(tx *transactions.Transfer, statedb *state.StateDB) bool
 
 	// TODO: Move to some common validation
 	if !(xmss.IsValidXMSSAddress(tx.AddrFrom()) || dilithium.IsValidDilithiumAddress(tx.AddrFrom())) {
-		log.Warn("[Transfer] Invalid address addr_from: %s", tx.AddrFrom())
+		log.Warn("[Transfer] Invalid address addr_from: ", tx.AddrFrom())
 		return false
 	}
 
-	if len(tx.To()) != 0 && !(xmss.IsValidXMSSAddress(*tx.To()) || dilithium.IsValidDilithiumAddress(*tx.To())) {
-		log.Warn("[Transfer] Invalid address addr_to: %s", tx.To())
-		return false
+	if tx.To() != nil && !(xmss.IsValidXMSSAddress(*tx.To()) || dilithium.IsValidDilithiumAddress(*tx.To())) {
+		// TODO: check if this conditions holds true for cases where contract can create other address
+		// If the address is neither a valid XMSS or Dilithium address and if code size is 0
+		// then this address not a contract address, thus must be an invalid address
+		if statedb.GetCodeSize(*tx.To()) == 0 {
+			log.Warn("[Transfer] Invalid address addr_to: ", tx.To())
+			return false
+		}
 	}
 
 	if reflect.DeepEqual(tx.AddrFrom(), config.GetDevConfig().Genesis.CoinBaseAddress) {
@@ -630,7 +635,7 @@ func ValidateTransferTxn(tx *transactions.Transfer, statedb *state.StateDB) bool
 		return false
 	}
 
-	if reflect.DeepEqual(*tx.To(), config.GetDevConfig().Genesis.CoinBaseAddress) {
+	if tx.To() != nil && reflect.DeepEqual(*tx.To(), config.GetDevConfig().Genesis.CoinBaseAddress) {
 		log.Warn("to address cannot be a coinbase address")
 		return false
 	}
@@ -860,6 +865,15 @@ func ValidateProtocolTransaction(protoTx *protos.ProtocolTransaction, statedb *s
 func ProcessEpochMetaData(b *block.Block, statedb *state.StateDB, epochMetaData *metadata.EpochMetaData,
 	validatorsStakeAmount map[string]uint64, validatorsStateChanged map[string]bool) error {
 
+	for _, pbData := range b.ProtocolTransactions() {
+		strPK := hex.EncodeToString(pbData.Pk)
+		amount, ok := validatorsStakeAmount[strPK]
+		if !ok {
+			return fmt.Errorf("balance not loaded for the validator %s", strPK)
+		}
+		epochMetaData.AddTotalStakeAmountFound(amount)
+	}
+
 	for _, pbData := range b.Transactions() {
 		switch pbData.Type.(type) {
 		case *protos.Transaction_Stake:
@@ -885,13 +899,6 @@ func ProcessEpochMetaData(b *block.Block, statedb *state.StateDB, epochMetaData 
 			}
 		}
 	}
-	for _, pbData := range b.ProtocolTransactions() {
-		strPK := hex.EncodeToString(pbData.Pk)
-		amount, ok := validatorsStakeAmount[strPK]
-		if !ok {
-			return fmt.Errorf("balance not loaded for the validator %s", strPK)
-		}
-		epochMetaData.AddTotalStakeAmountFound(amount)
-	}
+
 	return nil
 }
