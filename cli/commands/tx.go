@@ -10,6 +10,7 @@ import (
 	"github.com/theQRL/zond/cli/flags"
 	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/config"
+	"github.com/theQRL/zond/crypto"
 	"github.com/theQRL/zond/keys"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/transactions"
@@ -49,6 +50,37 @@ func broadcastTransaction(transaction interface{}, url string, txHash common.Has
 		fmt.Println("Transaction successfully broadcasted")
 	}
 	return nil
+}
+
+func evmCall(contractAddress string, data string, url string) (string, error) {
+	evmCallReq := view.EVMCall{Address: contractAddress, Data: data}
+	responseBody := new(bytes.Buffer)
+	err := json.NewEncoder(responseBody).Encode(evmCallReq)
+	if err != nil {
+		fmt.Println("Error: ", err)
+		return "", err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, responseBody)
+	if err != nil {
+		fmt.Println("Error: ", err)
+		return "", err
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+
+	var response api.Response
+	err = json.Unmarshal(bodyBytes, &response)
+
+	fmt.Println(response.Data)
+	responseData := response.Data.(map[string]interface{})
+	return responseData["result"].(string), nil
 }
 
 func getTransactionSubCommands() []*cli.Command {
@@ -156,7 +188,7 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.BroadcastFlag,
 				flags.RemoteAddrFlag,
 				&cli.StringFlag{
-					Name:  "address-to",
+					Name:  "to",
 					Value: "",
 				},
 				flags.AmountFlag,
@@ -164,7 +196,7 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.GasPriceFlag,
 			},
 			Action: func(c *cli.Context) error {
-				data, err := hex.DecodeString(flags.DataFlag.Name)
+				data, err := hex.DecodeString(c.String(flags.DataFlag.Name))
 				if err != nil {
 					fmt.Println("error decoding data")
 					return err
@@ -177,7 +209,7 @@ func getTransactionSubCommands() []*cli.Command {
 				}
 				a.SetIndex(uint32(c.Uint(flags.OTSKeyIndexFlag.Name)))
 
-				addressTo := c.String("address-to")
+				addressTo := c.String("to")
 				stdOut := c.Bool(flags.TransactionStdOut.Name)
 				broadcastFlag := c.Bool(flags.BroadcastFlag.Name)
 				remoteAddr := c.String(flags.RemoteAddrFlag.Name)
@@ -231,7 +263,7 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.BroadcastFlag,
 				flags.RemoteAddrFlag,
 				&cli.StringFlag{
-					Name:  "address-to",
+					Name:  "to",
 					Value: "",
 				},
 				flags.AmountFlag,
@@ -239,7 +271,7 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.GasPriceFlag,
 			},
 			Action: func(c *cli.Context) error {
-				data, err := hex.DecodeString(flags.DataFlag.Name)
+				data, err := hex.DecodeString(c.String(flags.DataFlag.Name))
 				if err != nil {
 					fmt.Println("error decoding data")
 					return err
@@ -251,7 +283,7 @@ func getTransactionSubCommands() []*cli.Command {
 					return err
 				}
 
-				addressTo := c.String("address-to")
+				addressTo := c.String("to")
 				stdOut := c.Bool(flags.TransactionStdOut.Name)
 				broadcastFlag := c.Bool(flags.BroadcastFlag.Name)
 				remoteAddr := c.String(flags.RemoteAddrFlag.Name)
@@ -289,6 +321,180 @@ func getTransactionSubCommands() []*cli.Command {
 					url := fmt.Sprintf("http://%s/api/broadcast/transfer", remoteAddr)
 					return broadcastTransaction(transfer, url, txHash)
 				}
+				return nil
+			},
+		},
+		{
+			Name:  "deployContractFromDilithium",
+			Usage: "Deploys a smart contract using Dilithium account",
+			Flags: []cli.Flag{
+				flags.WalletFile,
+				flags.AccountIndexFlag,
+				flags.NetworkIDFlag,
+				flags.DataFlag,
+				flags.NonceFlag,
+				flags.AmountFlag,
+				flags.GasFlag,
+				flags.GasPriceFlag,
+				flags.TransactionStdOut,
+				flags.BroadcastFlag,
+				flags.RemoteAddrFlag,
+			},
+			Action: func(c *cli.Context) error {
+				data, err := hex.DecodeString(c.String(flags.DataFlag.Name))
+				if err != nil {
+					fmt.Println("error decoding data")
+					return err
+				}
+
+				w := wallet.NewWallet(c.String(flags.WalletFile.Name))
+				a, err := w.GetDilithiumAccountByIndex(c.Uint(flags.AccountIndexFlag.Name))
+				if err != nil {
+					return err
+				}
+
+				stdOut := c.Bool(flags.TransactionStdOut.Name)
+				broadcastFlag := c.Bool(flags.BroadcastFlag.Name)
+				remoteAddr := c.String(flags.RemoteAddrFlag.Name)
+				nonce := c.Uint64(flags.NonceFlag.Name)
+
+				pk := a.GetPK()
+				tx := transactions.NewTransfer(
+					c.Uint64(flags.NetworkIDFlag.Name),
+					nil,
+					c.Uint64(flags.AmountFlag.Name),
+					c.Uint64(flags.GasFlag.Name),
+					c.Uint64(flags.GasPriceFlag.Name),
+					data,
+					nonce,
+					pk[:])
+				tx.SignDilithium(a, tx.GetSigningHash())
+
+				if stdOut {
+					jsonData, err := tx.ToJSON()
+					if err != nil {
+						fmt.Println("Error: ", err)
+						return err
+					}
+					fmt.Println(misc.BytesToString(jsonData))
+				}
+
+				contractAddr := crypto.CreateAddress(a.GetAddress(), nonce)
+				fmt.Println("Contract Address: ", contractAddr)
+
+				if broadcastFlag {
+					txHash := tx.Hash()
+					transfer := view.PlainTransferTransaction{}
+					transfer.TransactionFromPBData(tx.PBData(), txHash[:])
+
+					url := fmt.Sprintf("http://%s/api/broadcast/transfer", remoteAddr)
+					return broadcastTransaction(transfer, url, txHash)
+				}
+				return nil
+			},
+		},
+		{
+			Name:  "callContractFromDilithium",
+			Usage: "Calls contract using Dilithium account",
+			Flags: []cli.Flag{
+				flags.WalletFile,
+				flags.AccountIndexFlag,
+				flags.NetworkIDFlag,
+				flags.DataFlag,
+				flags.NonceFlag,
+				&cli.StringFlag{
+					Name:     "to",
+					Value:    "",
+					Required: true,
+				},
+				flags.AmountFlag,
+				flags.GasFlag,
+				flags.GasPriceFlag,
+				flags.TransactionStdOut,
+				flags.BroadcastFlag,
+				flags.RemoteAddrFlag,
+			},
+			Action: func(c *cli.Context) error {
+				data, err := hex.DecodeString(c.String(flags.DataFlag.Name))
+				if err != nil {
+					fmt.Println("error decoding data")
+					return err
+				}
+
+				w := wallet.NewWallet(c.String(flags.WalletFile.Name))
+				a, err := w.GetDilithiumAccountByIndex(c.Uint(flags.AccountIndexFlag.Name))
+				if err != nil {
+					return err
+				}
+
+				stdOut := c.Bool(flags.TransactionStdOut.Name)
+				broadcastFlag := c.Bool(flags.BroadcastFlag.Name)
+				remoteAddr := c.String(flags.RemoteAddrFlag.Name)
+				to := c.String("to")
+				nonce := c.Uint64(flags.NonceFlag.Name)
+
+				binTo, err := hex.DecodeString(to)
+				if err != nil {
+					fmt.Println("failed to decode to address")
+					return err
+				}
+				pk := a.GetPK()
+				tx := transactions.NewTransfer(
+					c.Uint64(flags.NetworkIDFlag.Name),
+					binTo,
+					c.Uint64(flags.AmountFlag.Name),
+					c.Uint64(flags.GasFlag.Name),
+					c.Uint64(flags.GasPriceFlag.Name),
+					data,
+					nonce,
+					pk[:])
+				tx.SignDilithium(a, tx.GetSigningHash())
+
+				if stdOut {
+					jsonData, err := tx.ToJSON()
+					if err != nil {
+						fmt.Println("Error: ", err)
+						return err
+					}
+					fmt.Println(misc.BytesToString(jsonData))
+				}
+
+				if broadcastFlag {
+					txHash := tx.Hash()
+					transfer := view.PlainTransferTransaction{}
+					transfer.TransactionFromPBData(tx.PBData(), txHash[:])
+
+					url := fmt.Sprintf("http://%s/api/broadcast/transfer", remoteAddr)
+					return broadcastTransaction(transfer, url, txHash)
+				}
+				return nil
+			},
+		},
+		{
+			Name:  "offChainCallContract",
+			Usage: "Off-chain contract call",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:     "contract-address",
+					Value:    "",
+					Required: true,
+				},
+				flags.DataFlag,
+				flags.RemoteAddrFlag,
+			},
+			Action: func(c *cli.Context) error {
+				data := c.String(flags.DataFlag.Name)
+				remoteAddr := c.String(flags.RemoteAddrFlag.Name)
+
+				contractAddress := c.String("contract-address")
+
+				url := fmt.Sprintf("http://%s/api/evmcall", remoteAddr)
+				result, err := evmCall(contractAddress, data, url)
+				if err != nil {
+					fmt.Println("error while making evmCall")
+					return err
+				}
+				fmt.Println("Result: ", result)
 				return nil
 			},
 		},
