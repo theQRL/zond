@@ -70,7 +70,7 @@ var GasFlag = &cli.Uint64Flag{
 }
 
 var GasPriceFlag = &cli.Uint64Flag{
-	Name:     "gasPrice",
+	Name:     "gas-price",
 	Value:    0,
 	Required: true,
 }
