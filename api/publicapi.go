@@ -58,6 +58,7 @@ func (p *PublicAPIServer) Start() error {
 	router.HandleFunc("/api/broadcast/transfer", p.BroadcastTransferTx).Methods("POST")
 	router.HandleFunc("/api/broadcast/stake", p.BroadcastStakeTx).Methods("POST")
 	router.HandleFunc("/api/height", p.GetHeight).Methods("GET")
+	router.HandleFunc("/api/evmcall", p.EVMCall).Methods("POST")
 	//handler := cors.Default().Handler(router)
 	co := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"}, //you service is available and allowed for this base url
@@ -409,6 +410,60 @@ func (p *PublicAPIServer) BroadcastTransferTx(w http.ResponseWriter, r *http.Req
 	response := &BroadcastTransactionResponse{
 		TransactionHash: hex.EncodeToString(txHash[:]),
 	}
+	json.NewEncoder(w).Encode(p.prepareResponse(0,
+		"",
+		response))
+}
+
+func (p *PublicAPIServer) EVMCall(w http.ResponseWriter, r *http.Request) {
+	// Check Rate Limit
+	if !p.visitors.isAllowed(r.RemoteAddr) {
+		w.WriteHeader(429)
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	var evmCall view.EVMCall
+	err := decoder.Decode(&evmCall)
+	if err != nil {
+		json.NewEncoder(w).Encode(p.prepareResponse(1,
+			fmt.Sprintf("Error Decoding EVMCall \n%s", err.Error()),
+			nil))
+		return
+	}
+
+	output, err := hex.DecodeString(evmCall.Address)
+	if err != nil {
+		json.NewEncoder(w).Encode(p.prepareResponse(1,
+			fmt.Sprintf("Error while decoding address \n%s", err.Error()),
+			nil))
+		return
+	}
+
+	var address common.Address
+	copy(address[:], output)
+
+	dataOutput, err := hex.DecodeString(evmCall.Data)
+	if err != nil {
+		json.NewEncoder(w).Encode(p.prepareResponse(1,
+			fmt.Sprintf("Error while decoding data \n%s", err.Error()),
+			nil))
+		return
+	}
+
+	result, err := p.chain.EVMCall(address, dataOutput)
+
+	var response *EVMCallResponse
+	if err != nil {
+		response = &EVMCallResponse{
+			Result: err.Error(),
+		}
+	} else {
+		response = &EVMCallResponse{
+			Result: hex.EncodeToString(result),
+		}
+	}
+
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",
 		response))
