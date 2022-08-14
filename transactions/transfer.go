@@ -26,6 +26,9 @@ func (tx *Transfer) Hash() common.Hash {
 }
 
 func (tx *Transfer) To() *common.Address {
+	if len(tx.pbData.GetTransfer().To) == 0 {
+		return nil
+	}
 	to := misc.UnSizedAddressToSizedAddress(tx.pbData.GetTransfer().To)
 	return (*common.Address)(&to)
 }
@@ -47,7 +50,9 @@ func (tx *Transfer) GetSigningHash() common.Hash {
 	binary.Write(tmp, binary.BigEndian, tx.GasPrice())
 
 	to := tx.To()
-	tmp.Write(to[:])
+	if to != nil {
+		tmp.Write(to[:])
+	}
 	binary.Write(tmp, binary.BigEndian, tx.Value())
 
 	tmp.Write(tx.Data())
