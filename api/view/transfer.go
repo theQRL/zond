@@ -34,7 +34,7 @@ func (t *PlainTransferTransaction) TransactionFromPBData(tx *protos.Transaction,
 
 	t.To = hex.EncodeToString(tx.GetTransfer().To)
 	t.Value = tx.GetTransfer().Value
-	t.Data = string(tx.GetTransfer().Data)
+	t.Data = hex.EncodeToString(tx.GetTransfer().Data)
 }
 
 func (t *PlainTransferTransaction) ToTransferTransactionObject() (*transactions.Transfer, error) {
@@ -42,14 +42,15 @@ func (t *PlainTransferTransaction) ToTransferTransactionObject() (*transactions.
 	if err != nil {
 		return nil, err
 	}
+
 	pk, err := hex.DecodeString(t.PublicKey)
 	if err != nil {
 		return nil, err
 	}
-	var data []byte
 
-	if len(t.Data) > 0 {
-		data = []byte(t.Data)
+	data, err := hex.DecodeString(t.Data)
+	if err != nil {
+		return nil, err
 	}
 
 	transferTx := transactions.NewTransfer(
