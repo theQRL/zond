@@ -1,15 +1,16 @@
 package api
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
+	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/api/view"
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/config"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/p2p/messages"
 	"github.com/theQRL/zond/protos"
@@ -44,7 +45,7 @@ type PublicAPIServer struct {
 	registerAndBroadcastChan chan *messages.RegisterMessage
 }
 
-func (p *PublicAPIServer) Start() error {
+func (p *PublicAPIServer) Start() {
 	c := config.GetConfig()
 
 	router := mux.NewRouter()
@@ -61,7 +62,7 @@ func (p *PublicAPIServer) Start() error {
 	router.HandleFunc("/api/evmcall", p.EVMCall).Methods("POST")
 	//handler := cors.Default().Handler(router)
 	co := cors.New(cors.Options{
-		AllowedOrigins: []string{"*"}, //you service is available and allowed for this base url
+		AllowedOrigins: []string{"*"}, // service is available and allowed for this base url
 		AllowedMethods: []string{
 			http.MethodGet, //http methods for your app
 			http.MethodPost,
@@ -81,11 +82,7 @@ func (p *PublicAPIServer) Start() error {
 		},
 	})
 	router.StrictSlash(false)
-	err := http.ListenAndServe(fmt.Sprintf("%s:%d", c.User.API.PublicAPI.Host, c.User.API.PublicAPI.Port), co.Handler(router))
-	if err != nil {
-
-	}
-	return nil
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", c.User.API.PublicAPI.Host, c.User.API.PublicAPI.Port), co.Handler(router)))
 }
 
 func (p *PublicAPIServer) prepareResponse(errorCode uint, errorMessage string, data interface{}) *Response {
@@ -133,7 +130,7 @@ func (p *PublicAPIServer) GetBlockByHash(w http.ResponseWriter, r *http.Request)
 			nil))
 		return
 	}
-	binData, err := hex.DecodeString(hash)
+	binData, err := misc.HexStrToBytes(hash)
 	var headerHash common.Hash
 	copy(headerHash[:], binData)
 
@@ -180,7 +177,7 @@ func (p *PublicAPIServer) GetAddressState(w http.ResponseWriter, r *http.Request
 	}
 	vars := mux.Vars(r)
 	address := vars["address"]
-	binData, err := hex.DecodeString(address)
+	binData, err := misc.HexStrToBytes(address)
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			fmt.Sprintf("Error Decoding address %s\n %s", address, err.Error()),
@@ -218,7 +215,7 @@ func (p *PublicAPIServer) GetBalance(w http.ResponseWriter, r *http.Request) {
 	}
 	vars := mux.Vars(r)
 	address := vars["address"]
-	binData, err := hex.DecodeString(address)
+	binData, err := misc.HexStrToBytes(address)
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			fmt.Sprintf("Error Decoding address %s\n %s", address, err.Error()),
@@ -301,9 +298,9 @@ func (p *PublicAPIServer) BroadcastStakeTx(w http.ResponseWriter, r *http.Reques
 			nil))
 		return
 	}
-	if !p.chain.ValidateTransaction(tx.PBData()) {
+	if err := p.chain.ValidateTransaction(tx.PBData()); err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			"Transaction Validation Failed",
+			err.Error(),
 			nil))
 		return
 	}
@@ -328,7 +325,7 @@ func (p *PublicAPIServer) BroadcastStakeTx(w http.ResponseWriter, r *http.Reques
 			},
 			FuncName: protos.LegacyMessage_ST,
 		},
-		MsgHash: hex.EncodeToString(txHash[:]),
+		MsgHash: misc.BytesToHexStr(txHash[:]),
 	}
 	select {
 	case p.registerAndBroadcastChan <- registerMessage:
@@ -340,7 +337,7 @@ func (p *PublicAPIServer) BroadcastStakeTx(w http.ResponseWriter, r *http.Reques
 	}
 
 	response := &BroadcastTransactionResponse{
-		TransactionHash: hex.EncodeToString(txHash[:]),
+		TransactionHash: misc.BytesToHexStr(txHash[:]),
 	}
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",
@@ -370,9 +367,9 @@ func (p *PublicAPIServer) BroadcastTransferTx(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if !p.chain.ValidateTransaction(tx.PBData()) {
+	if err := p.chain.ValidateTransaction(tx.PBData()); err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
-			"Transaction Validation Failed",
+			err.Error(),
 			nil))
 		return
 	}
@@ -397,7 +394,7 @@ func (p *PublicAPIServer) BroadcastTransferTx(w http.ResponseWriter, r *http.Req
 			},
 			FuncName: protos.LegacyMessage_TT,
 		},
-		MsgHash: hex.EncodeToString(txHash[:]),
+		MsgHash: misc.BytesToHexStr(txHash[:]),
 	}
 	select {
 	case p.registerAndBroadcastChan <- registerMessage:
@@ -408,7 +405,7 @@ func (p *PublicAPIServer) BroadcastTransferTx(w http.ResponseWriter, r *http.Req
 		return
 	}
 	response := &BroadcastTransactionResponse{
-		TransactionHash: hex.EncodeToString(txHash[:]),
+		TransactionHash: misc.BytesToHexStr(txHash[:]),
 	}
 	json.NewEncoder(w).Encode(p.prepareResponse(0,
 		"",
@@ -432,7 +429,7 @@ func (p *PublicAPIServer) EVMCall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	output, err := hex.DecodeString(evmCall.Address)
+	output, err := misc.HexStrToBytes(evmCall.Address)
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			fmt.Sprintf("Error while decoding address \n%s", err.Error()),
@@ -443,7 +440,7 @@ func (p *PublicAPIServer) EVMCall(w http.ResponseWriter, r *http.Request) {
 	var address common.Address
 	copy(address[:], output)
 
-	dataOutput, err := hex.DecodeString(evmCall.Data)
+	dataOutput, err := misc.HexStrToBytes(evmCall.Data)
 	if err != nil {
 		json.NewEncoder(w).Encode(p.prepareResponse(1,
 			fmt.Sprintf("Error while decoding data \n%s", err.Error()),
@@ -460,7 +457,7 @@ func (p *PublicAPIServer) EVMCall(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		response = &EVMCallResponse{
-			Result: hex.EncodeToString(result),
+			Result: misc.BytesToHexStr(result),
 		}
 	}
 
