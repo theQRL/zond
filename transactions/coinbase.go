@@ -34,7 +34,7 @@ func (tx *CoinBase) TotalRewardExceptFeeReward(numberOfAttestors uint64) uint64 
 func (tx *CoinBase) GetSigningHash(blockSigningHash common.Hash) common.Hash {
 	tmp := new(bytes.Buffer)
 	binary.Write(tmp, binary.BigEndian, blockSigningHash)
-	binary.Write(tmp, binary.BigEndian, tx.NetworkID())
+	binary.Write(tmp, binary.BigEndian, tx.ChainID())
 	binary.Write(tmp, binary.BigEndian, tx.Nonce())
 	// PK is considered as Block proposer
 	// and attestor need to sign the unsigned coinbase transaction with
@@ -55,7 +55,7 @@ func (tx *CoinBase) GetSigningHash(blockSigningHash common.Hash) common.Hash {
 
 func (tx *CoinBase) GetUnsignedHash() common.Hash {
 	tmp := new(bytes.Buffer)
-	binary.Write(tmp, binary.BigEndian, tx.NetworkID())
+	binary.Write(tmp, binary.BigEndian, tx.ChainID())
 	binary.Write(tmp, binary.BigEndian, tx.Nonce())
 	// PK is considered as Block proposer
 	// and attestor need to sign the unsigned coinbase transaction with
@@ -92,15 +92,15 @@ func (tx *CoinBase) ApplyStateChanges(stateContext *state.StateContext) error {
 	return nil
 }
 
-func NewCoinBase(networkId uint64, blockProposerDilithiumPK []byte, blockProposerReward uint64,
-	attestorReward uint64, feeReward uint64, lastCoinBaseNonce uint64) *CoinBase {
+func NewCoinBase(chainId uint64, blockProposerDilithiumPK []byte, blockProposerReward uint64,
+	attestorReward uint64, feeReward uint64, nonce uint64) *CoinBase {
 	tx := &CoinBase{}
 
 	tx.pbData = &protos.ProtocolTransaction{}
 	tx.pbData.Type = &protos.ProtocolTransaction_CoinBase{CoinBase: &protos.CoinBase{}}
 
 	// TODO: Derive Network ID based on the current connected network
-	tx.pbData.NetworkId = networkId
+	tx.pbData.ChainId = chainId
 	tx.pbData.Pk = blockProposerDilithiumPK
 	//tx.pbData.MasterAddr = tx.config.Dev.Genesis.CoinBaseAddress
 
@@ -109,7 +109,7 @@ func NewCoinBase(networkId uint64, blockProposerDilithiumPK []byte, blockPropose
 	cb.AttestorReward = attestorReward
 	cb.FeeReward = feeReward
 
-	tx.pbData.Nonce = lastCoinBaseNonce
+	tx.pbData.Nonce = nonce
 
 	// TODO: Pass StateContext
 	//if !tx.Validate(nil) {

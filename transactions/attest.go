@@ -16,7 +16,7 @@ type Attest struct {
 func (tx *Attest) GetSigningHash(partialBlockSigningHash common.Hash) common.Hash {
 	tmp := new(bytes.Buffer)
 	binary.Write(tmp, binary.BigEndian, partialBlockSigningHash)
-	binary.Write(tmp, binary.BigEndian, tx.NetworkID())
+	binary.Write(tmp, binary.BigEndian, tx.ChainID())
 	binary.Write(tmp, binary.BigEndian, tx.Nonce())
 
 	h := sha256.New()
@@ -46,17 +46,15 @@ func (tx *Attest) ApplyStateChanges(stateContext *state.StateContext) error {
 	return nil
 }
 
-func NewAttest(networkID uint64, coinBaseNonce uint64) *Attest {
+func NewAttest(chainID uint64, nonce uint64) *Attest {
 	tx := &Attest{}
 
 	tx.pbData = &protos.ProtocolTransaction{}
 	tx.pbData.Type = &protos.ProtocolTransaction_Attest{Attest: &protos.Attest{}}
 
-	// TODO: Derive Network ID based on the current connected network
-	tx.pbData.NetworkId = networkID
+	tx.pbData.ChainId = chainID
 
-	// TODO: Make nonce for CoinBase sequential, as this will not be sequential due to slotNumber
-	tx.pbData.Nonce = coinBaseNonce
+	tx.pbData.Nonce = nonce
 
 	// TODO: Pass StateContext
 	//if !tx.Validate(nil) {
