@@ -83,7 +83,7 @@ func FileExists(fileName string) bool {
 func Bin2Addresses(binAddresses [][]byte) []string {
 	addresses := make([]string, 0)
 	for i := 0; i < len(binAddresses); i++ {
-		addresses = append(addresses, hex.EncodeToString(binAddresses[i]))
+		addresses = append(addresses, BytesToHexStr(binAddresses[i]))
 	}
 	return addresses
 }
@@ -92,7 +92,7 @@ func StringAddressToBytesArray(addrs []string) ([][]byte, error) {
 	bytesAddrs := make([][]byte, len(addrs))
 	var err error
 	for i := 0; i < len(addrs); i++ {
-		bytesAddrs[i], err = hex.DecodeString(addrs[i])
+		bytesAddrs[i], err = HexStrToBytes(addrs[i])
 		if err != nil {
 			return nil, err
 		}
@@ -166,4 +166,28 @@ func GetXMSSAddressFromUnSizedPK(pk []byte) common.Address {
 	copy(address[:], addrOutput[:])
 
 	return address
+}
+
+func GetAddressFromUnSizedPK(pk []byte) common.Address {
+	if len(pk) == xmss.ExtendedPKSize {
+		return GetXMSSAddressFromUnSizedPK(pk)
+	} else if len(pk) == dilithium.PKSizePacked {
+		return GetDilithiumAddressFromUnSizedPK(pk)
+	}
+	return common.Address{}
+}
+
+func ClearPrefix0x(data string) string {
+	if strings.HasPrefix(data, "0x") {
+		return data[2:]
+	}
+	return data
+}
+
+func BytesToHexStr(data []uint8) string {
+	return "0x" + hex.EncodeToString(data)
+}
+
+func HexStrToBytes(data string) ([]uint8, error) {
+	return hex.DecodeString(ClearPrefix0x(data))
 }
