@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"encoding/hex"
 	log "github.com/sirupsen/logrus"
 	common2 "github.com/theQRL/go-qrllib/common"
 	"github.com/theQRL/go-qrllib/dilithium"
@@ -82,10 +81,14 @@ func (p *POS) Start() {
 	*/
 }
 
+func (p *POS) PendingBlock() *block.Block {
+	return p.blockBeingAttested
+}
+
 func (p *POS) TimeRemainingForNextAction() time.Duration {
 	isThisNodeProposer := false
 	if p.blockBeingAttested != nil {
-		proposerDilithiumPK := hex.EncodeToString(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
+		proposerDilithiumPK := misc.BytesToHexStr(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
 		_, isThisNodeProposer = p.validators[proposerDilithiumPK]
 	}
 	if p.blockBeingAttested == nil || !isThisNodeProposer {
@@ -137,7 +140,7 @@ running:
 			}
 			isThisNodeProposer := false
 			if p.blockBeingAttested != nil {
-				proposerDilithiumPK := hex.EncodeToString(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
+				proposerDilithiumPK := misc.BytesToHexStr(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
 				_, isThisNodeProposer = p.validators[proposerDilithiumPK]
 				if !isThisNodeProposer {
 					p.blockBeingAttested = nil
@@ -152,24 +155,17 @@ running:
 				}
 
 				slotNumber := p.GetCurrentSlot()
-				slotLeader, err := p.chain.GetSlotLeaderDilithiumPKBySlotNumber(lastBlockMetaData.TrieRoot(),
+				slotLeaderPK, err := p.chain.GetSlotLeaderDilithiumPKBySlotNumber(lastBlockMetaData.TrieRoot(),
 					slotNumber, lastBlock.Hash())
 
 				if err != nil {
 					log.Error("Error getting SlotLeader Dilithium PK By Slot Number ", err.Error())
 					continue
 				}
-				proposerD, ok := p.validators[hex.EncodeToString(slotLeader)]
+				proposerD, ok := p.validators[misc.BytesToHexStr(slotLeaderPK)]
 				if !ok {
 					continue
 				}
-
-				statedb, err := p.chain.AccountDBForTrie(lastBlockMetaData.TrieRoot())
-				if err != nil {
-					log.Error("failed to get statedb")
-					continue
-				}
-				coinBaseAddressNonce := statedb.GetNonce(config.GetDevConfig().Genesis.CoinBaseAddress)
 
 				log.Info("Minting Block #", slotNumber)
 				txPool := p.chain.GetTransactionPool()
@@ -183,19 +179,25 @@ running:
 					txInterface := txInfo.Transaction()
 					txPBData := txInterface.PBData()
 					txHash := txInterface.Hash()
-					strTxHash := hex.EncodeToString(txHash[:])
-					if !p.chain.ValidateTransaction(txPBData) {
-						log.Error("Transaction validation failed for ",
-							strTxHash)
+					strTxHash := misc.BytesToHexStr(txHash[:])
+					if err := p.chain.ValidateTransaction(txPBData); err != nil {
+						log.Error(err.Error())
 						continue
 					}
 					txs = append(txs, txPBData)
 					log.Info("Added transaction ", strTxHash, " into block #", slotNumber)
 					i++
 				}
+
+				statedb, err := p.chain.AccountDBForTrie(lastBlockMetaData.TrieRoot())
+				if err != nil {
+					log.Error("failed to get statedb")
+					continue
+				}
 				pk := proposerD.GetPK()
-				b := block.NewBlock(0, ntp.GetNTP().Time(), pk[:], slotNumber,
-					lastBlock.Hash(), txs, nil, coinBaseAddressNonce)
+				signerNonce := statedb.GetNonce(dilithium.GetDilithiumAddressFromPK(pk))
+				b := block.NewBlock(config.GetDevConfig().ChainID.Uint64(), ntp.GetNTP().Time(), pk[:], slotNumber,
+					lastBlock.Hash(), txs, nil, signerNonce)
 
 				attestors, err := p.chain.GetAttestorsBySlotNumber(lastBlockMetaData.TrieRoot(), b.SlotNumber(), b.ParentHash())
 				if err != nil {
@@ -206,16 +208,18 @@ running:
 				p.attestors = attestors
 				p.attestations = make([]*transactions.Attest, 0)
 				for _, dilithiumPK := range attestors {
-					strDilithiumPK := hex.EncodeToString(dilithiumPK)
+					strDilithiumPK := misc.BytesToHexStr(dilithiumPK)
 					d, ok := p.validators[strDilithiumPK]
 					if !ok {
 						continue
 					}
-					attestTx, err := b.Attest(0, d)
+					attestorNonce := statedb.GetNonce(dilithium.GetDilithiumAddressFromPK(d.GetPK()))
+					attestTx, err := b.Attest(config.GetDevConfig().ChainID.Uint64(), d, attestorNonce)
 					if err != nil {
 						log.Error("Error while Attesting ", err.Error())
 					}
 					p.attestations = append(p.attestations, attestTx)
+					p.blockBeingAttested.AddAttestTx(attestTx)
 				}
 
 				// In case of all attestors for this slot belongs to same node
@@ -253,7 +257,7 @@ running:
 					log.Info("Number of Attestations Received ",
 						len(p.blockBeingAttested.ProtocolTransactions())-1,
 						" for Block #", p.blockBeingAttested.SlotNumber())
-					dilithiumPK := hex.EncodeToString(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
+					dilithiumPK := misc.BytesToHexStr(p.blockBeingAttested.ProtocolTransactions()[0].Pk)
 					proposerD, ok := p.validators[dilithiumPK]
 					if !ok {
 						log.Error("Failed to load dilithium wallet for ", dilithiumPK)
@@ -324,7 +328,7 @@ running:
 				continue
 			}
 
-			if !slotValidatorsMetaData.IsSlotLeader(hex.EncodeToString(blockProposerPK)) {
+			if !slotValidatorsMetaData.IsSlotLeader(misc.BytesToHexStr(blockProposerPK)) {
 				expectedDilithiumAddress := misc.GetDilithiumAddressFromUnSizedPK(slotValidatorsMetaData.GetSlotLeaderPK())
 				foundDilithiumAddress := misc.GetDilithiumAddressFromUnSizedPK(blockProposerPK)
 
@@ -338,11 +342,13 @@ running:
 			p.slotValidatorsMetaData = slotValidatorsMetaData
 			log.Info("Block #", b.SlotNumber(), " received for attestation")
 			partialBlockSigningHash := b.PartialBlockSigningHash()
+			statedb, err := p.chain.AccountDBForTrie(parentBlockMetaData.TrieRoot())
 			for strDilithiumPK, d := range p.validators {
 				if !slotValidatorsMetaData.IsAttestor(strDilithiumPK) {
 					continue
 				}
-				attestTx, err := b.Attest(0, d)
+				attestorNonce := statedb.GetNonce(dilithium.GetDilithiumAddressFromPK(d.GetPK()))
+				attestTx, err := b.Attest(config.GetDevConfig().ChainID.Uint64(), d, attestorNonce)
 				if err != nil {
 					log.Error("Error while Attesting ", err.Error())
 					continue
@@ -391,8 +397,8 @@ running:
 			//	continue
 			//}
 
-			if !p.chain.ValidateAttestTransaction(tx.PBData(), p.slotValidatorsMetaData, p.blockBeingAttested.PartialBlockSigningHash()) {
-				log.Warn("Attestor transaction validation failed")
+			if err := p.chain.ValidateAttestTransaction(tx.PBData(), p.slotValidatorsMetaData, p.blockBeingAttested.PartialBlockSigningHash(), p.blockBeingAttested.SlotNumber()); err != nil {
+				log.Warn("Attestor transaction validation failed: ", err)
 				continue
 			}
 
@@ -411,7 +417,7 @@ running:
 			p.attestations = append(p.attestations, tx)
 			txHash := tx.TxHash(tx.GetSigningHash(partialBlockSigningHash))
 			log.Info("Received Attest Transaction ",
-				hex.EncodeToString(txHash[:]),
+				misc.BytesToHexStr(txHash[:]),
 				" for block #", p.blockBeingAttested.SlotNumber())
 
 			// Add received attestation into block
@@ -420,7 +426,7 @@ running:
 			// Check if all attestations has been received, if yes, then broadcast block
 			//if len(p.attestations) == len(p.attestors) {
 			//	slotLeader := p.blockBeingAttested.ProtocolTransactions()[0].Pk
-			//	proposerD, ok := p.validators[hex.EncodeToString(slotLeader)]
+			//	proposerD, ok := p.validators[misc.BytesToHexStr(slotLeader)]
 			//	if !ok {
 			//		continue
 			//	}
@@ -456,12 +462,12 @@ func NewPOS(srv *p2p.Server, chain *chain.Chain, db *db.DB) *POS {
 	dk := keys.NewDilithiumKeys(pos.config.User.Stake.DilithiumKeysFileName)
 	for i, dilithiumInfo := range dk.GetDilithiumInfo() {
 		strPK := dilithiumInfo.PK
-		pk, err := hex.DecodeString(dilithiumInfo.PK)
+		pk, err := misc.HexStrToBytes(strPK)
 		if err != nil {
 			log.Error("Error decoding Dilithium PK ", err.Error())
 			return nil
 		}
-		sk, err := hex.DecodeString(dilithiumInfo.SK)
+		sk, err := misc.HexStrToBytes(dilithiumInfo.SK)
 		if err != nil {
 			log.Error("Error decoding Dilithium SK ", err.Error())
 			return nil
@@ -472,7 +478,7 @@ func NewPOS(srv *p2p.Server, chain *chain.Chain, db *db.DB) *POS {
 		copy(pkSized[:], pk)
 		copy(skSized[:], sk)
 
-		binData, err := hex.DecodeString(dilithiumInfo.HexSeed)
+		binData, err := misc.HexStrToBytes(dilithiumInfo.HexSeed)
 		var binSeed [common2.SeedSize]uint8
 		copy(binSeed[:], binData)
 
