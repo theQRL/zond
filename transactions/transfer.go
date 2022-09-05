@@ -17,14 +17,6 @@ type Transfer struct {
 	Transaction
 }
 
-func (tx *Transfer) Type() uint8 {
-	return 0
-}
-
-func (tx *Transfer) Hash() common.Hash {
-	return tx.GenerateTxHash()
-}
-
 func (tx *Transfer) To() *common.Address {
 	if len(tx.pbData.GetTransfer().To) == 0 {
 		return nil
@@ -43,9 +35,8 @@ func (tx *Transfer) Data() []byte {
 
 func (tx *Transfer) GetSigningHash() common.Hash {
 	tmp := new(bytes.Buffer)
-	binary.Write(tmp, binary.BigEndian, tx.NetworkID())
+	binary.Write(tmp, binary.BigEndian, tx.ChainID())
 	binary.Write(tmp, binary.BigEndian, tx.Nonce())
-
 	binary.Write(tmp, binary.BigEndian, tx.Gas())
 	binary.Write(tmp, binary.BigEndian, tx.GasPrice())
 
@@ -63,10 +54,7 @@ func (tx *Transfer) GetSigningHash() common.Hash {
 	h.Write(tmp.Bytes())
 
 	output := h.Sum(nil)
-	var hash common.Hash
-	copy(hash[:], output)
-
-	return hash
+	return common.BytesToHash(output)
 }
 
 func (tx *Transfer) GenerateTxHash() common.Hash {
@@ -85,12 +73,12 @@ func (tx *Transfer) ApplyStateChanges(stateContext *state.StateContext) error {
 	return nil
 }
 
-func NewTransfer(networkID uint64, to []byte, value uint64, gas uint64, gasPrice uint64,
+func NewTransfer(chainID uint64, to []byte, value uint64, gas uint64, gasPrice uint64,
 	data []byte, nonce uint64, pk []byte) *Transfer {
 	tx := &Transfer{}
 
 	tx.pbData = &protos.Transaction{}
-	tx.pbData.NetworkId = networkID
+	tx.pbData.ChainId = chainID
 	tx.pbData.Type = &protos.Transaction_Transfer{Transfer: &protos.Transfer{}}
 
 	tx.pbData.Pk = pk

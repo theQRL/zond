@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/theQRL/go-qrllib/dilithium"
@@ -23,9 +22,9 @@ import (
 type CoreTransaction interface {
 	Size() int
 
-	Type() uint8
+	Type() TxType
 
-	NetworkID() uint64
+	ChainID() uint64
 
 	Nonce() uint64
 
@@ -49,9 +48,9 @@ type TransactionInterface interface {
 
 	SetPBData(*protos.Transaction)
 
-	Type() uint8
+	Type() TxType
 
-	NetworkID() uint64
+	ChainID() uint64
 
 	Gas() uint64
 
@@ -109,18 +108,12 @@ func (tx *Transaction) SetPBData(pbData *protos.Transaction) {
 	tx.pbData = pbData
 }
 
-func (tx *Transaction) Type() uint8 {
-	switch tx.pbData.Type.(type) {
-	case *protos.Transaction_Stake:
-		return 2
-	case *protos.Transaction_Transfer:
-		return 3
-	}
-	panic("invalid transaction")
+func (tx *Transaction) Type() TxType {
+	return GetTransactionType(tx.pbData)
 }
 
-func (tx *Transaction) NetworkID() uint64 {
-	return tx.pbData.NetworkId
+func (tx *Transaction) ChainID() uint64 {
+	return tx.pbData.ChainId
 }
 
 func (tx *Transaction) GasPrice() uint64 {
@@ -152,7 +145,7 @@ func (tx *Transaction) Signature() []byte {
 }
 
 func (tx *Transaction) Hash() common.Hash {
-	panic("not implemented")
+	return common.BytesToHash(tx.pbData.Hash)
 }
 
 func (tx *Transaction) SetNonce(n uint64) {
@@ -160,12 +153,11 @@ func (tx *Transaction) SetNonce(n uint64) {
 }
 
 func (tx *Transaction) AddrFrom() common.Address {
-	if len(tx.PK()) == xmss.ExtendedPKSize {
-		return misc.GetXMSSAddressFromUnSizedPK(tx.PK())
-	} else if len(tx.PK()) == dilithium.PKSizePacked {
-		return misc.GetDilithiumAddressFromUnSizedPK(tx.PK())
+	addr := misc.GetAddressFromUnSizedPK(tx.PK())
+	if addr == (common.Address{}) {
+		panic(fmt.Sprintf("invalid PK size %d | PK: %v ", len(tx.PK()), tx.PK()))
 	}
-	panic(fmt.Sprintf("invalid PK size %d | PK: %v ", len(tx.PK()), tx.PK()))
+	return addr
 }
 
 func (tx *Transaction) AddrFromPK() string {
@@ -178,7 +170,7 @@ func (tx *Transaction) AddrFromPK() string {
 		panic(fmt.Sprintf("invalid PK size %d | PK: %v ", len(tx.PK()), tx.PK()))
 	}
 
-	return hex.EncodeToString(address[:])
+	return misc.BytesToHexStr(address[:])
 }
 
 func (tx *Transaction) OTSIndex() uint64 {
@@ -229,11 +221,17 @@ func (tx *Transaction) SignXMSS(x *xmss.XMSS, signingHash common.Hash) {
 		panic("Failed To Sign")
 	}
 	tx.pbData.Signature = signature
+
+	txHash := tx.generateTxHash(signingHash)
+	tx.pbData.Hash = txHash[:]
 }
 
 func (tx *Transaction) SignDilithium(d *dilithium.Dilithium, signingHash common.Hash) {
 	signature := d.Sign(signingHash[:])
 	tx.pbData.Signature = signature
+
+	txHash := tx.generateTxHash(signingHash)
+	tx.pbData.Hash = txHash[:]
 }
 
 func (tx *Transaction) applyStateChangesForPK(stateContext *state.StateContext) error {
