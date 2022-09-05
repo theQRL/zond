@@ -18,9 +18,9 @@ type ProtocolTransactionInterface interface {
 
 	SetPBData(*protos.ProtocolTransaction)
 
-	Type() uint8
+	Type() TxType
 
-	NetworkID() uint64
+	ChainID() uint64
 
 	Nonce() uint64
 
@@ -28,9 +28,11 @@ type ProtocolTransactionInterface interface {
 
 	Signature() []byte
 
+	Hash() common.Hash
+
 	TxHash(signingHash common.Hash) common.Hash
 
-	FromPBData(pbdata protos.ProtocolTransaction) //Set return type
+	FromPBData(pbData *protos.ProtocolTransaction) //Set return type
 
 	GetSigningHash(common.Hash) common.Hash
 
@@ -61,18 +63,12 @@ func (tx *ProtocolTransaction) SetPBData(pbData *protos.ProtocolTransaction) {
 	tx.pbData = pbData
 }
 
-func (tx *ProtocolTransaction) Type() uint8 {
-	switch tx.pbData.Type.(type) {
-	case *protos.ProtocolTransaction_CoinBase:
-		return 0
-	case *protos.ProtocolTransaction_Attest:
-		return 1
-	}
-	panic("invalid protocol transaction")
+func (tx *ProtocolTransaction) Type() TxType {
+	return GetProtocolTransactionType(tx.pbData)
 }
 
-func (tx *ProtocolTransaction) NetworkID() uint64 {
-	return tx.pbData.NetworkId
+func (tx *ProtocolTransaction) ChainID() uint64 {
+	return tx.pbData.ChainId
 }
 
 func (tx *ProtocolTransaction) Nonce() uint64 {
@@ -87,6 +83,10 @@ func (tx *ProtocolTransaction) Signature() []byte {
 	return tx.pbData.Signature
 }
 
+func (tx *ProtocolTransaction) Hash() common.Hash {
+	return common.BytesToHash(tx.pbData.Hash)
+}
+
 func (tx *ProtocolTransaction) TxHash(signingHash common.Hash) common.Hash {
 	return tx.GenerateTxHash(signingHash)
 }
@@ -95,8 +95,8 @@ func (tx *ProtocolTransaction) SetNonce(n uint64) {
 	tx.pbData.Nonce = n
 }
 
-func (tx *ProtocolTransaction) FromPBData(pbData protos.ProtocolTransaction) {
-	tx.pbData = &pbData
+func (tx *ProtocolTransaction) FromPBData(pbData *protos.ProtocolTransaction) {
+	tx.pbData = pbData
 }
 
 func (tx *ProtocolTransaction) GetSigningHash() common.Hash {
@@ -137,6 +137,9 @@ func (tx *ProtocolTransaction) Sign(dilithium *dilithium.Dilithium, message []by
 	tx.pbData.Signature = dilithium.Sign(message)
 	pk := dilithium.GetPK()
 	tx.pbData.Pk = pk[:]
+
+	txHash := tx.TxHash(common.BytesToHash(message))
+	tx.pbData.Hash = txHash[:]
 }
 
 func (tx *ProtocolTransaction) ApplyStateChanges(stateContext *state.StateContext) error {
