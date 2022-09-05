@@ -186,7 +186,6 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		// Get the operation from the jump table and validate the stack to ensure there are
 		// enough stack items available to perform the operation.
 		op = contract.GetOp(pc)
-		//startPc := pc
 
 		operation := in.cfg.JumpTable[op]
 		cost = operation.constantGas // For tracing
@@ -235,11 +234,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		}
 		// execute the operation
 		res, err = operation.execute(&pc, in, callContext)
-		//if startPc >= pc {
-		//	fmt.Println(startPc, int(op), op)
-		//} else {
-		//	fmt.Println(startPc, int(op), op, contract.Code[startPc:pc+1])
-		//}
+
 		if err != nil {
 			break
 		}
