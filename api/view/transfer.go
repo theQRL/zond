@@ -1,14 +1,14 @@
 package view
 
 import (
-	"encoding/hex"
 	"errors"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/transactions"
 )
 
 type PlainTransferTransaction struct {
-	NetworkID       uint64 `json:"networkID"`
+	ChainID         uint64 `json:"chainID"`
 	Gas             uint64 `json:"gas"`
 	GasPrice        uint64 `json:"gasPrice"`
 	PublicKey       string `json:"publicKey"`
@@ -23,38 +23,38 @@ type PlainTransferTransaction struct {
 }
 
 func (t *PlainTransferTransaction) TransactionFromPBData(tx *protos.Transaction, txHash []byte) {
-	t.NetworkID = tx.NetworkId
+	t.ChainID = tx.ChainId
 	t.Gas = tx.Gas
 	t.GasPrice = tx.GasPrice
-	t.PublicKey = hex.EncodeToString(tx.Pk)
-	t.Signature = hex.EncodeToString(tx.Signature)
+	t.PublicKey = misc.BytesToHexStr(tx.Pk)
+	t.Signature = misc.BytesToHexStr(tx.Signature)
 	t.Nonce = tx.Nonce
-	t.TransactionHash = hex.EncodeToString(txHash)
+	t.TransactionHash = misc.BytesToHexStr(txHash)
 	t.TransactionType = "transfer"
 
-	t.To = hex.EncodeToString(tx.GetTransfer().To)
+	t.To = misc.BytesToHexStr(tx.GetTransfer().To)
 	t.Value = tx.GetTransfer().Value
-	t.Data = hex.EncodeToString(tx.GetTransfer().Data)
+	t.Data = misc.BytesToHexStr(tx.GetTransfer().Data)
 }
 
 func (t *PlainTransferTransaction) ToTransferTransactionObject() (*transactions.Transfer, error) {
-	to, err := hex.DecodeString(t.To)
+	to, err := misc.HexStrToBytes(t.To)
 	if err != nil {
 		return nil, err
 	}
 
-	pk, err := hex.DecodeString(t.PublicKey)
+	pk, err := misc.HexStrToBytes(t.PublicKey)
 	if err != nil {
 		return nil, err
 	}
 
-	data, err := hex.DecodeString(t.Data)
+	data, err := misc.HexStrToBytes(t.Data)
 	if err != nil {
 		return nil, err
 	}
 
 	transferTx := transactions.NewTransfer(
-		t.NetworkID,
+		t.ChainID,
 		to,
 		t.Value,
 		t.Gas,
@@ -67,7 +67,8 @@ func (t *PlainTransferTransaction) ToTransferTransactionObject() (*transactions.
 		return nil, errors.New("error parsing transfer transaction")
 	}
 
-	transferTx.PBData().Signature, err = hex.DecodeString(t.Signature)
+	transferTx.PBData().Signature, err = misc.HexStrToBytes(t.Signature)
+	transferTx.PBData().Hash, err = misc.HexStrToBytes(t.TransactionHash)
 
 	return transferTx, err
 }
