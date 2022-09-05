@@ -36,7 +36,7 @@ type ChainContext interface {
 }
 
 // NewEVMBlockContext creates a new context for use in the EVM.
-func NewEVMBlockContext(header *block.Header, getHashFunc vm.GetHashFunc, author *common.Address, blockTimestamp uint64) vm.BlockContext {
+func NewEVMBlockContext(header *block.Header, getHashFunc vm.GetHashFunc, author *common.Address) vm.BlockContext {
 	var (
 		beneficiary common.Address
 		baseFee     *big.Int
@@ -68,7 +68,7 @@ func NewEVMBlockContext(header *block.Header, getHashFunc vm.GetHashFunc, author
 		GetHash:     getHashFunc,
 		Coinbase:    beneficiary,
 		BlockNumber: new(big.Int).Set(header.Number()),
-		Time:        new(big.Int).SetUint64(blockTimestamp),
+		Time:        new(big.Int).SetUint64(header.Timestamp().Uint64()),
 		//Difficulty:  new(big.Int).Set(header.Difficulty),
 		Difficulty: new(big.Int), // Difficulty set to 0
 		BaseFee:    baseFee,
