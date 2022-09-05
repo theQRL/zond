@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
@@ -14,8 +13,10 @@ import (
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/metadata"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
+	"github.com/theQRL/zond/storagekeys"
 	"github.com/theQRL/zond/transactions"
 	"math/big"
 	"reflect"
@@ -31,14 +32,20 @@ func HeaderFromPBData(header *protos.BlockHeader) *Header {
 	}
 }
 
+func (h *Header) PBData() *protos.BlockHeader {
+	return h.pbData
+}
+
 func (h *Header) Number() *big.Int {
 	return big.NewInt(int64(h.pbData.SlotNumber))
 }
 
+func (h *Header) Hash() common.Hash {
+	return common.BytesToHash(h.pbData.Hash)
+}
+
 func (h *Header) ParentHash() common.Hash {
-	var output common.Hash
-	copy(output[:], h.pbData.ParentHash)
-	return output
+	return common.BytesToHash(h.pbData.ParentHash)
 }
 
 func (h *Header) BaseFee() *big.Int {
@@ -51,6 +58,22 @@ func (h *Header) GasLimit() uint64 {
 
 func (h *Header) GasUsed() *big.Int {
 	return big.NewInt(int64(h.pbData.GasUsed))
+}
+
+func (h *Header) Timestamp() *big.Int {
+	return big.NewInt(int64(h.pbData.TimestampSeconds))
+}
+
+func (h *Header) Root() common.Hash {
+	return common.BytesToHash(h.pbData.Root)
+}
+
+func (h *Header) TransactionsRoot() common.Hash {
+	return common.BytesToHash(h.pbData.TransactionsRoot)
+}
+
+func (h *Header) ReceiptsRoot() common.Hash {
+	return common.BytesToHash(h.pbData.ReceiptsRoot)
 }
 
 type Block struct {
@@ -87,27 +110,12 @@ func (b *Block) GasLimit() uint64 {
 }
 
 func (b *Block) Minter() *common.Address {
-	// TODO: Fix Minter
-	// b.pbData.ProtocolTransactions[0].GetPk()
-	// get xmss address by dilithium pk
-	return &common.Address{}
+	address := misc.GetDilithiumAddressFromUnSizedPK(b.pbData.ProtocolTransactions[0].GetPk())
+	return &address
 }
 
 func (b *Block) Hash() common.Hash {
-	blockSigningHash := b.BlockSigningHash()
-	tmp := new(bytes.Buffer)
-	tmp.Write(blockSigningHash[:])
-	coinBaseTx := transactions.ProtoToProtocolTransaction(b.ProtocolTransactions()[0])
-	txHash := coinBaseTx.TxHash(coinBaseTx.GetSigningHash(blockSigningHash))
-	tmp.Write(txHash[:])
-
-	headerHash := sha256.New()
-	headerHash.Write(tmp.Bytes())
-	hash := headerHash.Sum(nil)
-
-	var output common.Hash
-	copy(output[:], hash)
-	return output
+	return b.Header().Hash()
 }
 
 func (b *Block) Transactions() []*protos.Transaction {
@@ -138,14 +146,12 @@ func (b *Block) DeSerialize(data []byte) error {
 	return nil
 }
 
-func (b *Block) PartialBlockSigningHash() common.Hash {
-	// Partial Block Signing Hash is calculated by appending
-	// all block info including transaction hashes.
-	// It doesn't include coinbase & attestor transaction
-
-	tmp := new(bytes.Buffer)
+func (b *Block) partialBlockHashableBytes(tmp *bytes.Buffer) {
 	binary.Write(tmp, binary.BigEndian, b.Timestamp())
 	binary.Write(tmp, binary.BigEndian, b.Header().Number().Uint64())
+	binary.Write(tmp, binary.BigEndian, b.Header().BaseFee())
+	binary.Write(tmp, binary.BigEndian, b.Header().GasLimit())
+	binary.Write(tmp, binary.BigEndian, b.Header().GasUsed())
 	pHash := b.Header().ParentHash()
 	tmp.Write(pHash[:])
 
@@ -157,15 +163,19 @@ func (b *Block) PartialBlockSigningHash() common.Hash {
 	coinBaseTx := transactions.ProtoToProtocolTransaction(b.ProtocolTransactions()[0])
 	unsignedHash := coinBaseTx.GetUnsignedHash()
 	tmp.Write(unsignedHash[:])
+}
+
+func (b *Block) PartialBlockSigningHash() common.Hash {
+	// Partial Block Signing Hash is calculated by appending
+	// all block info including transaction hashes.
+	// It doesn't include coinbase & attestor transaction
+	tmp := new(bytes.Buffer)
+	b.partialBlockHashableBytes(tmp)
 
 	h := sha256.New()
 	h.Write(tmp.Bytes())
 
-	var hash common.Hash
-	outputHash := h.Sum(nil)
-	copy(hash[:], outputHash)
-
-	return hash
+	return common.BytesToHash(h.Sum(nil))
 }
 
 func (b *Block) BlockSigningHash() common.Hash {
@@ -174,23 +184,8 @@ func (b *Block) BlockSigningHash() common.Hash {
 	// It doesn't include coinbase & attestor transaction
 
 	tmp := new(bytes.Buffer)
-	binary.Write(tmp, binary.BigEndian, b.Timestamp())
-	binary.Write(tmp, binary.BigEndian, b.Header().Number().Uint64())
-	binary.Write(tmp, binary.BigEndian, b.Header().BaseFee())
-	binary.Write(tmp, binary.BigEndian, b.Header().GasLimit())
-	binary.Write(tmp, binary.BigEndian, b.Header().GasUsed())
+	b.partialBlockHashableBytes(tmp)
 
-	pHash := b.Header().ParentHash()
-	tmp.Write(pHash[:])
-
-	for _, pbData := range b.Transactions() {
-		tx := transactions.ProtoToTransaction(pbData)
-		txHash := tx.Hash()
-		tmp.Write(txHash[:])
-	}
-	coinBaseTx := transactions.ProtoToProtocolTransaction(b.ProtocolTransactions()[0])
-	unsignedHash := coinBaseTx.GetUnsignedHash()
-	tmp.Write(unsignedHash[:])
 	for i := 1; i < len(b.ProtocolTransactions()); i++ {
 		tx := transactions.ProtoToProtocolTransaction(b.ProtocolTransactions()[i])
 		txHash := tx.TxHash(tx.GetSigningHash(b.PartialBlockSigningHash()))
@@ -200,14 +195,11 @@ func (b *Block) BlockSigningHash() common.Hash {
 	h := sha256.New()
 	h.Write(tmp.Bytes())
 
-	var hash common.Hash
-	outputHash := h.Sum(nil)
-	copy(hash[:], outputHash)
-	return hash
+	return common.BytesToHash(h.Sum(nil))
 }
 
-func (b *Block) Attest(networkID uint64, d *dilithium.Dilithium) (*transactions.Attest, error) {
-	attestTx := transactions.NewAttest(networkID, b.ProtocolTransactions()[0].Nonce)
+func (b *Block) Attest(chainID uint64, d *dilithium.Dilithium, attestorNonce uint64) (*transactions.Attest, error) {
+	attestTx := transactions.NewAttest(chainID, attestorNonce)
 	signingHash := attestTx.GetSigningHash(b.PartialBlockSigningHash())
 	attestTx.Sign(d, signingHash[:])
 	return attestTx, nil
@@ -227,15 +219,36 @@ func (b *Block) AddAttestTx(attestTx *transactions.Attest) {
 }
 
 func (b *Block) SignByProposer(d *dilithium.Dilithium) {
-	coinbaseTx := transactions.ProtoToProtocolTransaction(b.ProtocolTransactions()[0])
-	message := coinbaseTx.GetSigningHash(b.BlockSigningHash())
-	coinbaseTx.Sign(d, message[:])
-	b.ProtocolTransactions()[0] = coinbaseTx.PBData()
+	blockSigningHash := b.BlockSigningHash()
+	coinBaseTx := transactions.ProtoToProtocolTransaction(b.ProtocolTransactions()[0])
+	message := coinBaseTx.GetSigningHash(blockSigningHash)
+	coinBaseTx.Sign(d, message[:])
+	b.ProtocolTransactions()[0] = coinBaseTx.PBData()
+
+	blockHash := ComputeBlockHash(b)
+	// Set hash in block header
+	b.pbData.Header.Hash = blockHash[:]
 }
 
-func NewBlock(networkId uint64, timestamp uint64, proposerDilithiumPK []byte, slotNumber uint64,
+func ComputeBlockHash(b *Block) common.Hash {
+	blockSigningHash := b.BlockSigningHash()
+	coinBaseTx := transactions.ProtoToProtocolTransaction(b.ProtocolTransactions()[0])
+	message := coinBaseTx.GetSigningHash(blockSigningHash)
+
+	// Compute block hash
+	tmp := new(bytes.Buffer)
+	tmp.Write(blockSigningHash[:])
+	txHash := coinBaseTx.TxHash(message)
+	tmp.Write(txHash[:])
+
+	headerHash := sha256.New()
+	headerHash.Write(tmp.Bytes())
+	return common.BytesToHash(headerHash.Sum(nil))
+}
+
+func NewBlock(chainId uint64, timestamp uint64, proposerDilithiumPK []byte, slotNumber uint64,
 	parentHeaderHash common.Hash, txs []*protos.Transaction, protocolTxs []*protos.ProtocolTransaction,
-	lastCoinBaseNonce uint64) *Block {
+	signerNonce uint64) *Block {
 	b := &Block{
 		pbData: &protos.Block{},
 	}
@@ -252,13 +265,14 @@ func NewBlock(networkId uint64, timestamp uint64, proposerDilithiumPK []byte, sl
 	feeReward := uint64(0)
 	for _, tx := range txs {
 		b.pbData.Transactions = append(b.pbData.Transactions, tx)
+		// TODO: freeReward needs to be calculated based on Gas remaining after refunding gas
 		feeReward += tx.Gas * tx.GasPrice
 	}
 
 	blockReward := rewards.GetBlockReward()
 	attestorReward := rewards.GetAttestorReward()
-	coinBase := transactions.NewCoinBase(networkId, proposerDilithiumPK, blockReward,
-		attestorReward, feeReward, lastCoinBaseNonce)
+	coinBase := transactions.NewCoinBase(chainId, proposerDilithiumPK, blockReward,
+		attestorReward, feeReward, signerNonce)
 
 	b.pbData.ProtocolTransactions = append(b.pbData.ProtocolTransactions, coinBase.PBData())
 
@@ -343,7 +357,7 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 	for {
 		bm, err := metadata.GetBlockMetaData(db, headerHash)
 		if err != nil {
-			log.Error("[UpdateFinalizedEpoch] Failed To Load GetBlockMetaData for ", hex.EncodeToString(headerHash[:]))
+			log.Error("[UpdateFinalizedEpoch] Failed To Load GetBlockMetaData for ", misc.BytesToHexStr(headerHash[:]))
 			return err
 		}
 		if reflect.DeepEqual(bm.HeaderHash(), stateContext.GetMainChainMetaData().FinalizedBlockHeaderHash()) {
@@ -354,6 +368,20 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 	}
 
 	return stateContext.Finalize(blockMetaDataPathForFinalization)
+}
+
+func (b *Block) GetPendingValidatorsUpdate(pendingStakeValidatorsUpdate map[string]uint8) {
+	for _, pbData := range b.Transactions() {
+		switch pbData.Type.(type) {
+		case *protos.Transaction_Stake:
+			pendingStakeValidatorsUpdate[misc.BytesToHexStr(pbData.GetPk())] = 0
+		}
+	}
+}
+
+func (b *Block) GetBlockProposer() common.Address {
+	tx := b.ProtocolTransactions()[0]
+	return misc.GetAddressFromUnSizedPK(tx.GetPk())
 }
 
 func GetBlockStorageKey(blockHeaderHash common.Hash) []byte {
@@ -368,6 +396,15 @@ func GetBlock(db *db.DB, blockHeaderHash common.Hash) (*Block, error) {
 
 	b := &Block{}
 	return b, b.DeSerialize(data)
+}
+
+func GetBlockByNumber(db *db.DB, slotNumber uint64) (*Block, error) {
+	blockHeaderHash, err := db.Get(storagekeys.GetBlockHashStorageKeyBySlotNumber(slotNumber))
+	if err != nil {
+		return nil, err
+	}
+
+	return GetBlock(db, common.BytesToHash(blockHeaderHash))
 }
 
 func BlockFromPBData(block *protos.Block) *Block {
