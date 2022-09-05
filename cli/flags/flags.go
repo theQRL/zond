@@ -25,8 +25,8 @@ var OTSKeyIndexFlag = &cli.UintFlag{
 	Required: true,
 }
 
-var NetworkIDFlag = &cli.Uint64Flag{
-	Name:     "network-id",
+var ChainIDFlag = &cli.Uint64Flag{
+	Name:     "chain-id",
 	Value:    1,
 	Required: false,
 }
