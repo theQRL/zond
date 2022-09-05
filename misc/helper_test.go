@@ -2,7 +2,6 @@ package misc
 
 import (
 	"container/list"
-	"encoding/hex"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -16,14 +15,14 @@ func TestMerkleTXHash(t *testing.T) {
 	hashes.PushBack([]byte{50})
 	result := MerkleTXHash(hashes)
 
-	assert.Equal(t, hex.EncodeToString(result),
-		"22073806c4a9967bed132107933c5ec151d602847274f6b911d0086c2a41adc0")
+	assert.Equal(t, BytesToHexStr(result),
+		"0x22073806c4a9967bed132107933c5ec151d602847274f6b911d0086c2a41adc0")
 }
 
 func TestBytesToString(t *testing.T) {
 	stringData := "Hello"
 	bytesData := []byte(stringData)
 
-	result := BytesToString(bytesData)
+	result := BytesToHexStr(bytesData)
 	assert.Equal(t, stringData, result)
 }
