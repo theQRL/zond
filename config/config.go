@@ -1,10 +1,10 @@
 package config
 
 import (
-	"encoding/hex"
 	"fmt"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/theQRL/zond/common"
+	"github.com/theQRL/zond/misc"
 	"math/big"
 	"os/user"
 	"path"
@@ -224,7 +224,7 @@ func GetUserConfig() (userConf *UserConfig) {
 	//	}
 	userCurrentDir, _ := user.Current() // TODO: Handle error
 	stake := &StakeConfig{
-		EnableStaking: false,
+		EnableStaking: true,
 		DilithiumKeysFileName: path.Join(path.Join(userCurrentDir.HomeDir,
 			".zond"), "dilithium_keys"),
 	}
@@ -268,14 +268,14 @@ func (u *UserConfig) GetLogFileName() string {
 
 func GetDevConfig() (dev *DevConfig) {
 	var coinBaseAddress common.Address
-	binCoinBaseAddress, err := hex.DecodeString("0000000000000000000000000000000000000000")
+	binCoinBaseAddress, err := misc.HexStrToBytes("0000000000000000000000000000000000000000")
 	copy(coinBaseAddress[:], binCoinBaseAddress)
 	if err != nil {
 		panic(fmt.Sprintf("Invalid CoinBaseAddress %v", err.Error()))
 	}
 
 	var foundationDilithiumAddress common.Address
-	binFoundationDilithiumAddress, err := hex.DecodeString("20e76bb23dea1fd77b29c34a3028e1a6f95a65eb")
+	binFoundationDilithiumAddress, err := misc.HexStrToBytes("0x20f6e005b12be8ecb7c5be0bc50b1f511dd5d19f")
 	if err != nil {
 		panic(fmt.Sprintf("Invalid FoundationAddress %v", err.Error()))
 	}
@@ -292,7 +292,7 @@ func GetDevConfig() (dev *DevConfig) {
 		GenesisDifficulty:          10000000,
 		CoinBaseAddress:            coinBaseAddress,
 		FoundationDilithiumAddress: foundationDilithiumAddress,
-		GenesisTimestamp:           1660057040,
+		GenesisTimestamp:           1662399802,
 	}
 	transaction := &TransactionConfig{
 		MultiOutputLimit: 100,

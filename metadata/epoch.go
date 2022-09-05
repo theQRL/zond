@@ -1,13 +1,13 @@
 package metadata
 
 import (
-	"encoding/hex"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"go.etcd.io/bbolt"
 	"math"
@@ -109,6 +109,9 @@ func (e *EpochMetaData) AllotSlots(randomSeed int64, epoch uint64, prevSlotLastB
 	e.pbData.SlotInfo = make([]*protos.SlotInfo, blocksPerEpoch)
 
 	lenValidators := uint64(len(e.Validators()))
+	if lenValidators == 0 {
+		panic("[AllotSlots] impossible error length of validators is 0")
+	}
 	maxValidatorsPerSlot := uint64(math.Ceil(float64(lenValidators) / float64(blocksPerEpoch)))
 	for i := uint64(0); i < maxValidatorsPerSlot; i++ {
 		offset := i * blocksPerEpoch
@@ -177,7 +180,7 @@ func GetEpochMetaData(db *db.DB, currentBlockSlotNumber uint64, parentHeaderHash
 	data, err := db.Get(key)
 
 	if err != nil {
-		log.Error("Error loading EpochMetaData for  ", hex.EncodeToString(prevSlotLastBlockHeaderHash[:]),
+		log.Error("Error loading EpochMetaData for  ", misc.BytesToHexStr(prevSlotLastBlockHeaderHash[:]),
 			err)
 		return nil, err
 	}

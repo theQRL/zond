@@ -1,8 +1,8 @@
 package view
 
 import (
-	"encoding/hex"
 	"github.com/theQRL/zond/common"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 )
 
@@ -26,13 +26,13 @@ type IsUnusedOTSIndex struct {
 }
 
 func (a *PlainAddressState) AddressStateFromPBData(a2 *protos.AddressState) {
-	a.Address = hex.EncodeToString(a2.Address)
+	a.Address = misc.BytesToHexStr(a2.Address)
 	a.Balance = a2.Balance
 	a.Nonce = a2.Nonce
 }
 
 func (a *PlainAddressState) FromData(address common.Address, balance uint64, nonce uint64) {
-	a.Address = hex.EncodeToString(address[:])
+	a.Address = misc.BytesToHexStr(address[:])
 	a.Balance = balance
 	a.Nonce = nonce
 }

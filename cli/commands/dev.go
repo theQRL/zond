@@ -1,12 +1,10 @@
 package commands
 
 import (
-	"encoding/hex"
 	"fmt"
 	"github.com/theQRL/zond/block/genesis"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/keys"
-	"github.com/theQRL/zond/log"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/transactions"
 	"github.com/theQRL/zond/wallet"
@@ -36,7 +34,7 @@ func getDevSubCommands() []*cli.Command {
 				walletFoundation.AddDilithium()
 				foundationDilithiumAccount, err := walletFoundation.GetDilithiumAccountByIndex(1)
 				if err != nil {
-					log.Error("failed to get foundation dilithium account by index")
+					fmt.Println("failed to get foundation dilithium account by index")
 					return nil
 				}
 				dk.Add(foundationDilithiumAccount)
@@ -46,7 +44,7 @@ func getDevSubCommands() []*cli.Command {
 					walletStake.AddDilithium()
 					stakeDilithiumAccount, err := walletStake.GetDilithiumAccountByIndex(i + 1)
 					if err != nil {
-						log.Error("failed to get dilithium account by index")
+						fmt.Println("failed to get dilithium account by index")
 						return nil
 					}
 					dk.Add(stakeDilithiumAccount)
@@ -54,14 +52,15 @@ func getDevSubCommands() []*cli.Command {
 				fmt.Println("Successfully generated 200 dilithium address for staking")
 
 				foundationDilithiumPK := foundationDilithiumAccount.GetPK()
-				foundationAccountNonce := uint64(0)
+				// nonce starts with 1 as foundation has signed coinbase transaction with nonce 0 for genesis block
+				foundationAccountNonce := uint64(1)
 
 				stakeAmount := 110000 * config.GetDevConfig().ShorPerQuanta
 				gas := uint64(30000)
 				gasPrice := uint64(10000)
 
 				binAddress := foundationDilithiumAccount.GetAddress()
-				address := hex.EncodeToString(binAddress[:])
+				address := misc.BytesToHexStr(binAddress[:])
 				fmt.Println("Foundation Dilithium Address: ", address)
 
 				tl := misc.NewTransactionList(path.Join("bootstrap", "genesisTransactions.json"))
@@ -70,7 +69,7 @@ func getDevSubCommands() []*cli.Command {
 				for i := uint(0); i < 200; i++ {
 					stakeDilithiumAccount, err := walletStake.GetDilithiumAccountByIndex(i + 1)
 					if err != nil {
-						log.Error("failed to get stake dilithium account by index")
+						fmt.Println("failed to get stake dilithium account by index")
 						return nil
 					}
 
@@ -104,7 +103,7 @@ func getDevSubCommands() []*cli.Command {
 				for i := uint(0); i < 200; i++ {
 					stakeDilithiumAccount, err := walletStake.GetDilithiumAccountByIndex(i + 1)
 					if err != nil {
-						log.Error("failed to get stake dilithium account by index")
+						fmt.Println("failed to get stake dilithium account by index")
 						return nil
 					}
 
@@ -141,7 +140,7 @@ func getDevSubCommands() []*cli.Command {
 				}
 
 				if err != nil {
-					log.Error("failed to generate genesis and preStateFile")
+					fmt.Println("failed to generate genesis and preStateFile")
 					return err
 				}
 

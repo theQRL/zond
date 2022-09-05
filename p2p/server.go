@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/libp2p/go-libp2p"
@@ -18,6 +17,7 @@ import (
 	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/metadata"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/p2p/messages"
 	"github.com/theQRL/zond/protos"
@@ -100,7 +100,7 @@ func (srv *Server) BroadcastBlock(block *block.Block) {
 				Block: block.PBData(),
 			},
 		},
-		MsgHash: hex.EncodeToString(blockHash[:]),
+		MsgHash: misc.BytesToHexStr(blockHash[:]),
 	}
 	srv.registerAndBroadcastChan <- msg
 }
@@ -117,7 +117,7 @@ func (srv *Server) BroadcastBlockForAttestation(block *block.Block, signature []
 				},
 			},
 		},
-		MsgHash: hex.EncodeToString(partialBlockSigningHash[:]),
+		MsgHash: misc.BytesToHexStr(partialBlockSigningHash[:]),
 	}
 	srv.registerAndBroadcastChan <- msg
 }
@@ -139,7 +139,7 @@ func (srv *Server) BroadcastAttestationTransaction(attestTx *transactions.Attest
 				},
 			},
 		},
-		MsgHash: hex.EncodeToString(txHash[:]),
+		MsgHash: misc.BytesToHexStr(txHash[:]),
 	}
 	log.Info("[BroadcastAttestationTransaction] Broadcasting Attestation Txn ",
 		msg.MsgHash)
@@ -301,6 +301,7 @@ func (srv *Server) startListening(keys crypto.PrivKey) error {
 		srv.config.User.Node.BindingIP,
 		srv.config.User.Node.LocalPort)
 	sourceMultiAddr, _ := multiaddr.NewMultiaddr(multiAddrStr)
+
 	host, err := libp2p.New(
 		context.Background(),
 		libp2p.ListenAddrs(sourceMultiAddr),
@@ -309,6 +310,7 @@ func (srv *Server) startListening(keys crypto.PrivKey) error {
 	if err != nil {
 		return err
 	}
+
 	srv.host = host
 	host.SetStreamHandler(config.GetDevConfig().ProtocolID,
 		srv.handleStream)
@@ -316,6 +318,7 @@ func (srv *Server) startListening(keys crypto.PrivKey) error {
 	listenAddr := fmt.Sprintf("%s/p2p/%s",
 		multiAddrStr, host.ID().Pretty())
 	log.Info("Listening at ", listenAddr)
+
 	//bindingAddress := fmt.Sprintf("%s:%d",
 	//	srv.config.User.Node.BindingIP,
 	//	srv.config.User.Node.LocalPort)
@@ -410,7 +413,7 @@ running:
 			// TODO: Process Message Receipt
 			// Need to get connection too
 			mrData := mrDataConn.mrData
-			msgHash := hex.EncodeToString(mrData.Hash)
+			msgHash := misc.BytesToHexStr(mrData.Hash)
 			switch mrData.Type {
 			case protos.LegacyMessage_BA:
 				/*
@@ -425,8 +428,8 @@ running:
 				if err != nil {
 					log.Info("[BlockForAttestation] Missing Parent Block",
 						" #", mrData.SlotNumber,
-						" Partial Block Signing Hash ", hex.EncodeToString(mrData.Hash),
-						" Parent Block ", hex.EncodeToString(mrData.ParentHeaderHash))
+						" Partial Block Signing Hash ", misc.BytesToHexStr(mrData.Hash),
+						" Parent Block ", misc.BytesToHexStr(mrData.ParentHeaderHash))
 					break
 				}
 
@@ -454,7 +457,7 @@ running:
 					finalizedBlock, err := srv.chain.GetBlock(finalizedHeaderHash)
 					if err != nil {
 						log.Error("Failed to get finalized block ",
-							hex.EncodeToString(finalizedHeaderHash[:]))
+							misc.BytesToHexStr(finalizedHeaderHash[:]))
 						break
 					}
 					// skip slot number beyond the Finalized slot Number
@@ -472,8 +475,8 @@ running:
 				if err != nil {
 					log.Info("[BlockReceived] Missing Parent Block ",
 						" #", mrData.SlotNumber,
-						" Block ", hex.EncodeToString(mrData.Hash),
-						" Parent Block ", hex.EncodeToString(mrData.ParentHeaderHash))
+						" Block ", misc.BytesToHexStr(mrData.Hash),
+						" Parent Block ", misc.BytesToHexStr(mrData.ParentHeaderHash))
 					break
 				}
 
@@ -508,7 +511,7 @@ running:
 			srv.UpdatePeerList(addPeerToPeerList)
 		case registerAndBroadcast := <-srv.registerAndBroadcastChan:
 			srv.mr.Register(registerAndBroadcast.MsgHash, registerAndBroadcast.Msg)
-			binMsgHash, err := hex.DecodeString(registerAndBroadcast.MsgHash)
+			binMsgHash, err := misc.HexStrToBytes(registerAndBroadcast.MsgHash)
 			if err != nil {
 				log.Error("Error decoding message hash ", err.Error())
 				continue
@@ -567,7 +570,7 @@ func (srv *Server) HandleTransaction(mrDataConn *MRDataConn) {
 
 func (srv *Server) RequestFullMessage(mrData *protos.MRData) {
 	for {
-		msgHash := hex.EncodeToString(mrData.Hash)
+		msgHash := misc.BytesToHexStr(mrData.Hash)
 		_, ok := srv.mr.GetHashMsg(msgHash)
 		if ok {
 			if _, ok = srv.mr.GetRequestedHash(msgHash); ok {
@@ -603,7 +606,7 @@ func (srv *Server) RequestFullMessage(mrData *protos.MRData) {
 
 func (srv *Server) BlockReceived(peer *Peer, b *block.Block) {
 	blockHash := b.Hash()
-	headerHash := hex.EncodeToString(blockHash[:])
+	headerHash := misc.BytesToHexStr(blockHash[:])
 	log.Info(">>> Received Block",
 		" #", b.SlotNumber(),
 		" Hash ", headerHash)

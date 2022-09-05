@@ -13,7 +13,7 @@ func getGenesisSubCommands() []*cli.Command {
 			Name:  "generate",
 			Usage: "Generates new genesis block & prestate file",
 			Flags: []cli.Flag{
-				flags.NetworkIDFlag,
+				flags.ChainIDFlag,
 				&cli.StringFlag{
 					Name:  "stake-txs-filename",
 					Value: "stake_transactions.json", // TODO: Move this to Dev Config

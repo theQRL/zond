@@ -1,8 +1,8 @@
 package metadata
 
 import (
-	"encoding/hex"
 	"github.com/theQRL/zond/config"
+	"github.com/theQRL/zond/misc"
 )
 
 /*
@@ -20,7 +20,7 @@ func (s *SlotValidatorsMetaData) GetValidatorsType() map[string]uint8 {
 }
 
 func (s *SlotValidatorsMetaData) GetValidatorType(dilithiumPK []byte) (uint8, bool) {
-	value, found := s.validatorsType[hex.EncodeToString(dilithiumPK)]
+	value, found := s.validatorsType[misc.BytesToHexStr(dilithiumPK)]
 	return value, found
 }
 
@@ -46,11 +46,11 @@ func NewSlotValidatorsMetaData(slotNumber uint64, epochMetaData *EpochMetaData) 
 
 	validatorsType := make(map[string]uint8)
 	slotLeaderPK := epochMetaData.Validators()[slotLeaderIndex]
-	validatorsType[hex.EncodeToString(slotLeaderPK[:])] = 1
+	validatorsType[misc.BytesToHexStr(slotLeaderPK[:])] = 1
 
 	for _, attestorIndex := range attestorsIndex {
 		validatorPK := validators[attestorIndex]
-		validatorsType[hex.EncodeToString(validatorPK[:])] = 0
+		validatorsType[misc.BytesToHexStr(validatorPK[:])] = 0
 	}
 
 	return &SlotValidatorsMetaData{

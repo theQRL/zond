@@ -1,7 +1,6 @@
 package genesis
 
 import (
-	"encoding/hex"
 	"fmt"
 	"github.com/ghodss/yaml"
 	"github.com/theQRL/zond/block"
@@ -34,17 +33,17 @@ func GeneratePreState(transactions []*protos.Transaction) *protos.PreState {
 	return preState
 }
 
-func NewGenesisBlock(networkID uint64, txs []*protos.Transaction,
+func NewGenesisBlock(chainID uint64, txs []*protos.Transaction,
 	foundationDilithiumPK []byte) (*block.Block, error) {
 
 	c := config.GetDevConfig()
 
-	b := block.NewBlock(networkID, c.Genesis.GenesisTimestamp, foundationDilithiumPK,
+	b := block.NewBlock(chainID, c.Genesis.GenesisTimestamp, foundationDilithiumPK,
 		0, c.Genesis.GenesisPrevHeaderHash, txs, nil, 0)
 	return b, nil
 }
 
-func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
+func GenerateGenesis(chainID uint64, stakeTransactionsFile string,
 	dilithiumInfos []*protos.DilithiumInfo, genesisFilename string,
 	preStateFilename string) error {
 	/*
@@ -53,7 +52,7 @@ func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
 		must be validated against transactions into the block.
 	*/
 
-	//if err := GeneratePreState(networkID, dilithiumGroup, xmss, preStateFilename); err != nil {
+	//if err := GeneratePreState(chainID, dilithiumGroup, xmss, preStateFilename); err != nil {
 	//	return err
 	//}
 
@@ -73,12 +72,12 @@ func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
 		return err
 	}
 
-	binDilithiumPK, err := hex.DecodeString(dilithiumInfos[0].PK)
+	binDilithiumPK, err := misc.HexStrToBytes(dilithiumInfos[0].PK)
 	if err != nil {
 		return err
 	}
 
-	b := block.NewBlock(networkID, c.Genesis.GenesisTimestamp, binDilithiumPK,
+	b := block.NewBlock(chainID, c.Genesis.GenesisTimestamp, binDilithiumPK,
 		0, c.Genesis.GenesisPrevHeaderHash, transactions, nil, 0)
 
 	//for i := 0; i < len(dilithiumGroup); i++ {
@@ -88,27 +87,27 @@ func GenerateGenesis(networkID uint64, stakeTransactionsFile string,
 	//			continue
 	//		}
 	//		dilithiumInfo := dilithiumGroup[i].DilithiumInfo[j]
-	//		binDilithiumPK, err := hex.DecodeString(dilithiumInfo.PK)
+	//		binDilithiumPK, err := misc.HexStrToBytes(dilithiumInfo.PK)
 	//		if err != nil {
 	//			return err
 	//		}
-	//		binDilithiumSK, err := hex.DecodeString(dilithiumInfo.SK)
+	//		binDilithiumSK, err := misc.HexStrToBytes(dilithiumInfo.SK)
 	//		if err != nil {
 	//			return err
 	//		}
 	//		d := dilithium.RecoverDilithium(binDilithiumPK, binDilithiumSK)
-	//		attestTx, err := b.Attest(networkID, d)
+	//		attestTx, err := b.Attest(chainID, d)
 	//		if err != nil {
 	//			return err
 	//		}
 	//		b.AddAttestTx(attestTx)
 	//	}
 	//}
-	//binDilithiumPK, err := hex.DecodeString(dilithiumInfos[0].PK)
+	//binDilithiumPK, err := misc.HexStrToBytes(dilithiumInfos[0].PK)
 	//if err != nil {
 	//	return err
 	//}
-	//binDilithiumSK, err := hex.DecodeString(dilithiumInfos[0].SK)
+	//binDilithiumSK, err := misc.HexStrToBytes(dilithiumInfos[0].SK)
 	//if err != nil {
 	//	return err
 	//}

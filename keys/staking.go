@@ -1,7 +1,6 @@
 package keys
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/theQRL/go-qrllib/dilithium"
@@ -24,9 +23,9 @@ func (dk *StakingKeys) GetDilithiumInfo() []*protos.DilithiumInfo {
 
 func (dk *StakingKeys) Add(dilithiumAccount *dilithium.Dilithium) {
 	pk := dilithiumAccount.GetPK()
-	strPK := hex.EncodeToString(pk[:])
+	strPK := misc.BytesToHexStr(pk[:])
 	sk := dilithiumAccount.GetSK()
-	strSK := hex.EncodeToString(sk[:])
+	strSK := misc.BytesToHexStr(sk[:])
 	hexSeed := dilithiumAccount.GetHexSeed()
 
 	found := false
