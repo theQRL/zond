@@ -1,8 +1,8 @@
 package view
 
 import (
-	"encoding/hex"
 	"github.com/theQRL/zond/common"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 )
 
@@ -15,10 +15,10 @@ type PlainBlockHeader struct {
 
 func (bh *PlainBlockHeader) BlockHeaderFromPBData(bh2 *protos.BlockHeader,
 	headerHash common.Hash) {
-	bh.HeaderHash = hex.EncodeToString(headerHash[:])
+	bh.HeaderHash = misc.BytesToHexStr(headerHash[:])
 	bh.SlotNumber = bh2.SlotNumber
 	bh.Timestamp = bh2.TimestampSeconds
-	bh.ParentHash = hex.EncodeToString(bh2.ParentHash)
+	bh.ParentHash = misc.BytesToHexStr(bh2.ParentHash)
 }
 
 type PlainBlock struct {
@@ -32,4 +32,13 @@ func (b *PlainBlock) BlockFromPBData(b2 *protos.Block, headerHash common.Hash) {
 	//for _, tx := range b2.Transactions {
 	//	b.Transactions = append(b.Transactions, transactions.ProtoToPlainTransaction(tx))
 	//}
+}
+
+func NewPlainBlockHeader(bh2 *protos.BlockHeader, headerHash common.Hash) *PlainBlockHeader {
+	return &PlainBlockHeader{
+		HeaderHash: misc.BytesToHexStr(headerHash[:]),
+		SlotNumber: bh2.SlotNumber,
+		Timestamp:  bh2.TimestampSeconds,
+		ParentHash: misc.BytesToHexStr(bh2.ParentHash),
+	}
 }

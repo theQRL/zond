@@ -13,7 +13,7 @@ type TransactionList struct {
 	pbData *protos.TransactionList
 }
 
-func (t *TransactionList) GetTransactions() []*protos.Transaction{
+func (t *TransactionList) GetTransactions() []*protos.Transaction {
 	var tl []*protos.Transaction
 	for _, tx := range t.pbData.Txs {
 		tl = append(tl, tx)
@@ -25,7 +25,7 @@ func (t *TransactionList) Add(tx *protos.Transaction) {
 	t.pbData.Txs = append(t.pbData.Txs, tx)
 
 	// TODO: Fix call to TransactionHash
-	//fmt.Println("Added New Transaction: ", hex.EncodeToString(tx.TransactionHash))
+	//fmt.Println("Added New Transaction: ", misc.BytesToHexStr(tx.TransactionHash))
 
 	t.Save()
 }
@@ -33,7 +33,7 @@ func (t *TransactionList) Add(tx *protos.Transaction) {
 func (t *TransactionList) List() {
 	// TODO: Fix call to TransactionHash
 	//for i, tx := range t.pbData.Txs {
-	//	fmt.Println(fmt.Sprintf("%d\t%s", i, hex.EncodeToString(tx.TransactionHash)))
+	//	fmt.Println(fmt.Sprintf("%d\t%s", i, misc.BytesToHexStr(tx.TransactionHash)))
 	//}
 }
 

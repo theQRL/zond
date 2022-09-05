@@ -2,7 +2,6 @@ package commands
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/theQRL/zond/api"
@@ -46,7 +45,7 @@ func broadcastTransaction(transaction interface{}, url string, txHash common.Has
 	err = json.Unmarshal(bodyBytes, &response)
 
 	responseData := response.Data.(map[string]interface{})
-	if responseData["transactionHash"].(string) == hex.EncodeToString(txHash[:]) {
+	if responseData["transactionHash"].(string) == misc.BytesToHexStr(txHash[:]) {
 		fmt.Println("Transaction successfully broadcasted")
 	}
 	return nil
@@ -91,7 +90,7 @@ func getTransactionSubCommands() []*cli.Command {
 			Flags: []cli.Flag{
 				flags.WalletFile,
 				flags.AccountIndexFlag,
-				flags.NetworkIDFlag,
+				flags.ChainIDFlag,
 				&cli.StringFlag{
 					Name:  "dilithium-file",
 					Value: "dilithium_keys",
@@ -139,7 +138,7 @@ func getTransactionSubCommands() []*cli.Command {
 				dilithiumKeys.Add(a)
 
 				pk := a.GetPK()
-				tx := transactions.NewStake(c.Uint64(flags.NetworkIDFlag.Name),
+				tx := transactions.NewStake(c.Uint64(flags.ChainIDFlag.Name),
 					stakeAmount,
 					c.Uint64(flags.GasFlag.Name),
 					c.Uint64(flags.GasPriceFlag.Name),
@@ -181,7 +180,7 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.WalletFile,
 				flags.AccountIndexFlag,
 				flags.OTSKeyIndexFlag,
-				flags.NetworkIDFlag,
+				flags.ChainIDFlag,
 				flags.DataFlag,
 				flags.NonceFlag,
 				flags.TransactionStdOut,
@@ -196,7 +195,7 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.GasPriceFlag,
 			},
 			Action: func(c *cli.Context) error {
-				data, err := hex.DecodeString(c.String(flags.DataFlag.Name))
+				data, err := misc.HexStrToBytes(c.String(flags.DataFlag.Name))
 				if err != nil {
 					fmt.Println("error decoding data")
 					return err
@@ -213,14 +212,14 @@ func getTransactionSubCommands() []*cli.Command {
 				stdOut := c.Bool(flags.TransactionStdOut.Name)
 				broadcastFlag := c.Bool(flags.BroadcastFlag.Name)
 				remoteAddr := c.String(flags.RemoteAddrFlag.Name)
-				binAddressTo, err := hex.DecodeString(addressTo)
+				binAddressTo, err := misc.HexStrToBytes(addressTo)
 				if err != nil {
 					return err
 				}
 
 				pk := a.GetPK()
 				tx := transactions.NewTransfer(
-					c.Uint64(flags.NetworkIDFlag.Name),
+					c.Uint64(flags.ChainIDFlag.Name),
 					binAddressTo,
 					c.Uint64(flags.AmountFlag.Name),
 					c.Uint64(flags.GasFlag.Name),
@@ -256,7 +255,7 @@ func getTransactionSubCommands() []*cli.Command {
 			Flags: []cli.Flag{
 				flags.WalletFile,
 				flags.AccountIndexFlag,
-				flags.NetworkIDFlag,
+				flags.ChainIDFlag,
 				flags.DataFlag,
 				flags.NonceFlag,
 				flags.TransactionStdOut,
@@ -271,7 +270,7 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.GasPriceFlag,
 			},
 			Action: func(c *cli.Context) error {
-				data, err := hex.DecodeString(c.String(flags.DataFlag.Name))
+				data, err := misc.HexStrToBytes(c.String(flags.DataFlag.Name))
 				if err != nil {
 					fmt.Println("error decoding data")
 					return err
@@ -287,14 +286,14 @@ func getTransactionSubCommands() []*cli.Command {
 				stdOut := c.Bool(flags.TransactionStdOut.Name)
 				broadcastFlag := c.Bool(flags.BroadcastFlag.Name)
 				remoteAddr := c.String(flags.RemoteAddrFlag.Name)
-				binAddressTo, err := hex.DecodeString(addressTo)
+				binAddressTo, err := misc.HexStrToBytes(addressTo)
 				if err != nil {
 					return err
 				}
 
 				pk := a.GetPK()
 				tx := transactions.NewTransfer(
-					c.Uint64(flags.NetworkIDFlag.Name),
+					c.Uint64(flags.ChainIDFlag.Name),
 					binAddressTo,
 					c.Uint64(flags.AmountFlag.Name),
 					c.Uint64(flags.GasFlag.Name),
@@ -330,7 +329,7 @@ func getTransactionSubCommands() []*cli.Command {
 			Flags: []cli.Flag{
 				flags.WalletFile,
 				flags.AccountIndexFlag,
-				flags.NetworkIDFlag,
+				flags.ChainIDFlag,
 				flags.DataFlag,
 				flags.NonceFlag,
 				flags.AmountFlag,
@@ -341,7 +340,7 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.RemoteAddrFlag,
 			},
 			Action: func(c *cli.Context) error {
-				data, err := hex.DecodeString(c.String(flags.DataFlag.Name))
+				data, err := misc.HexStrToBytes(c.String(flags.DataFlag.Name))
 				if err != nil {
 					fmt.Println("error decoding data")
 					return err
@@ -360,7 +359,7 @@ func getTransactionSubCommands() []*cli.Command {
 
 				pk := a.GetPK()
 				tx := transactions.NewTransfer(
-					c.Uint64(flags.NetworkIDFlag.Name),
+					c.Uint64(flags.ChainIDFlag.Name),
 					nil,
 					c.Uint64(flags.AmountFlag.Name),
 					c.Uint64(flags.GasFlag.Name),
@@ -399,7 +398,7 @@ func getTransactionSubCommands() []*cli.Command {
 			Flags: []cli.Flag{
 				flags.WalletFile,
 				flags.AccountIndexFlag,
-				flags.NetworkIDFlag,
+				flags.ChainIDFlag,
 				flags.DataFlag,
 				flags.NonceFlag,
 				&cli.StringFlag{
@@ -415,7 +414,7 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.RemoteAddrFlag,
 			},
 			Action: func(c *cli.Context) error {
-				data, err := hex.DecodeString(c.String(flags.DataFlag.Name))
+				data, err := misc.HexStrToBytes(c.String(flags.DataFlag.Name))
 				if err != nil {
 					fmt.Println("error decoding data")
 					return err
@@ -433,14 +432,14 @@ func getTransactionSubCommands() []*cli.Command {
 				to := c.String("to")
 				nonce := c.Uint64(flags.NonceFlag.Name)
 
-				binTo, err := hex.DecodeString(to)
+				binTo, err := misc.HexStrToBytes(to)
 				if err != nil {
 					fmt.Println("failed to decode to address")
 					return err
 				}
 				pk := a.GetPK()
 				tx := transactions.NewTransfer(
-					c.Uint64(flags.NetworkIDFlag.Name),
+					c.Uint64(flags.ChainIDFlag.Name),
 					binTo,
 					c.Uint64(flags.AmountFlag.Name),
 					c.Uint64(flags.GasFlag.Name),

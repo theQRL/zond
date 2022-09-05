@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,7 +27,7 @@ func (w *Wallet) AddXMSS(height uint8, hashFunction xmss.HashFunction) {
 	x := xmss.NewXMSSFromHeight(height, hashFunction)
 	address := x.GetAddress()
 	info := &protos.Info{
-		Address:  hex.EncodeToString(address[:]),
+		Address:  misc.BytesToHexStr(address[:]),
 		HexSeed:  x.GetHexSeed(),
 		Mnemonic: x.GetMnemonic(),
 		Type:     uint32(common2.XMSSSig),
@@ -44,7 +43,7 @@ func (w *Wallet) RecoverXMSSFromHexSeed(hexSeed [common2.ExtendedSeedSize]uint8)
 	x := xmss.NewXMSSFromExtendedSeed(hexSeed)
 	address := x.GetAddress()
 	info := &protos.Info{
-		Address:  hex.EncodeToString(address[:]),
+		Address:  misc.BytesToHexStr(address[:]),
 		HexSeed:  x.GetHexSeed(),
 		Mnemonic: x.GetMnemonic(),
 		Type:     uint32(common2.XMSSSig),
@@ -60,7 +59,7 @@ func (w *Wallet) AddDilithium() {
 	d := dilithium.New()
 	address := d.GetAddress()
 	info := &protos.Info{
-		Address:  hex.EncodeToString(address[:]),
+		Address:  misc.BytesToHexStr(address[:]),
 		HexSeed:  d.GetHexSeed(),
 		Mnemonic: d.GetMnemonic(),
 		Type:     uint32(common2.DilithiumSig),
@@ -76,7 +75,7 @@ func (w *Wallet) RecoverDilithiumFromSeed(seed [common2.SeedSize]uint8) {
 	d := dilithium.NewDilithiumFromSeed(seed)
 	address := d.GetAddress()
 	info := &protos.Info{
-		Address:  hex.EncodeToString(address[:]),
+		Address:  misc.BytesToHexStr(address[:]),
 		HexSeed:  d.GetHexSeed(),
 		Mnemonic: d.GetMnemonic(),
 		Type:     uint32(common2.DilithiumSig),
@@ -180,7 +179,7 @@ func (w *Wallet) GetXMSSAccountByIndex(index uint) (*xmss.XMSS, error) {
 	a := w.pbData.Info[index-1]
 	if a.Type == uint32(common2.XMSSSig) {
 		strHexSeed := a.HexSeed
-		binHexSeed, err := hex.DecodeString(strHexSeed)
+		binHexSeed, err := misc.HexStrToBytes(strHexSeed)
 		var binHexSeedSized [common2.ExtendedSeedSize]uint8
 		copy(binHexSeedSized[:], binHexSeed)
 		if err != nil {
@@ -200,7 +199,7 @@ func (w *Wallet) GetDilithiumAccountByIndex(index uint) (*dilithium.Dilithium, e
 	a := w.pbData.Info[index-1]
 	if a.Type == uint32(common2.DilithiumSig) {
 		strHexSeed := a.HexSeed
-		binHexSeed, err := hex.DecodeString(strHexSeed)
+		binHexSeed, err := misc.HexStrToBytes(strHexSeed)
 		var binHexSeedSized [common2.SeedSize]uint8
 		copy(binHexSeedSized[:], binHexSeed)
 		if err != nil {

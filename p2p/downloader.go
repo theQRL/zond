@@ -1,12 +1,12 @@
 package p2p
 
 import (
-	"encoding/hex"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/block"
 	"github.com/theQRL/zond/chain"
 	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/config"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/protos"
 	"math/big"
@@ -256,7 +256,7 @@ func (d *Downloader) Consumer(lastBlockHeaderToDownload common.Hash, peerGroup [
 			b := blockAndPeer.block
 			// Ensure if the block received is from the same Peer from which it was requested
 			bHash := blockAndPeer.block.Hash()
-			strHeaderHash := hex.EncodeToString(bHash[:])
+			strHeaderHash := misc.BytesToHexStr(bHash[:])
 			targetPeer, ok := d.requestTracker.GetPeerByHeaderHash(strHeaderHash)
 			if !ok || blockAndPeer.peer.ID() != targetPeer.ID() {
 				continue
@@ -272,7 +272,7 @@ func (d *Downloader) Consumer(lastBlockHeaderToDownload common.Hash, peerGroup [
 				}
 				log.Info("Trying To Add Block",
 					" #", b.SlotNumber(),
-					" ", hex.EncodeToString(bHash[:]))
+					" ", misc.BytesToHexStr(bHash[:]))
 				delete(pendingBlocks, strHeaderHash)
 				d.requestTracker.RemoveFirstElementFromSequence()
 				d.requestTracker.RemoveRequestKey(strHeaderHash)
@@ -307,7 +307,7 @@ main:
 	for ; nextIndexForRequest < len(targetSlotNumbers); nextIndexForRequest++ {
 		hashesPeerInfo := targetSlotNumbers[nextIndexForRequest]
 		for headerHash := range hashesPeerInfo.peerByBlockHash {
-			binData, err := hex.DecodeString(headerHash)
+			binData, err := misc.HexStrToBytes(headerHash)
 			var binHeaderHash common.Hash
 			copy(binHeaderHash[:], binData)
 			if err != nil {
@@ -611,7 +611,7 @@ func (d *Downloader) Initialize(peerGroup []*Peer,
 				hashesWithPeerInfoBySlotNumber[slotNumber] = hashesWithPeers
 			}
 			for _, headerHash := range blockHashesBySlotNumber.HeaderHashes {
-				strHeaderHash := hex.EncodeToString(headerHash)
+				strHeaderHash := misc.BytesToHexStr(headerHash)
 				data, ok := hashesWithPeers.peerByBlockHash[strHeaderHash]
 				if !ok {
 					data = make([]*Peer, 0)
@@ -658,7 +658,7 @@ func (d *Downloader) Initialize(peerGroup []*Peer,
 	var err error
 
 	for headerHash := range targetSlotNumbers[len(targetSlotNumbers)-1].peerByBlockHash {
-		binData, err = hex.DecodeString(headerHash)
+		binData, err = misc.HexStrToBytes(headerHash)
 		copy(lastBlockHeaderToDownload[:], binData)
 		if err != nil {
 			d.isSyncing = false

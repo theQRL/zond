@@ -1,12 +1,12 @@
 package pool
 
 import (
-	"encoding/hex"
 	"errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/block"
 	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/config"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/transactions"
 	"sync"
@@ -54,7 +54,7 @@ func (t *TransactionPool) Add(tx transactions.TransactionInterface, txHash commo
 		return err
 	}
 
-	log.Info("Added Transaction ", hex.EncodeToString(txHash[:]), " to pool")
+	log.Info("Added Transaction ", misc.BytesToHexStr(txHash[:]), " to pool")
 	return nil
 }
 
@@ -139,7 +139,7 @@ func (t *TransactionPool) AddTxFromBlock(block *block.Block, currentBlockHeight 
 //			//}
 //			//
 //			//registerMessage := &messages.RegisterMessage{
-//			//	MsgHash:hex.EncodeToString(b.Hash()),
+//			//	MsgHash:misc.BytesToHexStr(b.Hash()),
 //			//	Msg:msg,
 //			//}
 //			//select {
