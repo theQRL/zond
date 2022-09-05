@@ -1,7 +1,6 @@
 package state
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
@@ -9,6 +8,8 @@ import (
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/metadata"
+	"github.com/theQRL/zond/misc"
+	"github.com/theQRL/zond/storagekeys"
 	"go.etcd.io/bbolt"
 	"math/big"
 	"reflect"
@@ -76,21 +77,21 @@ func (s *StateContext) ValidatorsFlag() map[string]bool {
 }
 
 func (s *StateContext) processValidatorStakeAmount(dilithiumPK []byte, stakeBalance *big.Int) error {
-	//addr := dilithium.GetDilithiumAddressFromPK(misc.UnSizedDilithiumPKToSizedPK(dilithiumPK))
-	//stakeBalance := s.db2.GetStakeBalance(addr)
-
-	if stakeBalance.Uint64() == 0 {
-		return errors.New(fmt.Sprintf("Invalid stake balance %d for pk %s", stakeBalance, dilithiumPK))
+	requiredStakeAmount := big.NewInt(int64(config.GetDevConfig().StakeAmount))
+	if stakeBalance.Cmp(requiredStakeAmount) < 0 {
+		return errors.New(fmt.Sprintf("Invalid stake balance %d for address %s", stakeBalance, misc.GetAddressFromUnSizedPK(dilithiumPK)))
 	}
-	s.currentBlockTotalStakeAmount = s.currentBlockTotalStakeAmount.Add(s.currentBlockTotalStakeAmount, stakeBalance)
+	s.currentBlockTotalStakeAmount = s.currentBlockTotalStakeAmount.Add(s.currentBlockTotalStakeAmount,
+		requiredStakeAmount)
 	return nil
 }
 
 func (s *StateContext) ProcessAttestorsFlag(attestorDilithiumPK []byte, stakeBalance *big.Int) error {
+	// TODO (cyyber): Make this cleaner for genesis block
 	if s.slotNumber == 0 {
 		return nil
 	}
-	strAttestorDilithiumPK := hex.EncodeToString(attestorDilithiumPK)
+	strAttestorDilithiumPK := misc.BytesToHexStr(attestorDilithiumPK)
 	result, ok := s.validatorsFlag[strAttestorDilithiumPK]
 	if !ok {
 		return errors.New("attestor is not assigned to attest at this slot number")
@@ -109,6 +110,7 @@ func (s *StateContext) ProcessAttestorsFlag(attestorDilithiumPK []byte, stakeBal
 }
 
 func (s *StateContext) ProcessBlockProposerFlag(blockProposerDilithiumPK []byte, stakeBalance *big.Int) error {
+	// TODO (cyyber): Make this cleaner for genesis block
 	if s.slotNumber == 0 {
 		return nil
 	}
@@ -117,7 +119,12 @@ func (s *StateContext) ProcessBlockProposerFlag(blockProposerDilithiumPK []byte,
 	if !reflect.DeepEqual(slotLeader, blockProposerDilithiumPK) {
 		return errors.New("unexpected block proposer")
 	}
-	if s.validatorsFlag[hex.EncodeToString(blockProposerDilithiumPK)] {
+	result, ok := s.validatorsFlag[misc.BytesToHexStr(blockProposerDilithiumPK)]
+	if !ok {
+		return errors.New("block proposer is not assigned to this slot number")
+	}
+
+	if result {
 		return errors.New("block proposer has already been processed")
 	}
 
@@ -125,13 +132,12 @@ func (s *StateContext) ProcessBlockProposerFlag(blockProposerDilithiumPK []byte,
 	if err != nil {
 		return err
 	}
-	s.validatorsFlag[hex.EncodeToString(blockProposerDilithiumPK)] = true
+	s.validatorsFlag[misc.BytesToHexStr(blockProposerDilithiumPK)] = true
 	return nil
 }
 
-func (s *StateContext) PrepareValidators(dilithiumPK []byte) error {
-	s.validatorsFlag[hex.EncodeToString(dilithiumPK)] = false
-	return nil
+func (s *StateContext) PrepareValidators(dilithiumPK []byte) {
+	s.validatorsFlag[misc.BytesToHexStr(dilithiumPK)] = false
 }
 
 func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, trieRoot common.Hash, isFinalizedState bool) error {
@@ -158,13 +164,13 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, trieRoo
 		lastBlockHash := s.mainChainMetaData.LastBlockHeaderHash()
 		if err != nil {
 			log.Error("[Commit] Failed to load last block meta data ",
-				hex.EncodeToString(lastBlockHash[:]))
+				misc.BytesToHexStr(lastBlockHash[:]))
 			return err
 		}
 		err = lastBlockTotalStakeAmount.UnmarshalText(lastBlockMetaData.TotalStakeAmount())
 		if err != nil {
 			log.Error("[Commit] Unable to Unmarshal Text for lastblockmetadata total stake amount ",
-				hex.EncodeToString(lastBlockHash[:]))
+				misc.BytesToHexStr(lastBlockHash[:]))
 			return err
 		}
 	}
@@ -225,7 +231,7 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, trieRoo
 			}
 		}
 
-		if totalStakeAmount.Cmp(lastBlockTotalStakeAmount) == 1 {
+		if s.slotNumber == 0 || totalStakeAmount.Cmp(lastBlockTotalStakeAmount) == 1 {
 			// Update Main Chain Last Block Data
 			s.mainChainMetaData.UpdateLastBlockData(s.blockHeaderHash, s.slotNumber)
 			if err := s.mainChainMetaData.Commit(b); err != nil {
@@ -238,6 +244,8 @@ func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, trieRoo
 				log.Error("[Commit] Failed to commit state trie root")
 				return err
 			}
+
+			err = b.Put(storagekeys.GetBlockHashStorageKeyBySlotNumber(s.slotNumber), s.blockHeaderHash[:])
 		}
 
 		if !isFinalizedState {
@@ -258,7 +266,7 @@ func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.Blo
 	pHash := bm.ParentHeaderHash()
 	if err != nil {
 		log.Error("[Finalize] Failed to load ParentBlockMetaData ",
-			hex.EncodeToString(pHash[:]))
+			misc.BytesToHexStr(pHash[:]))
 		return err
 	}
 
@@ -283,9 +291,9 @@ func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.Blo
 			if !reflect.DeepEqual(parentBlockMetaData.HeaderHash(), bm.ParentHeaderHash()) {
 				log.Error("[Finalize] Unexpected error parent block header hash not matching")
 				log.Error("Expected ParentBlockHeaderHash ",
-					hex.EncodeToString(expectedPHash[:]))
+					misc.BytesToHexStr(expectedPHash[:]))
 				log.Error("ParentBlockHeaderHash found ",
-					hex.EncodeToString(foundPHash[:]))
+					misc.BytesToHexStr(foundPHash[:]))
 				return errors.New("unexpected error parent block header hash not matching")
 			}
 
@@ -293,7 +301,7 @@ func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.Blo
 			err := parentBlockMetaData.Commit(mainBucket)
 			if err != nil {
 				log.Error("[Finalize] Failed to Commit ParentBlockMetaData ",
-					hex.EncodeToString(foundPHash[:]))
+					misc.BytesToHexStr(foundPHash[:]))
 				return err
 			}
 			parentBlockMetaData = bm
@@ -325,12 +333,13 @@ func NewStateContext(db *db.DB, slotNumber uint64,
 		epochBlockHashes = metadata.NewEpochBlockHashes(epoch)
 	}
 
-	attestorsFlag := make(map[string]bool)
+	validatorsFlag := make(map[string]bool)
 	if slotNumber > 0 {
 		slotInfo := epochMetaData.SlotInfo()[slotNumber%config.GetDevConfig().BlocksPerEpoch]
 		for _, attestorsIndex := range slotInfo.Attestors {
-			attestorsFlag[hex.EncodeToString(epochMetaData.Validators()[attestorsIndex])] = false
+			validatorsFlag[misc.BytesToHexStr(epochMetaData.Validators()[attestorsIndex])] = false
 		}
+		validatorsFlag[misc.BytesToHexStr(epochMetaData.Validators()[slotInfo.SlotLeader])] = false
 	}
 
 	return &StateContext{
@@ -345,7 +354,7 @@ func NewStateContext(db *db.DB, slotNumber uint64,
 		blockSigningHash:             blockSigningHash,
 		currentBlockTotalStakeAmount: big.NewInt(0),
 
-		validatorsFlag: make(map[string]bool),
+		validatorsFlag: validatorsFlag,
 
 		epochMetaData:     epochMetaData,
 		epochBlockHashes:  epochBlockHashes,
