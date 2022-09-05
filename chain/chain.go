@@ -3,7 +3,6 @@ package chain
 import (
 	"crypto/md5"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
@@ -18,6 +17,7 @@ import (
 	"github.com/theQRL/zond/core/vm/runtime"
 	"github.com/theQRL/zond/crypto"
 	"github.com/theQRL/zond/metadata"
+	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/params"
 	"github.com/theQRL/zond/protos"
@@ -95,6 +95,54 @@ func setDefaults(cfg *runtime.Config) {
 	if cfg.BaseFee == nil {
 		cfg.BaseFee = big.NewInt(params.InitialBaseFee)
 	}
+}
+
+func (c *Chain) Config() *params.ChainConfig {
+	cfg := new(runtime.Config)
+	setDefaults(cfg)
+	return cfg.ChainConfig
+}
+
+// GetVMConfig returns the chain VM config.
+func (c *Chain) GetVMConfig() *vm.Config {
+	return &vm.Config{
+		EnablePreimageRecording: false,
+	}
+}
+
+func (c *Chain) CurrentBlock() *block.Block {
+	return c.lastBlock
+}
+
+func (c *Chain) CurrentFinalizedBlock() *block.Block {
+	blockHash, err := c.GetFinalizedHeaderHash()
+	if err != nil {
+		log.Error("failed to get finalized header hash")
+		return nil
+	}
+
+	b, err := c.GetBlock(blockHash)
+	if err != nil {
+		log.Error("failed to get block for blockHash ", blockHash)
+		return nil
+	}
+
+	return b
+}
+
+func (c *Chain) GetBlockByNumber(number uint64) *block.Block {
+	b, err := block.GetBlockByNumber(c.state.DB(), number)
+	if err != nil {
+		log.Error("failed to get block for slot number ", number)
+		return nil
+	}
+
+	return b
+}
+
+func (c *Chain) StateAt(root common.Hash) (*state2.StateDB, error) {
+	//return state2.New(root, c.db2, bc.snaps)
+	return state2.New(root, c.db2, nil)
 }
 
 func (c *Chain) AccountDB() (*state2.StateDB, error) {
@@ -270,6 +318,9 @@ func (c *Chain) Load() error {
 			return err
 		}
 
+		// Inject block proposer of genesis block
+		stateContext.PrepareValidators(blockProposerDilithiumPK)
+
 		_, _, _, err = stateProcessor.ProcessGenesis(b, statedb, stateContext, vm.Config{})
 		if err != nil {
 			log.Error("Failed to Process Genesis Block")
@@ -290,7 +341,7 @@ func (c *Chain) Load() error {
 	lastBlock, err := block.GetBlock(db, mainChainLastBlockHash)
 	if err != nil {
 		log.Error("Failed to load last block for ",
-			hex.EncodeToString(mainChainLastBlockHash[:]))
+			misc.BytesToHexStr(mainChainLastBlockHash[:]))
 		return err
 	}
 	if lastBlock == nil {
@@ -300,7 +351,7 @@ func (c *Chain) Load() error {
 	c.lastBlock = lastBlock
 	lastBlockHash := c.lastBlock.Hash()
 	log.Info(fmt.Sprintf("Current Block Slot Number %d Hash %s",
-		c.lastBlock.SlotNumber(), hex.EncodeToString(lastBlockHash[:])))
+		c.lastBlock.SlotNumber(), misc.BytesToHexStr(lastBlockHash[:])))
 
 	return nil
 }
@@ -317,7 +368,6 @@ func (c *Chain) GetSlotLeaderDilithiumPKBySlotNumber(trieRoot common.Hash,
 	if err != nil {
 		return nil, err
 	}
-
 	slotLeaderIndex := epochMetaData.SlotInfo()[slotNumber%c.config.Dev.BlocksPerEpoch].SlotLeader
 	return epochMetaData.Validators()[slotLeaderIndex], nil
 }
@@ -367,11 +417,11 @@ func (c *Chain) GetSlotValidatorsMetaDataBySlotNumber(trieRoot common.Hash,
 	//
 	//validatorsType := make(map[string]uint8)
 	//slotLeaderPK := epochMetaData.Validators()[slotLeaderIndex]
-	//validatorsType[hex.EncodeToString(slotLeaderPK[:])] = 1
+	//validatorsType[misc.BytesToHexStr(slotLeaderPK[:])] = 1
 	//
 	//for _, attestorIndex := range attestorsIndex {
 	//	validatorPK := validators[attestorIndex]
-	//	validatorsType[hex.EncodeToString(validatorPK[:])] = 0
+	//	validatorsType[misc.BytesToHexStr(validatorPK[:])] = 0
 	//}
 	return slotValidatorsMetaData, nil
 }
@@ -464,20 +514,20 @@ func (c *Chain) GetBlockHashBySlotNumber(n uint64) common.Hash {
 //
 //		b, err := c.GetBlock(headerHash)
 //		if err != nil {
-//			log.Error("Failed to GetBlock ", hex.EncodeToString(headerHash))
+//			log.Error("Failed to GetBlock ", misc.BytesToHexStr(headerHash))
 //			return nil, err
 //		}
 //
 //		blockMetaData, err := c.GetBlockMetaData(headerHash)
 //		if err != nil {
-//			log.Error("Failed to GetBlockMetaData ", hex.EncodeToString(headerHash))
+//			log.Error("Failed to GetBlockMetaData ", misc.BytesToHexStr(headerHash))
 //			return nil, err
 //		}
 //
 //		for _, childHeaderHash := range blockMetaData.ChildHeaderHashes() {
 //			childBlock, err := c.GetBlock(childHeaderHash)
 //			if err != nil {
-//				log.Error("Error getting child block ", hex.EncodeToString(childHeaderHash))
+//				log.Error("Error getting child block ", misc.BytesToHexStr(childHeaderHash))
 //				return nil, err
 //			}
 //
@@ -519,13 +569,12 @@ func (c *Chain) GetEpochHeaderHashes(epoch uint64) (*protos.EpochBlockHashesMeta
 	return epochBlockHashes.PBData(), nil
 }
 
-func (c *Chain) ValidateTransaction(protoTx *protos.Transaction) bool {
+func (c *Chain) ValidateTransaction(protoTx *protos.Transaction) error {
 	statedb, err := c.AccountDB()
 	if err != nil {
-		log.Error("failed to get statedb, cannot verify transaction")
-		return false
+		return fmt.Errorf("failed to get statedb, cannot verify transaction %v", err.Error())
 	}
-	//dec, err := hex.DecodeString("6EDEA5b4fBAd96789433675c49a120b537413296")
+	//dec, err := misc.HexStrToBytes("6EDEA5b4fBAd96789433675c49a120b537413296")
 	//if err != nil {
 	//	log.Error("error decoding string")
 	//
@@ -536,37 +585,42 @@ func (c *Chain) ValidateTransaction(protoTx *protos.Transaction) bool {
 	return core.ValidateTransaction(protoTx, statedb)
 }
 
-func (c *Chain) ValidateProtocolTransaction(protoTx *protos.ProtocolTransaction, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, isGenesis bool) bool {
+func (c *Chain) ValidateProtocolTransaction(protoTx *protos.ProtocolTransaction, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, slotNumber uint64, isGenesis bool) error {
 	statedb, err := c.AccountDB()
 	if err != nil {
-		log.Error("failed to get statedb, cannot verify protocol transaction")
-		return false
+		return fmt.Errorf("failed to get statedb, cannot verify protocol transaction")
 	}
-	return core.ValidateProtocolTransaction(protoTx, statedb, slotValidatorsMetaData, blockSigningHash, isGenesis)
+	return core.ValidateProtocolTransaction(protoTx, statedb, slotValidatorsMetaData, blockSigningHash, slotNumber, isGenesis)
 }
 
-func (c *Chain) ValidateCoinBaseTransaction(protoTx *protos.ProtocolTransaction, validatorsType *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, isGenesis bool) bool {
+func (c *Chain) ValidateCoinBaseTransaction(protoTx *protos.ProtocolTransaction, validatorsType *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, slotNumber uint64, isGenesis bool) error {
 	statedb, err := c.AccountDB()
 	if err != nil {
-		log.Error("failed to get statedb, cannot verify protocol transaction")
-		return false
+		return fmt.Errorf("failed to get statedb, cannot verify protocol transaction")
 	}
 	tx := transactions.CoinBaseTransactionFromPBData(protoTx)
-	return core.ValidateCoinBaseTx(tx, statedb, validatorsType, blockSigningHash, isGenesis)
+	return core.ValidateCoinBaseTx(tx, statedb, validatorsType, blockSigningHash, slotNumber, isGenesis)
 }
 
-func (c *Chain) ValidateAttestTransaction(protoTx *protos.ProtocolTransaction, validatorsType *metadata.SlotValidatorsMetaData, partialBlockSigningHash common.Hash) bool {
+func (c *Chain) ValidateAttestTransaction(protoTx *protos.ProtocolTransaction, validatorsType *metadata.SlotValidatorsMetaData, partialBlockSigningHash common.Hash, slotNumber uint64) error {
 	statedb, err := c.AccountDB()
 	if err != nil {
-		log.Error("failed to get statedb, cannot verify protocol transaction")
-		return false
+		return fmt.Errorf("failed to get statedb, cannot verify protocol transaction")
 	}
 	tx := transactions.AttestTransactionFromPBData(protoTx)
-	return core.ValidateAttestTx(tx, statedb, validatorsType, partialBlockSigningHash)
+	return core.ValidateAttestTx(tx, statedb, validatorsType, partialBlockSigningHash, slotNumber)
 }
 
 func (c *Chain) AddBlock(b *block.Block) bool {
 	/* TODO: Revise Block Validation */
+	expectedHash := block.ComputeBlockHash(b)
+	if b.Hash() != expectedHash {
+		log.Error("[AddBlock] Invalid block hash")
+		log.Error("Expected block hash ", expectedHash)
+		log.Error("Found block hash ", b.Hash())
+		return false
+	}
+
 	maxSlotNumber := c.GetMaxPossibleSlotNumber()
 	if b.SlotNumber() > maxSlotNumber {
 		log.Error("[AddBlock] Failed to add block as slot number is beyond maximum possible slot number")
@@ -595,8 +649,8 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 		fHash := mainChainMetaData.FinalizedBlockHeaderHash()
 		if !reflect.DeepEqual(parentHeaderHash, mainChainMetaData.FinalizedBlockHeaderHash()) {
 			log.Error("[AddBlock] ParentBlock is not the part of the finalized chain",
-				" Expected hash ", hex.EncodeToString(fHash[:]),
-				" Found hash ", hex.EncodeToString(parentHeaderHash[:]))
+				" Expected hash ", misc.BytesToHexStr(fHash[:]),
+				" Found hash ", misc.BytesToHexStr(parentHeaderHash[:]))
 			return false
 		}
 	}
@@ -620,7 +674,7 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 	validators, err := c.GetSlotValidatorsMetaDataBySlotNumber(trieRoot, b.SlotNumber(), b.ParentHash())
 	if err != nil {
 		log.Error(fmt.Sprintf("failed to get validatorsBySlotNumber block #%d %s | Error %s", b.SlotNumber(),
-			hex.EncodeToString(bHash[:]), err.Error()))
+			misc.BytesToHexStr(bHash[:]), err.Error()))
 		return false
 	}
 
@@ -636,14 +690,14 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 	_, _, _, err = stateProcessor.Process(b, statedb, stateContext, validators, false, vm.Config{})
 	if err != nil {
 		log.Error(fmt.Sprintf("Failed to process block #%d %s | Error %s", b.SlotNumber(),
-			hex.EncodeToString(bHash[:]), err.Error()))
+			misc.BytesToHexStr(bHash[:]), err.Error()))
 		return false
 	}
 
 	//err = b.Commit(c.state.DB(), c.state2, mainChainMetaData.FinalizedBlockHeaderHash(), false)
 	//if err != nil {
 	//	log.Error(fmt.Sprintf("Failed to commit block #%d %s | Error %s", b.SlotNumber(),
-	//		hex.EncodeToString(bHash[:]), err.Error()))
+	//		misc.BytesToHexStr(bHash[:]), err.Error()))
 	//	return false
 	//}
 
@@ -662,13 +716,15 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 		lHash := mainChainMetaData.LastBlockHeaderHash()
 		if err != nil {
 			log.Error("Failed to Get Block for LastBlockHeaderHash ",
-				hex.EncodeToString(lHash[:]))
+				misc.BytesToHexStr(lHash[:]))
 			return true
 		}
 		c.lastBlock = lastBlock
 	}
 
-	log.Info(fmt.Sprintf("Added Block #%d %s", b.SlotNumber(), hex.EncodeToString(bHash[:])))
+	log.Info(fmt.Sprintf("Added Block #%d %s", b.SlotNumber(), misc.BytesToHexStr(bHash[:])))
+	log.Info(fmt.Sprintf("Protocol Txs Count %d | Txs Count %d",
+		len(b.ProtocolTransactions()), len(b.Transactions())))
 	return true
 }
 
@@ -775,22 +831,30 @@ func (c *Chain) CalculateEpochMetaData(statedb *state2.StateDB, slotNumber uint6
 		return nil, err
 	}
 
-	validatorsStakeAmount := make(map[string]uint64)
-	totalStakeAmountAlloted := uint64(len(epochMetaData.Validators())) * config.GetDevConfig().StakeAmount
+	totalStakeAmountAllotted := uint64(len(epochMetaData.Validators())) * config.GetDevConfig().StakeAmount
 	epochMetaData.UpdatePrevEpochStakeData(0,
-		totalStakeAmountAlloted)
+		totalStakeAmountAllotted)
 
-	validatorsStateChanged := make(map[string]bool)
+	pendingStakeValidatorsUpdate := make(map[string]uint8)
 	for i := lenPathToFirstBlockOfEpoch - 1; i >= 0; i-- {
 		b, err := block.GetBlock(db, pathToFirstBlockOfEpoch[i])
 		if err != nil {
 			return nil, err
 		}
-		err = core.ProcessEpochMetaData(b, statedb, epochMetaData, validatorsStakeAmount, validatorsStateChanged)
+		err = core.ProcessEpochMetaData(b, statedb, epochMetaData)
 		if err != nil {
 			return nil, err
 		}
-		// TODO: Calculate RandomSeed
+		// Ignore genesis block otherwise it will result into issue as we have
+		// already processed while committing genesis block
+		if b.SlotNumber() != 0 {
+			b.GetPendingValidatorsUpdate(pendingStakeValidatorsUpdate)
+		}
+	}
+
+	err = core.UpdateStakeValidators(statedb, pendingStakeValidatorsUpdate, epochMetaData)
+	if err != nil {
+		return nil, err
 	}
 
 	// TODO: load accountState of all the dilithium pk in validatorsStateChanged
