@@ -11,8 +11,11 @@ import (
 	"github.com/theQRL/zond/consensus"
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/misc"
+	"github.com/theQRL/zond/node"
 	"github.com/theQRL/zond/p2p"
 	"github.com/theQRL/zond/state"
+	"github.com/theQRL/zond/zond"
+	"github.com/theQRL/zond/zond/tracers"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"io/ioutil"
 	"os"
@@ -34,7 +37,9 @@ func run(c *chain.Chain, db *db.DB, keys crypto.PrivKey) error {
 		log.Error("Failed to initialize server")
 		return err
 	}
-	go srv.Start(keys)
+	if err := srv.Start(keys); err != nil {
+		return err
+	}
 	defer srv.Stop()
 
 	if config.GetUserConfig().API.PublicAPI.Enabled {
@@ -44,7 +49,28 @@ func run(c *chain.Chain, db *db.DB, keys crypto.PrivKey) error {
 
 	pos := consensus.NewPOS(srv, c, db)
 
+	stack, err := node.New(c)
+	if err != nil {
+		log.Error("Error creating new node")
+		return err
+	}
+
+	backend, err := zond.New(stack, pos)
+	if err != nil {
+		log.Error("Error creating zond backend")
+		return err
+	}
+
+	stack.RegisterAPIs(tracers.APIs(backend.APIBackend))
+
+	err = stack.Start()
+	if err != nil {
+		log.Error("Failed to start API stacks ", err)
+		return err
+	}
+
 	go pos.Run()
+	defer stack.Close()
 	defer pos.Stop()
 
 	quit := make(chan os.Signal, 1)
@@ -154,6 +180,7 @@ func main() {
 		return
 	}
 	log.Info("Main Chain Loaded Successfully")
+
 	err = run(c, s.DB(), keys)
 	if err != nil {
 		log.Error("Initialization Error ", err.Error())
