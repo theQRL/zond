@@ -10,15 +10,18 @@ package protos;
 import "protos/transaction.proto";
 
 message BlockHeader {
-    uint64 timestamp_seconds = 1;
-    uint64 slot_number = 2;
+    uint64 slot_number = 1;
+    bytes hash = 2;
     bytes parent_hash = 3;
 
     uint64 base_fee = 4;
     uint64 gas_limit = 5;
     uint64 gas_used = 6;
+    uint64 timestamp_seconds = 7;
 
-    bytes root = 7;
+    bytes root = 8;
+    bytes transactions_root = 9;
+    bytes receipts_root = 10;
 }
 
 message Block {
