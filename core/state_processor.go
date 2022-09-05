@@ -3,7 +3,6 @@ package core
 import (
 	"crypto/md5"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/go-qrllib/dilithium"
@@ -17,6 +16,7 @@ import (
 	"github.com/theQRL/zond/core/vm"
 	"github.com/theQRL/zond/crypto"
 	"github.com/theQRL/zond/db"
+	"github.com/theQRL/zond/errmsg"
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/params"
@@ -69,8 +69,8 @@ func (p *StateProcessor) ProcessGenesisPreState(preState *protos.PreState, b *bl
 	statedb.GetOrNewStateObject(blockProposerDilithiumAddress).SetBalance(big.NewInt(int64(config.GetDevConfig().Genesis.SuppliedCoins)))
 
 	if !reflect.DeepEqual(blockProposerDilithiumAddress, config.GetDevConfig().Genesis.FoundationDilithiumAddress) {
-		expectedFoundationDilithiumAddress := hex.EncodeToString(config.GetDevConfig().Genesis.FoundationDilithiumAddress[:])
-		foundFoundationDilithiumAddress := hex.EncodeToString(config.GetDevConfig().Genesis.FoundationDilithiumAddress[:])
+		expectedFoundationDilithiumAddress := misc.BytesToHexStr(config.GetDevConfig().Genesis.FoundationDilithiumAddress[:])
+		foundFoundationDilithiumAddress := misc.BytesToHexStr(config.GetDevConfig().Genesis.FoundationDilithiumAddress[:])
 
 		log.Warn("block proposer dilithium address is not matching with the foundation dilithium address in config")
 		log.Warn("expected foundation dilithium address ", expectedFoundationDilithiumAddress)
@@ -92,7 +92,7 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 	//validatorsType := make(map[string]uint8)
 
 	//blockProposerDilithiumPK := b.ProtocolTransactions()[0].GetPk()
-	//validatorsType[hex.EncodeToString(blockProposerDilithiumPK)] = 1
+	//validatorsType[misc.BytesToHexStr(blockProposerDilithiumPK)] = 1
 	slotValidatorsMetaData := metadata.NewSlotValidatorsMetaData(b.SlotNumber(), stateContext.GetEpochMetaData())
 
 	var (
@@ -105,7 +105,7 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 		gp          = new(GasPool).AddGas(b.GasLimit())
 	)
 
-	blockContext := NewEVMBlockContext(header, p.getHashFunc, b.Minter(), b.Timestamp())
+	blockContext := NewEVMBlockContext(header, p.getHashFunc, b.Minter())
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
 
 	switch b.ProtocolTransactions()[0].Type.(type) {
@@ -128,8 +128,8 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 
 			coinBaseTx := transactions.CoinBaseTransactionFromPBData(b.ProtocolTransactions()[0])
 
-			if !ValidateCoinBaseTx(coinBaseTx, statedb, slotValidatorsMetaData, b.BlockSigningHash(), false) {
-				return nil, nil, 0, fmt.Errorf("coinbase tx validation failed")
+			if err := ValidateCoinBaseTx(coinBaseTx, statedb, slotValidatorsMetaData, b.BlockSigningHash(), b.SlotNumber(), true); err != nil {
+				return nil, nil, 0, err
 			}
 
 			coinBaseTxHash := coinBaseTx.TxHash(coinBaseTx.GetSigningHash(b.BlockSigningHash()))
@@ -142,13 +142,14 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 		case *protos.ProtocolTransaction_Attest:
 			attestTx := transactions.AttestTransactionFromPBData(protoTx)
 
-			if !ValidateAttestTx(attestTx, statedb, slotValidatorsMetaData, b.PartialBlockSigningHash()) {
-				return nil, nil, 0, fmt.Errorf("attest tx validation failed")
+			if err := ValidateAttestTx(attestTx, statedb, slotValidatorsMetaData, b.PartialBlockSigningHash(), b.SlotNumber()); err != nil {
+				return nil, nil, 0, err
 			}
 
 			txHash := attestTx.TxHash(attestTx.GetSigningHash(b.PartialBlockSigningHash()))
 			statedb.Prepare(txHash, i)
-			receipt, err = applyAttestTransaction(statedb, stateContext, blockNumber, blockHash, attestTx)
+			receipt, err = applyAttestTransaction(statedb, stateContext, blockNumber, blockHash, attestTx,
+				b.ProtocolTransactions()[0].GetCoinBase().AttestorReward)
 			if err != nil {
 				return nil, nil, 0, fmt.Errorf("could not apply attest tx %d [%v]: %w", 0, txHash, err)
 			}
@@ -156,8 +157,6 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
 	}
-
-	validatorsStakeAmount := make(map[string]uint64)
 
 	// Iterate over and process the individual transactions
 	for i, protoTx := range b.Transactions() {
@@ -171,11 +170,8 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 		case *protos.Transaction_Stake:
 			stakeTx := transactions.StakeTransactionFromPBData(protoTx)
 
-			strDilithiumPK := hex.EncodeToString(stakeTx.PK())
-			validatorsStakeAmount[strDilithiumPK] = config.GetDevConfig().StakeAmount
-
-			if !ValidateStakeTxn(stakeTx, statedb) {
-				return nil, nil, 0, fmt.Errorf("stake tx validation failed")
+			if err := ValidateStakeTxn(stakeTx, statedb); err != nil {
+				return nil, nil, 0, err
 			}
 			receipt, err = applyStakeTransaction(gp, statedb, blockNumber, blockHash, stakeTx, usedGas, b.Minter())
 			if err != nil {
@@ -184,8 +180,8 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 
 		case *protos.Transaction_Transfer:
 			transferTx := transactions.TransferTransactionFromPBData(protoTx)
-			if !ValidateTransferTxn(transferTx, statedb) {
-				return nil, nil, 0, fmt.Errorf("transfer tx validation failed")
+			if err := ValidateTransferTxn(transferTx, statedb); err != nil {
+				return nil, nil, 0, err
 			}
 			msg, err := tx.AsMessage(header.BaseFee())
 			if err != nil {
@@ -199,7 +195,7 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
 
-		// If code size is 0 in that case it is an account and not a contract
+		// If not a contract and an xmss address then update the ots bitfield
 		if statedb.GetCodeSize(tx.AddrFrom()) == 0 && xmss.IsValidXMSSAddress(tx.AddrFrom()) {
 			statedb.SetOTSBitfield(tx.AddrFrom(), misc.GetOTSIndexFromSignature(tx.Signature()), false)
 		}
@@ -207,10 +203,18 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 	}
 
 	epochMetaData := stateContext.GetEpochMetaData()
-	validatorsStateChanged := make(map[string]bool)
-	err := ProcessEpochMetaData(b, statedb, epochMetaData, validatorsStakeAmount, validatorsStateChanged)
+	err := ProcessEpochMetaData(b, statedb, epochMetaData)
 	if err != nil {
 		log.Error("Failed to Process Epoch MetaData")
+		return nil, nil, 0, err
+	}
+
+	pendingStakeValidatorsUpdate := make(map[string]uint8)
+	b.GetPendingValidatorsUpdate(pendingStakeValidatorsUpdate)
+
+	err = UpdateStakeValidators(statedb, pendingStakeValidatorsUpdate, epochMetaData)
+	if err != nil {
+		log.Error("Failed to update stake validators for genesis")
 		return nil, nil, 0, err
 	}
 
@@ -241,7 +245,6 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 		return nil, nil, 0, fmt.Errorf("failed to commit trieDB : %w", err)
 	}
 
-	fmt.Println("Trie root committed >> ", hex.EncodeToString(trieRoot[:]))
 	bytesBlock, err := b.Serialize()
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("failed to serialize block : %w", err)
@@ -265,7 +268,7 @@ func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateCo
 		gp          = new(GasPool).AddGas(b.GasLimit())
 	)
 
-	blockContext := NewEVMBlockContext(header, p.getHashFunc, b.Minter(), b.Timestamp())
+	blockContext := NewEVMBlockContext(header, p.getHashFunc, b.Minter())
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
 
 	switch b.ProtocolTransactions()[0].Type.(type) {
@@ -288,12 +291,12 @@ func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateCo
 
 			coinBaseTx := transactions.CoinBaseTransactionFromPBData(b.ProtocolTransactions()[0])
 
-			if !ValidateCoinBaseTx(coinBaseTx, statedb, slotValidatorsMetaData, b.BlockSigningHash(), false) {
-				return nil, nil, 0, fmt.Errorf("coinbase tx validation failed")
+			if err := ValidateCoinBaseTx(coinBaseTx, statedb, slotValidatorsMetaData, b.BlockSigningHash(), b.SlotNumber(), false); err != nil {
+				return nil, nil, 0, err
 			}
 
 			coinBaseTxHash := coinBaseTx.TxHash(coinBaseTx.GetSigningHash(b.BlockSigningHash()))
-			statedb.Prepare(coinBaseTxHash, 0)
+			statedb.Prepare(coinBaseTxHash, i)
 			receipt, err = applyCoinBaseTransaction(statedb, stateContext, blockNumber, blockHash, coinBaseTx)
 			if err != nil {
 				return nil, nil, 0, fmt.Errorf("could not apply coinbase tx %d [%v]: %w", 0, coinBaseTxHash, err)
@@ -302,13 +305,14 @@ func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateCo
 		case *protos.ProtocolTransaction_Attest:
 			attestTx := transactions.AttestTransactionFromPBData(protoTx)
 
-			if !ValidateAttestTx(attestTx, statedb, slotValidatorsMetaData, b.PartialBlockSigningHash()) {
-				return nil, nil, 0, fmt.Errorf("attest tx validation failed")
+			if err := ValidateAttestTx(attestTx, statedb, slotValidatorsMetaData, b.PartialBlockSigningHash(), b.SlotNumber()); err != nil {
+				return nil, nil, 0, err
 			}
 
 			txHash := attestTx.TxHash(attestTx.GetSigningHash(b.PartialBlockSigningHash()))
 			statedb.Prepare(txHash, i)
-			receipt, err = applyAttestTransaction(statedb, stateContext, blockNumber, blockHash, attestTx)
+			receipt, err = applyAttestTransaction(statedb, stateContext, blockNumber, blockHash, attestTx,
+				b.ProtocolTransactions()[0].GetCoinBase().AttestorReward)
 			if err != nil {
 				return nil, nil, 0, fmt.Errorf("could not apply attest tx %d [%v]: %w", 0, txHash, err)
 			}
@@ -328,8 +332,8 @@ func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateCo
 		switch protoTx.Type.(type) {
 		case *protos.Transaction_Stake:
 			stakeTx := transactions.StakeTransactionFromPBData(protoTx)
-			if !ValidateStakeTxn(stakeTx, statedb) {
-				return nil, nil, 0, fmt.Errorf("stake tx validation failed")
+			if err := ValidateStakeTxn(stakeTx, statedb); err != nil {
+				return nil, nil, 0, err
 			}
 			receipt, err = applyStakeTransaction(gp, statedb, blockNumber, blockHash, stakeTx, usedGas, b.Minter())
 			if err != nil {
@@ -338,8 +342,8 @@ func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateCo
 
 		case *protos.Transaction_Transfer:
 			transferTx := transactions.TransferTransactionFromPBData(protoTx)
-			if !ValidateTransferTxn(transferTx, statedb) {
-				return nil, nil, 0, fmt.Errorf("transfer tx validation failed")
+			if err := ValidateTransferTxn(transferTx, statedb); err != nil {
+				return nil, nil, 0, err
 			}
 			msg, err := tx.AsMessage(header.BaseFee())
 			if err != nil {
@@ -406,7 +410,7 @@ func applyTransaction(msg types.Message, gp *GasPool, statedb *state.StateDB, bl
 
 	// Create a new receipt for the transaction, storing the intermediate root and gas used
 	// by the tx.
-	receipt := &types.Receipt{Type: tx.Type(), PostState: root, CumulativeGasUsed: *usedGas}
+	receipt := &types.Receipt{Type: uint8(tx.Type()), PostState: root, CumulativeGasUsed: *usedGas}
 	if result.Failed() {
 		receipt.Status = types.ReceiptStatusFailed
 	} else {
@@ -479,7 +483,7 @@ func applyStakeTransaction(gp *GasPool, statedb *state.StateDB, blockNumber *big
 
 	// Create a new receipt for the transaction, storing the intermediate root and gas used
 	// by the tx.
-	receipt := &types.Receipt{Type: tx.Type(), PostState: root, CumulativeGasUsed: *usedGas}
+	receipt := &types.Receipt{Type: uint8(tx.Type()), PostState: root, CumulativeGasUsed: *usedGas}
 	receipt.Status = types.ReceiptStatusSuccessful
 
 	receipt.TxHash = tx.Hash()
@@ -504,33 +508,17 @@ func applyCoinBaseTransaction(statedb *state.StateDB, stateContext *state2.State
 	accountState := statedb.GetOrNewStateObject(address)
 
 	if err := stateContext.ProcessBlockProposerFlag(tx.PK(), accountState.StakeBalance()); err != nil {
-		return nil, fmt.Errorf("failed to process block proposer %s | Reason: %w", hex.EncodeToString(tx.PK()), err)
+		return nil, fmt.Errorf("failed to process block proposer %s | Reason: %w", misc.BytesToHexStr(tx.PK()), err)
 	}
 
-	validatorsFlag := stateContext.ValidatorsFlag()
-
-	strBlockProposerDilithiumPK := hex.EncodeToString(stateContext.BlockProposer())
-
-	for strValidatorDilithiumPK, _ := range validatorsFlag {
-		validatorDilithiumPK, err := hex.DecodeString(strValidatorDilithiumPK)
-		if err != nil {
-			return nil, err
-		}
-		accountState := statedb.GetOrNewStateObject(misc.GetDilithiumAddressFromUnSizedPK(validatorDilithiumPK))
-
-		if strValidatorDilithiumPK == strBlockProposerDilithiumPK {
-			accountState.AddBalance(big.NewInt(int64(tx.BlockProposerReward())))
-			accountState.AddBalance(big.NewInt(int64(tx.FeeReward())))
-		} else {
-			accountState.AddBalance(big.NewInt(int64(tx.AttestorReward())))
-		}
-	}
+	blockReward := big.NewInt(int64(tx.BlockProposerReward()))
+	accountState.AddBalance(blockReward)
+	accountState.AddBalance(big.NewInt(int64(tx.FeeReward())))
+	accountState.SetNonce(statedb.GetNonce(address) + 1)
 
 	coinBaseAddress := config.GetDevConfig().Genesis.CoinBaseAddress
 	coinBaseAccountState := statedb.GetOrNewStateObject(coinBaseAddress)
-	// len(validatorsFlag) - 1 is the number of attestors, as one of the validator is block proposer
-	coinBaseAccountState.SubBalance(big.NewInt(int64(tx.TotalRewardExceptFeeReward(uint64(len(validatorsFlag) - 1)))))
-	coinBaseAccountState.SetNonce(statedb.GetNonce(coinBaseAddress) + 1)
+	coinBaseAccountState.SubBalance(blockReward)
 
 	signedMessage := tx.GetSigningHash(stateContext.BlockSigningHash())
 	txHash := tx.TxHash(signedMessage)
@@ -538,7 +526,7 @@ func applyCoinBaseTransaction(statedb *state.StateDB, stateContext *state2.State
 
 	// Create a new receipt for the transaction, storing the intermediate root and gas used
 	// by the tx.
-	receipt := &types.Receipt{Type: tx.Type(), PostState: root}
+	receipt := &types.Receipt{Type: uint8(tx.Type()), PostState: root}
 	receipt.Status = types.ReceiptStatusSuccessful
 
 	receipt.TxHash = txHash
@@ -551,7 +539,7 @@ func applyCoinBaseTransaction(statedb *state.StateDB, stateContext *state2.State
 	return receipt, nil
 }
 
-func applyAttestTransaction(statedb *state.StateDB, stateContext *state2.StateContext, blockNumber *big.Int, blockHash common.Hash, tx *transactions.Attest) (*types.Receipt, error) {
+func applyAttestTransaction(statedb *state.StateDB, stateContext *state2.StateContext, blockNumber *big.Int, blockHash common.Hash, tx *transactions.Attest, attestorReward uint64) (*types.Receipt, error) {
 	// Update the state with pending changes.
 	var root []byte
 
@@ -565,13 +553,21 @@ func applyAttestTransaction(statedb *state.StateDB, stateContext *state2.StateCo
 	accountState := statedb.GetOrNewStateObject(address)
 
 	if err := stateContext.ProcessAttestorsFlag(tx.PK(), accountState.StakeBalance()); err != nil {
-		return nil, fmt.Errorf("failed to process attest transaction for attestor  %s | Reason: %w", hex.EncodeToString(tx.PK()), err)
+		return nil, fmt.Errorf("failed to process attest transaction for attestor  %s | Reason: %w", misc.BytesToHexStr(tx.PK()), err)
 	}
+
+	reward := big.NewInt(int64(attestorReward))
+	accountState.AddBalance(reward)
+	accountState.SetNonce(statedb.GetNonce(address) + 1)
+
+	coinBaseAddress := config.GetDevConfig().Genesis.CoinBaseAddress
+	coinBaseAccountState := statedb.GetOrNewStateObject(coinBaseAddress)
+	coinBaseAccountState.SubBalance(reward)
 	/* -- Attest Transaction changes ends -- */
 
 	// Create a new receipt for the transaction, storing the intermediate root and gas used
 	// by the tx.
-	receipt := &types.Receipt{Type: tx.Type(), PostState: root}
+	receipt := &types.Receipt{Type: uint8(tx.Type()), PostState: root}
 	receipt.Status = types.ReceiptStatusSuccessful
 
 	receipt.TxHash = txHash
@@ -584,40 +580,37 @@ func applyAttestTransaction(statedb *state.StateDB, stateContext *state2.StateCo
 	return receipt, nil
 }
 
-func ValidateTransferTxn(tx *transactions.Transfer, statedb *state.StateDB) bool {
-	txHash := tx.Hash()
+func ValidateTransferTxn(tx *transactions.Transfer, statedb *state.StateDB) error {
+	txHash := tx.GenerateTxHash()
 
 	addrFrom := tx.AddrFrom()
-	addressState := statedb.GetOrNewStateObject(addrFrom)
+	accountState := statedb.GetOrNewStateObject(addrFrom)
 
-	if tx.Nonce() != addressState.Nonce() {
-		log.Warn(fmt.Sprintf("Transfer [%s] Invalid Nonce %d, Expected Nonce %d",
-			hex.EncodeToString(txHash[:]), tx.Nonce(), addressState.Nonce()))
-		return false
+	if tx.Hash() != txHash {
+		return fmt.Errorf(errmsg.TXInvalidTxHash, "transfer", tx.Hash(), addrFrom, txHash)
+	}
+
+	if tx.Nonce() != accountState.Nonce() {
+		return fmt.Errorf(errmsg.TXInvalidNonce, "transfer", tx.Hash(), addrFrom, tx.Nonce(), accountState.Nonce())
 	}
 
 	if len(tx.PK()) == xmss.ExtendedPKSize {
-		if misc.IsUsedOTSIndex(tx.OTSIndex(), addressState.OTSBitfield()) {
-			log.Warn(fmt.Sprintf("Transfer [%s] OTS Index %d is already used",
-				hex.EncodeToString(txHash[:]), tx.OTSIndex()))
-			return false
+		if misc.IsUsedOTSIndex(tx.OTSIndex(), accountState.OTSBitfield()) {
+			log.Warn(fmt.Sprintf(errmsg.TXInvalidXMSSOTSIndex,
+				"transfer", txHash, addrFrom, tx.OTSIndex()))
+			return fmt.Errorf("")
 		}
 	}
 
-	balance := addressState.Balance().Uint64()
-	if balance < tx.Value()+tx.Gas()*tx.GasPrice() {
-		log.Warn("Insufficient balance",
-			"txhash", hex.EncodeToString(txHash[:]),
-			"balance", balance,
-			"value", tx.Value(),
-			"max fee", tx.Gas()*tx.GasPrice())
-		return false
+	balance := accountState.Balance().Uint64()
+	requiredBalance := tx.Value() + tx.Gas()*tx.GasPrice()
+	if balance < requiredBalance {
+		return fmt.Errorf(errmsg.TXInsufficientBalance, "transfer", tx.Hash(), addrFrom, requiredBalance, balance)
 	}
 
 	// TODO: Move to some common validation
 	if !(xmss.IsValidXMSSAddress(tx.AddrFrom()) || dilithium.IsValidDilithiumAddress(tx.AddrFrom())) {
-		log.Warn("[Transfer] Invalid address addr_from: ", tx.AddrFrom())
-		return false
+		return fmt.Errorf(errmsg.TXInvalidAddrFrom, "transfer", tx.Hash(), tx.AddrFrom())
 	}
 
 	if tx.To() != nil && !(xmss.IsValidXMSSAddress(*tx.To()) || dilithium.IsValidDilithiumAddress(*tx.To())) {
@@ -625,26 +618,23 @@ func ValidateTransferTxn(tx *transactions.Transfer, statedb *state.StateDB) bool
 		// If the address is neither a valid XMSS or Dilithium address and if code size is 0
 		// then this address not a contract address, thus must be an invalid address
 		if statedb.GetCodeSize(*tx.To()) == 0 {
-			log.Warn("[Transfer] Invalid address addr_to: ", tx.To())
-			return false
+			return fmt.Errorf(errmsg.TXInvalidAddrTo, "transfer", tx.Hash(), tx.To())
 		}
 	}
 
 	if reflect.DeepEqual(tx.AddrFrom(), config.GetDevConfig().Genesis.CoinBaseAddress) {
-		log.Warn("from address cannot be a coinbase address")
-		return false
+		return fmt.Errorf(errmsg.TXAddrFromCannotBeCoinBaseAddr, "transfer", tx.Hash(), tx.AddrFrom())
 	}
 
 	if tx.To() != nil && reflect.DeepEqual(*tx.To(), config.GetDevConfig().Genesis.CoinBaseAddress) {
-		log.Warn("to address cannot be a coinbase address")
-		return false
+		return fmt.Errorf(errmsg.TXAddrToCannotBeCoinBaseAddr, "transfer", tx.Hash(), tx.To())
 	}
 
 	dataLen := len(tx.Data())
-	// TODO: Move the hardcoded value to config
-	if dataLen > 24*1024 {
-		log.Warn("Data length beyond limit: %d", dataLen)
-		return false
+	// TODO (cyyber): Move the hardcoded value to config
+	dataLenLimit := 24 * 1024
+	if dataLen > dataLenLimit {
+		return fmt.Errorf(errmsg.TXDataLengthExceedsLimit, "transfer", tx.Hash(), addrFrom, dataLen, dataLenLimit)
 	}
 
 	signingHash := tx.GetSigningHash()
@@ -652,154 +642,157 @@ func ValidateTransferTxn(tx *transactions.Transfer, statedb *state.StateDB) bool
 		pk := misc.UnSizedDilithiumPKToSizedPK(tx.PK())
 		// Dilithium Signature Verification
 		if !dilithium.Verify(signingHash[:], tx.Signature(), &pk) {
-			log.Warn("Dilithium Signature Verification Failed")
-			return false
+			return fmt.Errorf(errmsg.TXDilithiumSignatureVerificationFailed, "transfer", addrFrom, tx.Hash())
 		}
 	} else if len(tx.PK()) == xmss.ExtendedPKSize {
 		// XMSS Signature Verification
 		if !xmss.Verify(signingHash[:], tx.Signature(), misc.UnSizedXMSSPKToSizedPK(tx.PK())) {
-			log.Warn("XMSS Verification Failed")
-			return false
+			return fmt.Errorf(errmsg.TXXMSSSignatureVerificationFailed, "transfer", addrFrom, tx.Hash())
 		}
 	}
 
-	return true
+	return nil
 }
 
-func ValidateStakeTxn(tx *transactions.Stake, statedb *state.StateDB) bool {
-	txHash := tx.Hash()
+func ValidateStakeTxn(tx *transactions.Stake, statedb *state.StateDB) error {
+	txHash := tx.GenerateTxHash()
 
 	addrFrom := tx.AddrFrom()
-
 	accountState := statedb.GetOrNewStateObject(addrFrom)
 
+	if tx.Hash() != txHash {
+		return fmt.Errorf(errmsg.TXInvalidTxHash, "stake", tx.Hash(), addrFrom, txHash)
+	}
+
 	if tx.Nonce() != accountState.Nonce() {
-		log.Warn(fmt.Sprintf("Stake [%s] Invalid Nonce %d, Expected Nonce %d",
-			hex.EncodeToString(txHash[:]), tx.Nonce(), accountState.Nonce()))
-		return false
+		return fmt.Errorf(errmsg.TXInvalidNonce,
+			"stake", txHash, addrFrom, tx.Nonce(), accountState.Nonce())
 	}
 
 	if tx.Amount() < config.GetDevConfig().StakeAmount {
-		log.Warn("Invalid stake amount",
-			"Must be multiplier of", config.GetDevConfig().StakeAmount,
-			"Stake Amount", tx.Amount())
+		return fmt.Errorf(errmsg.TXInvalidStakeAmount,
+			"stake", tx.Hash(), addrFrom, tx.Amount(), config.GetDevConfig().StakeAmount)
+	}
+
+	if len(tx.PK()) != dilithium.PKSizePacked {
+		return fmt.Errorf(errmsg.TXInvalidDilithiumPKSize, "stake", tx.Hash(), addrFrom, len(tx.PK()))
 	}
 
 	balance := accountState.Balance()
 	requiredBalance := tx.Gas()*tx.GasPrice() + tx.Amount()
 
 	if balance.Cmp(big.NewInt(int64(requiredBalance))) < 0 {
-		log.Warn("Insufficient balance",
-			"txhash", hex.EncodeToString(txHash[:]),
-			"balance", balance,
-			"required balance", requiredBalance)
-		return false
+		return fmt.Errorf(errmsg.TXInsufficientBalance,
+			"stake", txHash, addrFrom, requiredBalance, balance)
 	}
 
 	// TODO: Remove this hardcoded 1000 gas
-	if tx.Gas() < 1000 {
-		log.Warn("Insufficient stake transaction gas",
-			"txhash", hex.EncodeToString(txHash[:]),
-			"min stake txn gas required", 1000,
-			"gas provided", tx.Gas())
-		return false
+	gasRequired := uint64(1000)
+	if tx.Gas() < gasRequired {
+		return fmt.Errorf(errmsg.TXInsufficientGas,
+			"stake", txHash, addrFrom, tx.Gas(), gasRequired)
 	}
 
 	if !dilithium.IsValidDilithiumAddress(tx.AddrFrom()) {
-		log.Warn("[Stake] Invalid dilithium address in addr_from: %s", tx.AddrFrom())
-		return false
+		return fmt.Errorf(errmsg.TXInvalidDilithiumAddrFrom, "stake", tx.Hash(), tx.AddrFrom())
 	}
 
 	pk := misc.UnSizedDilithiumPKToSizedPK(tx.PK())
 	signingHash := tx.GetSigningHash()
-	// Dilithium Signature Verification
+
 	if !dilithium.Verify(signingHash[:], tx.Signature(), &pk) {
-		log.Warn("Dilithium Signature Verification Failed")
-		return false
+		return fmt.Errorf(errmsg.TXDilithiumSignatureVerificationFailed, "stake", tx.Hash(), addrFrom)
 	}
 
-	return true
+	return nil
 }
 
-func ValidateAttestTx(tx *transactions.Attest, statedb *state.StateDB, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, partialBlockSigningHash common.Hash) bool {
+func ValidateAttestTx(tx *transactions.Attest, statedb *state.StateDB, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, partialBlockSigningHash common.Hash, slotNumber uint64) error {
 	signedMessage := tx.GetSigningHash(partialBlockSigningHash)
 	txHash := tx.TxHash(signedMessage)
 
+	signerAddr := misc.GetDilithiumAddressFromUnSizedPK(tx.PK())
+	accountState := statedb.GetOrNewStateObject(signerAddr)
+
+	if tx.Hash() != txHash {
+		return fmt.Errorf(errmsg.TXInvalidTxHash, "attest", tx.Hash(), signerAddr, txHash)
+	}
+
+	if tx.Nonce() != accountState.Nonce() {
+		return fmt.Errorf(errmsg.TXInvalidNonce, "attest", tx.Hash(), signerAddr, tx.Nonce(), accountState.Nonce())
+	}
+
 	if len(tx.PK()) != dilithium.PKSizePacked {
-		log.Error("Invalid Dilithium PK ")
-		return false
+		return fmt.Errorf(errmsg.TXInvalidDilithiumPKSize, "attest", tx.Hash(), signerAddr, len(tx.PK()))
 	}
 
 	pk := misc.UnSizedDilithiumPKToSizedPK(tx.PK())
 	if !dilithium.Verify(signedMessage[:], tx.Signature(), &pk) {
-		log.Warn(fmt.Sprintf("Dilithium Signature Verification failed for Attest Txn %s",
-			hex.EncodeToString(txHash[:])))
-		return false
+		return fmt.Errorf(errmsg.TXDilithiumSignatureVerificationFailed, "attest", tx.Hash(), signerAddr)
 	}
 
-	validatorPK := tx.PK()
-	if !slotValidatorsMetaData.IsAttestor(hex.EncodeToString(validatorPK[:])) {
-		log.Error("invalid attestor",
-			"TxHash", hex.EncodeToString(txHash[:]))
-		return false
+	if !slotValidatorsMetaData.IsAttestor(misc.BytesToHexStr(tx.PK())) {
+		return fmt.Errorf(errmsg.TXInvalidAttestor,
+			"attest", misc.BytesToHexStr(txHash[:]), signerAddr, slotNumber)
 	}
 
-	accountState := statedb.GetOrNewStateObject(misc.GetDilithiumAddressFromUnSizedPK(tx.PK()))
 	if accountState.StakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
-		return false
+		return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
+			"attest", tx.Hash(), signerAddr, accountState.StakeBalance())
 	}
 
-	return true
+	return nil
 }
 
-func ValidateCoinBaseTx(tx *transactions.CoinBase, statedb *state.StateDB, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, isGenesis bool) bool {
+func ValidateCoinBaseTx(tx *transactions.CoinBase, statedb *state.StateDB, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, slotNumber uint64, isGenesis bool) error {
 	signedMessage := tx.GetSigningHash(blockSigningHash)
 	txHash := tx.TxHash(signedMessage)
+
+	signerAddr := misc.GetDilithiumAddressFromUnSizedPK(tx.PK())
+	accountState := statedb.GetOrNewStateObject(signerAddr)
+
+	if tx.Hash() != txHash {
+		return fmt.Errorf(errmsg.TXInvalidTxHash, "coinbase", tx.Hash(), signerAddr, txHash)
+	}
+
+	if tx.Nonce() != accountState.Nonce() {
+		return fmt.Errorf(errmsg.TXInvalidNonce, "coinbase", tx.Hash(), signerAddr, tx.Nonce(), accountState.Nonce())
+	}
+
+	if len(tx.PK()) != dilithium.PKSizePacked {
+		return fmt.Errorf(errmsg.TXInvalidDilithiumPKSize, "coinbase", tx.Hash(), signerAddr, len(tx.PK()))
+	}
 
 	// Genesis block has unsigned coinbase txn
 	if !isGenesis {
 		pk := misc.UnSizedDilithiumPKToSizedPK(tx.PK())
 		if !dilithium.Verify(signedMessage[:], tx.Signature(), &pk) {
-			log.Warn(fmt.Sprintf("Dilithium Signature Verification failed for CoinBase Txn %s",
-				hex.EncodeToString(txHash[:])))
-			return false
+			return fmt.Errorf(errmsg.TXDilithiumSignatureVerificationFailed, "coinbase", tx.Hash(), signerAddr)
 		}
 	}
 
-	if len(tx.PK()) != dilithium.PKSizePacked {
-		log.Error("Invalid Dilithium PK",
-			"TxHash", hex.EncodeToString(txHash[:]))
-		return false
-	}
-
 	validatorPK := tx.PK()
-	if !slotValidatorsMetaData.IsSlotLeader(hex.EncodeToString(validatorPK[:])) {
-		log.Error("invalid block proposer",
-			"TxHash", hex.EncodeToString(txHash[:]))
-		return false
-	}
-
-	coinBaseAddress := config.GetDevConfig().Genesis.CoinBaseAddress
-	coinBaseAccountState := statedb.GetOrNewStateObject(coinBaseAddress)
-
-	if tx.Nonce() != coinBaseAccountState.Nonce() {
-		log.Warn(fmt.Sprintf("CoinBase [%s] Invalid Nonce %d, Expected Nonce %d",
-			hex.EncodeToString(txHash[:]), tx.Nonce(), coinBaseAccountState.Nonce()))
-		return false
+	if !slotValidatorsMetaData.IsSlotLeader(misc.BytesToHexStr(validatorPK[:])) {
+		return fmt.Errorf(errmsg.TXInvalidSlotLeader,
+			"coinbase", misc.BytesToHexStr(txHash[:]), signerAddr, slotNumber)
 	}
 
 	if tx.BlockProposerReward() != rewards.GetBlockReward() {
-		log.Error("Invalid Block Proposer Reward")
-		log.Error("Expected Reward ", rewards.GetBlockReward())
-		log.Error("Found Reward ", tx.BlockProposerReward())
-		return false
+		return fmt.Errorf(errmsg.TXInvalidBlockReward,
+			"coinbase", misc.BytesToHexStr(txHash[:]), signerAddr, tx.BlockProposerReward(), rewards.GetBlockReward())
 	}
 
 	if tx.AttestorReward() != rewards.GetAttestorReward() {
-		log.Error("Invalid Attestor Reward")
-		log.Error("Expected Reward ", rewards.GetAttestorReward())
-		log.Error("Found Reward ", tx.AttestorReward())
-		return false
+		return fmt.Errorf(errmsg.TXInvalidAttestorReward,
+			"coinbase", misc.BytesToHexStr(txHash[:]), signerAddr, tx.AttestorReward(), rewards.GetAttestorReward())
+	}
+
+	// Genesis block proposer will have 0 stake balance initially
+	if !isGenesis {
+		if accountState.StakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
+			return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
+				"coinbase", tx.Hash(), signerAddr, accountState.StakeBalance())
+		}
 	}
 
 	// TODO: remove fee reward or the coinbase transaction
@@ -814,27 +807,27 @@ func ValidateCoinBaseTx(tx *transactions.CoinBase, statedb *state.StateDB, slotV
 	//balance := addressState.Balance()
 	//if balance < tx.TotalAmounts() {
 	//	log.Warn("Insufficient balance",
-	//		"txhash", hex.EncodeToString(txHash),
+	//		"txhash", misc.BytesToHexStr(txHash),
 	//		"balance", balance,
 	//		"fee", tx.FeeReward())
 	//	return false
 	//}
 
-	//ds := stateContext.GetDilithiumState(hex.EncodeToString(tx.PK()))
+	//ds := stateContext.GetDilithiumState(misc.BytesToHexStr(tx.PK()))
 	//if ds == nil {
-	//	log.Warn("Dilithium State not found for %s", hex.EncodeToString(tx.PK()))
+	//	log.Warn("Dilithium State not found for %s", misc.BytesToHexStr(tx.PK()))
 	//	return false
 	//}
 	//if !ds.Stake() {
-	//	log.Warn("Dilithium PK %s is not allowed to stake", hex.EncodeToString(tx.PK()))
+	//	log.Warn("Dilithium PK %s is not allowed to stake", misc.BytesToHexStr(tx.PK()))
 	//	return false
 	//}
 
 	// TODO: Check the block proposer and attestor reward
-	return true
+	return nil
 }
 
-func ValidateTransaction(protoTx *protos.Transaction, statedb *state.StateDB) bool {
+func ValidateTransaction(protoTx *protos.Transaction, statedb *state.StateDB) error {
 	switch protoTx.Type.(type) {
 	case *protos.Transaction_Stake:
 		stakeTx := transactions.StakeTransactionFromPBData(protoTx)
@@ -843,60 +836,56 @@ func ValidateTransaction(protoTx *protos.Transaction, statedb *state.StateDB) bo
 		transferTx := transactions.TransferTransactionFromPBData(protoTx)
 		return ValidateTransferTxn(transferTx, statedb)
 	default:
-		panic("Unknown txn")
+		return fmt.Errorf("unkown transaction type")
 	}
-	return false
 }
 
-func ValidateProtocolTransaction(protoTx *protos.ProtocolTransaction, statedb *state.StateDB, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, hash common.Hash, isGenesis bool) bool {
+func ValidateProtocolTransaction(protoTx *protos.ProtocolTransaction, statedb *state.StateDB, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, hash common.Hash, slotNumber uint64, isGenesis bool) error {
 	switch protoTx.Type.(type) {
 	case *protos.ProtocolTransaction_CoinBase:
 		coinBaseTx := transactions.CoinBaseTransactionFromPBData(protoTx)
-		return ValidateCoinBaseTx(coinBaseTx, statedb, slotValidatorsMetaData, hash, isGenesis)
+		return ValidateCoinBaseTx(coinBaseTx, statedb, slotValidatorsMetaData, hash, slotNumber, isGenesis)
 	case *protos.ProtocolTransaction_Attest:
 		attestTx := transactions.AttestTransactionFromPBData(protoTx)
-		return ValidateAttestTx(attestTx, statedb, slotValidatorsMetaData, hash)
+		return ValidateAttestTx(attestTx, statedb, slotValidatorsMetaData, hash, slotNumber)
 	default:
-		panic("Unknown txn")
+		return fmt.Errorf("unkown transaction type")
 	}
-	return false
 }
 
-func ProcessEpochMetaData(b *block.Block, statedb *state.StateDB, epochMetaData *metadata.EpochMetaData,
-	validatorsStakeAmount map[string]uint64, validatorsStateChanged map[string]bool) error {
-
+func ProcessEpochMetaData(b *block.Block, statedb *state.StateDB, epochMetaData *metadata.EpochMetaData) error {
 	for _, pbData := range b.ProtocolTransactions() {
-		strPK := hex.EncodeToString(pbData.Pk)
-		amount, ok := validatorsStakeAmount[strPK]
-		if !ok {
-			return fmt.Errorf("balance not loaded for the validator %s", strPK)
+		address := misc.GetDilithiumAddressFromUnSizedPK(pbData.GetPk())
+		validatorStakeBalance := statedb.GetStakeBalance(address).Uint64()
+		requiredStakeAmount := config.GetDevConfig().StakeAmount
+		if validatorStakeBalance < requiredStakeAmount && b.SlotNumber() != 0 {
+			return fmt.Errorf("balance not loaded for the validator %s", address)
 		}
-		epochMetaData.AddTotalStakeAmountFound(amount)
+		epochMetaData.AddTotalStakeAmountFound(requiredStakeAmount)
 	}
+	return nil
+}
 
-	for _, pbData := range b.Transactions() {
-		switch pbData.Type.(type) {
-		case *protos.Transaction_Stake:
-			// TODO: Need to add this address into the epoch metadata, if it doesn't exist
-			// add existing stake amount to balance
-			// then set stake amount equal to tx.Amount
-			// finally set the pendingStakeBalance to 0 for all the validators
+func UpdateStakeValidators(statedb *state.StateDB, pendingStakeValidatorsUpdate map[string]uint8, epochMetaData *metadata.EpochMetaData) error {
+	for strValidatorPK, _ := range pendingStakeValidatorsUpdate {
+		validatorPK, err := misc.HexStrToBytes(strValidatorPK)
+		if err != nil {
+			return fmt.Errorf("[UpdateStakeValidators] Failed to decode validator PK")
+		}
+		account := statedb.GetOrNewStateObject(misc.GetAddressFromUnSizedPK(validatorPK))
+		if account.PendingStakeBalance().Uint64() == 0 {
+			epochMetaData.RemoveValidators(validatorPK)
 
-			tx := transactions.ProtoToTransaction(pbData)
-			account := statedb.GetOrNewStateObject(misc.GetDilithiumAddressFromUnSizedPK(tx.PK()))
-			if pbData.GetStake().Amount > 0 {
-				epochMetaData.AddValidators(tx.PK())
-				validatorsStateChanged[hex.EncodeToString(tx.PK())] = true
+			account.AddBalance(account.StakeBalance())
+			account.SetStakeBalance(common.Big0)
+			log.Info("Removed validator ", misc.GetAddressFromUnSizedPK(validatorPK))
+		} else {
+			account.AddBalance(account.StakeBalance())
+			account.SetStakeBalance(account.PendingStakeBalance())
+			account.SetPendingStakeBalance(common.Big0)
 
-				account.SetStakeBalance(account.PendingStakeBalance())
-				account.SetPendingStakeBalance(common.Big0)
-			} else {
-				epochMetaData.RemoveValidators(tx.PK())
-				validatorsStateChanged[hex.EncodeToString(tx.PK())] = false
-
-				account.AddBalance(account.StakeBalance())
-				account.SetStakeBalance(common.Big0)
-			}
+			epochMetaData.AddValidators(validatorPK)
+			log.Info("Added validator ", misc.GetAddressFromUnSizedPK(validatorPK))
 		}
 	}
 
