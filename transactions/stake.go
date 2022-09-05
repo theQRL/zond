@@ -13,21 +13,13 @@ type Stake struct {
 	Transaction
 }
 
-func (tx *Stake) Type() uint8 {
-	return 1
-}
-
-func (tx *Stake) Hash() common.Hash {
-	return tx.GenerateTxHash()
-}
-
 func (tx *Stake) Amount() uint64 {
 	return tx.pbData.GetStake().Amount
 }
 
 func (tx *Stake) GetSigningHash() common.Hash {
 	tmp := new(bytes.Buffer)
-	binary.Write(tmp, binary.BigEndian, tx.NetworkID())
+	binary.Write(tmp, binary.BigEndian, tx.ChainID())
 	binary.Write(tmp, binary.BigEndian, tx.Nonce())
 
 	binary.Write(tmp, binary.BigEndian, tx.Gas())
@@ -39,10 +31,7 @@ func (tx *Stake) GetSigningHash() common.Hash {
 	h.Write(tmp.Bytes())
 
 	output := h.Sum(nil)
-	var hash common.Hash
-	copy(hash[:], output)
-
-	return hash
+	return common.BytesToHash(output)
 }
 
 func (tx *Stake) GenerateTxHash() common.Hash {
@@ -66,12 +55,12 @@ func (tx *Stake) ApplyStateChanges(stateContext *state.StateContext) error {
 	We are only taking DilithiumPK for the staking purpose, however in the
 	future, we may allow other signature schemes like XMSS for staking
 */
-func NewStake(networkID uint64, amount uint64,
+func NewStake(chainID uint64, amount uint64,
 	gas uint64, gasPrice uint64, nonce uint64, dilithiumPK []byte) *Stake {
 	tx := &Stake{}
 
 	tx.pbData = &protos.Transaction{}
-	tx.pbData.NetworkId = networkID
+	tx.pbData.ChainId = chainID
 	tx.pbData.Type = &protos.Transaction_Stake{Stake: &protos.Stake{}}
 
 	tx.pbData.Pk = dilithiumPK
