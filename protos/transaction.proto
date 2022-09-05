@@ -27,17 +27,18 @@ message CoinBase {
 }
 
 message Transaction {
-    uint64 network_id = 1;
+    uint64 chain_id = 1;
     uint64 nonce = 2;
     bytes pk = 3;
     bytes signature = 4;
 
     uint64 gas = 5;
     uint64 gas_price = 6;
+    bytes hash = 7;
 
     oneof type {
-        Stake stake = 7;
-        Transfer transfer = 8;
+        Stake stake = 8;
+        Transfer transfer = 9;
     }
 }
 
@@ -46,14 +47,15 @@ message TransactionList {
 }
 
 message ProtocolTransaction {
-    uint64 network_id = 1;
+    uint64 chain_id = 1;
     uint64 nonce = 2;
     bytes pk = 3;
     bytes signature = 4;
+    bytes hash = 5;
 
     oneof type {
-        CoinBase coin_base = 5;
-        Attest attest = 6;
+        CoinBase coin_base = 6;
+        Attest attest = 7;
     }
 }
 
