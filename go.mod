@@ -8,6 +8,7 @@ require (
 	github.com/deckarep/golang-set v1.7.1
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-stack/stack v1.8.1
+	github.com/golang-jwt/jwt/v4 v4.4.2
 	github.com/golang/protobuf v1.5.2
 	github.com/golang/snappy v0.0.4
 	github.com/gorilla/mux v1.8.0
@@ -24,11 +25,11 @@ require (
 	github.com/prometheus/tsdb v0.10.0
 	github.com/rs/cors v1.7.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
-	github.com/sirupsen/logrus v1.6.0
+	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.2
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
-	github.com/theQRL/go-libp2p-qrl v0.0.0-20220806153848-7dfc75fcfade
-	github.com/theQRL/go-qrllib v0.0.0-20220809144012-a93c711979b0
+	github.com/theQRL/go-libp2p-qrl v0.0.0-20220905140727-a440bc5ac394
+	github.com/theQRL/go-qrllib v0.0.0-20220905123946-c103e7739266
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
 	github.com/urfave/cli/v2 v2.2.0
 	github.com/willf/bitset v1.1.11 // indirect
