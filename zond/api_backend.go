@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/theQRL/zond/block"
 	"github.com/theQRL/zond/common"
+	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/core"
 	"github.com/theQRL/zond/core/state"
 	"github.com/theQRL/zond/core/vm"
@@ -339,8 +340,8 @@ func (b *ZondAPIBackend) SendTx(ctx context.Context, signedTx transactions.Trans
 //}
 
 func (b *ZondAPIBackend) RPCGasCap() uint64 {
-	// TODO (cyyber): Move this to config
-	return 50000000
+	// TODO (cyyber): Add a separate config for RPCGasCap
+	return config.GetDevConfig().BlockGasLimit
 	//return b.zond.config.RPCGasCap
 }
 
