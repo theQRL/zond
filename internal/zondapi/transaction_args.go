@@ -23,7 +23,7 @@ type TransactionArgs struct {
 	Value                *hexutil.Big    `json:"value"`
 	Nonce                *hexutil.Uint64 `json:"nonce"`
 
-	Input *hexutil.Bytes `json:"input"`
+	Data *hexutil.Bytes `json:"data"`
 
 	// Introduced by AccessListTxType transaction.
 	AccessList *types.AccessList `json:"accessList,omitempty"`
@@ -199,12 +199,12 @@ func (args *TransactionArgs) ToMessage(globalGasCap uint64, baseFee *big.Int) (t
 	if args.Value != nil {
 		value = args.Value.ToInt()
 	}
-	input := *args.Input
+	data := *args.Data
 	var accessList types.AccessList
 	if args.AccessList != nil {
 		accessList = *args.AccessList
 	}
-	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, gasFeeCap, gasTipCap, input, accessList, true)
+	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, gasFeeCap, gasTipCap, data, accessList, true)
 	return msg, nil
 }
 
@@ -226,7 +226,7 @@ func (args *TransactionArgs) toTransaction() *types.Transaction {
 			GasFeeCap:  (*big.Int)(args.MaxFeePerGas),
 			GasTipCap:  (*big.Int)(args.MaxPriorityFeePerGas),
 			Value:      (*big.Int)(args.Value),
-			Data:       *args.Input,
+			Data:       *args.Data,
 			AccessList: al,
 		}
 	case args.AccessList != nil:
@@ -237,7 +237,7 @@ func (args *TransactionArgs) toTransaction() *types.Transaction {
 			Gas:        uint64(*args.Gas),
 			GasPrice:   (*big.Int)(args.GasPrice),
 			Value:      (*big.Int)(args.Value),
-			Data:       *args.Input,
+			Data:       *args.Data,
 			AccessList: *args.AccessList,
 		}
 	default:
@@ -247,7 +247,7 @@ func (args *TransactionArgs) toTransaction() *types.Transaction {
 			Gas:      uint64(*args.Gas),
 			GasPrice: (*big.Int)(args.GasPrice),
 			Value:    (*big.Int)(args.Value),
-			Data:     *args.Input,
+			Data:     *args.Data,
 		}
 	}
 	return types.NewTx(data)
