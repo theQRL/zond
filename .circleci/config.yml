@@ -1,0 +1,17 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: cimg/go:1.17.8
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run: go build ./cmd/zond-cli
+      - run: ./zond-cli dev genesis-bootstrap
+      - run: mkdir ~/.zond
+      - run: mkdir block/genesis/devnet
+      - run: cp bootstrap/prestate.yml ./block/genesis/devnet/
+      - run: cp bootstrap/genesis.yml ./block/genesis/devnet/
+      - run: cp bootstrap/dilithium_keys ~/.zond
+      - run: go build ./cmd/gzond
+      - run: "[[ -f ./gzond ]] && echo \"[SUCCESS] Zond built\"; exit 0 || echo \"[ERROR] Zond not built\"; exit 1"
