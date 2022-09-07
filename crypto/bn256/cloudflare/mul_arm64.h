@@ -1,181 +1,133 @@
-#define mul(a0,a1,a2,a3, rb, stack) \
-	MOVQ a0, AX \
-	MULQ 0+rb \
-	MOVQ AX, R8 \
-	MOVQ DX, R9 \
-	MOVQ a0, AX \
-	MULQ 8+rb \
-	ADDQ AX, R9 \
-	ADCQ $0, DX \
-	MOVQ DX, R10 \
-	MOVQ a0, AX \
-	MULQ 16+rb \
-	ADDQ AX, R10 \
-	ADCQ $0, DX \
-	MOVQ DX, R11 \
-	MOVQ a0, AX \
-	MULQ 24+rb \
-	ADDQ AX, R11 \
-	ADCQ $0, DX \
-	MOVQ DX, R12 \
+#define mul(c0,c1,c2,c3,c4,c5,c6,c7) \
+	MUL R1, R5, c0 \
+	UMULH R1, R5, c1 \
+	MUL R1, R6, R0 \
+	ADDS R0, c1 \
+	UMULH R1, R6, c2 \
+	MUL R1, R7, R0 \
+	ADCS R0, c2 \
+	UMULH R1, R7, c3 \
+	MUL R1, R8, R0 \
+	ADCS R0, c3 \
+	UMULH R1, R8, c4 \
+	ADCS ZR, c4 \
 	\
-	storeBlock(R8,R9,R10,R11, 0+stack) \
-	MOVQ R12, 32+stack \
+	MUL R2, R5, R1 \
+	UMULH R2, R5, R26 \
+	MUL R2, R6, R0 \
+	ADDS R0, R26 \
+	UMULH R2, R6, R27 \
+	MUL R2, R7, R0 \
+	ADCS R0, R27 \
+	UMULH R2, R7, R29 \
+	MUL R2, R8, R0 \
+	ADCS R0, R29 \
+	UMULH R2, R8, c5 \
+	ADCS ZR, c5 \
+	ADDS R1, c1 \
+	ADCS R26, c2 \
+	ADCS R27, c3 \
+	ADCS R29, c4 \
+	ADCS  ZR, c5 \
 	\
-	MOVQ a1, AX \
-	MULQ 0+rb \
-	MOVQ AX, R8 \
-	MOVQ DX, R9 \
-	MOVQ a1, AX \
-	MULQ 8+rb \
-	ADDQ AX, R9 \
-	ADCQ $0, DX \
-	MOVQ DX, R10 \
-	MOVQ a1, AX \
-	MULQ 16+rb \
-	ADDQ AX, R10 \
-	ADCQ $0, DX \
-	MOVQ DX, R11 \
-	MOVQ a1, AX \
-	MULQ 24+rb \
-	ADDQ AX, R11 \
-	ADCQ $0, DX \
-	MOVQ DX, R12 \
+	MUL R3, R5, R1 \
+	UMULH R3, R5, R26 \
+	MUL R3, R6, R0 \
+	ADDS R0, R26 \
+	UMULH R3, R6, R27 \
+	MUL R3, R7, R0 \
+	ADCS R0, R27 \
+	UMULH R3, R7, R29 \
+	MUL R3, R8, R0 \
+	ADCS R0, R29 \
+	UMULH R3, R8, c6 \
+	ADCS ZR, c6 \
+	ADDS R1, c2 \
+	ADCS R26, c3 \
+	ADCS R27, c4 \
+	ADCS R29, c5 \
+	ADCS  ZR, c6 \
 	\
-	ADDQ 8+stack, R8 \
-	ADCQ 16+stack, R9 \
-	ADCQ 24+stack, R10 \
-	ADCQ 32+stack, R11 \
-	ADCQ $0, R12 \
-	storeBlock(R8,R9,R10,R11, 8+stack) \
-	MOVQ R12, 40+stack \
-	\
-	MOVQ a2, AX \
-	MULQ 0+rb \
-	MOVQ AX, R8 \
-	MOVQ DX, R9 \
-	MOVQ a2, AX \
-	MULQ 8+rb \
-	ADDQ AX, R9 \
-	ADCQ $0, DX \
-	MOVQ DX, R10 \
-	MOVQ a2, AX \
-	MULQ 16+rb \
-	ADDQ AX, R10 \
-	ADCQ $0, DX \
-	MOVQ DX, R11 \
-	MOVQ a2, AX \
-	MULQ 24+rb \
-	ADDQ AX, R11 \
-	ADCQ $0, DX \
-	MOVQ DX, R12 \
-	\
-	ADDQ 16+stack, R8 \
-	ADCQ 24+stack, R9 \
-	ADCQ 32+stack, R10 \
-	ADCQ 40+stack, R11 \
-	ADCQ $0, R12 \
-	storeBlock(R8,R9,R10,R11, 16+stack) \
-	MOVQ R12, 48+stack \
-	\
-	MOVQ a3, AX \
-	MULQ 0+rb \
-	MOVQ AX, R8 \
-	MOVQ DX, R9 \
-	MOVQ a3, AX \
-	MULQ 8+rb \
-	ADDQ AX, R9 \
-	ADCQ $0, DX \
-	MOVQ DX, R10 \
-	MOVQ a3, AX \
-	MULQ 16+rb \
-	ADDQ AX, R10 \
-	ADCQ $0, DX \
-	MOVQ DX, R11 \
-	MOVQ a3, AX \
-	MULQ 24+rb \
-	ADDQ AX, R11 \
-	ADCQ $0, DX \
-	MOVQ DX, R12 \
-	\
-	ADDQ 24+stack, R8 \
-	ADCQ 32+stack, R9 \
-	ADCQ 40+stack, R10 \
-	ADCQ 48+stack, R11 \
-	ADCQ $0, R12 \
-	storeBlock(R8,R9,R10,R11, 24+stack) \
-	MOVQ R12, 56+stack
+	MUL R4, R5, R1 \
+	UMULH R4, R5, R26 \
+	MUL R4, R6, R0 \
+	ADDS R0, R26 \
+	UMULH R4, R6, R27 \
+	MUL R4, R7, R0 \
+	ADCS R0, R27 \
+	UMULH R4, R7, R29 \
+	MUL R4, R8, R0 \
+	ADCS R0, R29 \
+	UMULH R4, R8, c7 \
+	ADCS ZR, c7 \
+	ADDS R1, c3 \
+	ADCS R26, c4 \
+	ADCS R27, c5 \
+	ADCS R29, c6 \
+	ADCS  ZR, c7
 
-#define gfpReduce(stack) \
-	\ // m = (T * N') mod R, store m in R8:R9:R10:R11
-	MOVQ ·np+0(SB), AX \
-	MULQ 0+stack \
-	MOVQ AX, R8 \
-	MOVQ DX, R9 \
-	MOVQ ·np+0(SB), AX \
-	MULQ 8+stack \
-	ADDQ AX, R9 \
-	ADCQ $0, DX \
-	MOVQ DX, R10 \
-	MOVQ ·np+0(SB), AX \
-	MULQ 16+stack \
-	ADDQ AX, R10 \
-	ADCQ $0, DX \
-	MOVQ DX, R11 \
-	MOVQ ·np+0(SB), AX \
-	MULQ 24+stack \
-	ADDQ AX, R11 \
+#define gfpReduce() \
+	\ // m = (T * N') mod R, store m in R1:R2:R3:R4
+	MOVD ·np+0(SB), R17 \
+	MOVD ·np+8(SB), R25 \
+	MOVD ·np+16(SB), R19 \
+	MOVD ·np+24(SB), R20 \
 	\
-	MOVQ ·np+8(SB), AX \
-	MULQ 0+stack \
-	MOVQ AX, R12 \
-	MOVQ DX, R13 \
-	MOVQ ·np+8(SB), AX \
-	MULQ 8+stack \
-	ADDQ AX, R13 \
-	ADCQ $0, DX \
-	MOVQ DX, R14 \
-	MOVQ ·np+8(SB), AX \
-	MULQ 16+stack \
-	ADDQ AX, R14 \
+	MUL R9, R17, R1 \
+	UMULH R9, R17, R2 \
+	MUL R9, R25, R0 \
+	ADDS R0, R2 \
+	UMULH R9, R25, R3 \
+	MUL R9, R19, R0 \
+	ADCS R0, R3 \
+	UMULH R9, R19, R4 \
+	MUL R9, R20, R0 \
+	ADCS R0, R4 \
 	\
-	ADDQ R12, R9 \
-	ADCQ R13, R10 \
-	ADCQ R14, R11 \
+	MUL R10, R17, R21 \
+	UMULH R10, R17, R22 \
+	MUL R10, R25, R0 \
+	ADDS R0, R22 \
+	UMULH R10, R25, R23 \
+	MUL R10, R19, R0 \
+	ADCS R0, R23 \
+	ADDS R21, R2 \
+	ADCS R22, R3 \
+	ADCS R23, R4 \
 	\
-	MOVQ ·np+16(SB), AX \
-	MULQ 0+stack \
-	MOVQ AX, R12 \
-	MOVQ DX, R13 \
-	MOVQ ·np+16(SB), AX \
-	MULQ 8+stack \
-	ADDQ AX, R13 \
+	MUL R11, R17, R21 \
+	UMULH R11, R17, R22 \
+	MUL R11, R25, R0 \
+	ADDS R0, R22 \
+	ADDS R21, R3 \
+	ADCS R22, R4 \
 	\
-	ADDQ R12, R10 \
-	ADCQ R13, R11 \
-	\
-	MOVQ ·np+24(SB), AX \
-	MULQ 0+stack \
-	ADDQ AX, R11 \
-	\
-	storeBlock(R8,R9,R10,R11, 64+stack) \
+	MUL R12, R17, R21 \
+	ADDS R21, R4 \
 	\
 	\ // m * N
-	mul(·p2+0(SB),·p2+8(SB),·p2+16(SB),·p2+24(SB), 64+stack, 96+stack) \
+	loadModulus(R5,R6,R7,R8) \
+	mul(R17,R25,R19,R20,R21,R22,R23,R24) \
 	\
 	\ // Add the 512-bit intermediate to m*N
-	loadBlock(96+stack, R8,R9,R10,R11) \
-	loadBlock(128+stack, R12,R13,R14,CX) \
+	MOVD  ZR, R0 \
+	ADDS  R9, R17 \
+	ADCS R10, R25 \
+	ADCS R11, R19 \
+	ADCS R12, R20 \
+	ADCS R13, R21 \
+	ADCS R14, R22 \
+	ADCS R15, R23 \
+	ADCS R16, R24 \
+	ADCS  ZR, R0 \
 	\
-	MOVQ $0, AX \
-	ADDQ 0+stack, R8 \
-	ADCQ 8+stack, R9 \
-	ADCQ 16+stack, R10 \
-	ADCQ 24+stack, R11 \
-	ADCQ 32+stack, R12 \
-	ADCQ 40+stack, R13 \
-	ADCQ 48+stack, R14 \
-	ADCQ 56+stack, CX \
-	ADCQ $0, AX \
+	\ // Our output is R21:R22:R23:R24. Reduce mod p if necessary.
+	SUBS R5, R21, R10 \
+	SBCS R6, R22, R11 \
+	SBCS R7, R23, R12 \
+	SBCS R8, R24, R13 \
 	\
-	gfpCarry(R12,R13,R14,CX,AX, R8,R9,R10,R11,BX)
+	CSEL CS, R10, R21, R1 \
+	CSEL CS, R11, R22, R2 \
+	CSEL CS, R12, R23, R3 \
+	CSEL CS, R13, R24, R4
