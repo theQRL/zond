@@ -14,4 +14,4 @@ jobs:
       - run: cp bootstrap/genesis.yml ./block/genesis/devnet/
       - run: cp bootstrap/dilithium_keys ~/.zond
       - run: go build ./cmd/gzond
-      - run: "[[ -f ./gzond ]] && echo \"Zond built\" || echo \"Not built\"; exit(1)"
+      - run: "[[ -f ./gzond ]] && echo \"Zond built\" || echo \"Not built\"; exit 1"
