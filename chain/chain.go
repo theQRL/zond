@@ -13,6 +13,7 @@ import (
 	"github.com/theQRL/zond/core"
 	"github.com/theQRL/zond/core/rawdb"
 	state2 "github.com/theQRL/zond/core/state"
+	"github.com/theQRL/zond/core/types"
 	"github.com/theQRL/zond/core/vm"
 	"github.com/theQRL/zond/core/vm/runtime"
 	"github.com/theQRL/zond/crypto"
@@ -21,6 +22,7 @@ import (
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/params"
 	"github.com/theQRL/zond/protos"
+	"github.com/theQRL/zond/rlp"
 	"github.com/theQRL/zond/state"
 	"github.com/theQRL/zond/transactions"
 	"github.com/theQRL/zond/transactions/pool"
@@ -138,6 +140,73 @@ func (c *Chain) GetBlockByNumber(number uint64) *block.Block {
 	}
 
 	return b
+}
+
+func (c *Chain) GetTransactionMetaDataByHash(txHash common.Hash) *metadata.TransactionMetaData {
+	txMetaData, err := metadata.GetTransactionMetaData(c.state.DB(), txHash)
+	if err != nil {
+		log.Error("failed to get transaction metadata for txHash ", txHash)
+		return nil
+	}
+
+	return txMetaData
+}
+
+func (c *Chain) GetReceiptsByHash(headerHash common.Hash, isProtocolTransaction bool) types.Receipts {
+	b, err := block.GetBlock(c.state.DB(), headerHash)
+	if err != nil {
+		log.Error("Failed to derive block", "hash", headerHash, "err", err)
+		return nil
+	}
+	blockReceipts, err := metadata.GetBlockReceipts(c.state.DB(), headerHash, b.SlotNumber(), isProtocolTransaction)
+	if err != nil {
+		log.Error("Failed to get block receipts", "hash", headerHash, "number", b.SlotNumber(), "err", err)
+		return nil
+	}
+
+	data := blockReceipts.Receipts()
+	if len(data) == 0 {
+		return nil
+	}
+	storageReceipts := []*types.ReceiptForStorage{}
+	if err := rlp.DecodeBytes(data, &storageReceipts); err != nil {
+		log.Error("Invalid receipt array RLP", "hash", headerHash, "err", err)
+		return nil
+	}
+	receipts := make(types.Receipts, len(storageReceipts))
+	for i, storageReceipt := range storageReceipts {
+		receipts[i] = (*types.Receipt)(storageReceipt)
+	}
+
+	if !isProtocolTransaction {
+		if err := receipts.DeriveFieldsForTransactions(headerHash, b.SlotNumber(), b.Transactions()); err != nil {
+			log.Error("Failed to derive transaction block receipts fields", "hash", headerHash, "number", b.SlotNumber(), "err", err)
+			return nil
+		}
+	} else {
+		if err := receipts.DeriveFieldsForProtocolTransactions(headerHash, b.SlotNumber(), b.ProtocolTransactions()); err != nil {
+			log.Error("Failed to derive protocol transaction block receipts fields", "hash", headerHash, "number", b.SlotNumber(), "err", err)
+			return nil
+		}
+	}
+
+	return receipts
+}
+
+func (c *Chain) GetLogsByHash(headerHash common.Hash) ([][]*types.Log, error) {
+	b, err := block.GetBlock(c.state.DB(), headerHash)
+	if err != nil {
+		log.Error("Failed to derive block", "hash", headerHash, "err", err)
+		return nil, err
+	}
+	blockReceipts, err := metadata.GetBlockReceipts(c.state.DB(), headerHash, b.SlotNumber(), false)
+	if err != nil {
+		log.Error("Failed to get block receipts", "hash", headerHash, "number", b.SlotNumber(), "err", err)
+		return nil, err
+	}
+
+	data := blockReceipts.Receipts()
+	return rawdb.ReadLogsFromReceiptsRLPData(data, b.Hash(), b.Number(), b.Transactions()), nil
 }
 
 func (c *Chain) StateAt(root common.Hash) (*state2.StateDB, error) {
