@@ -5,12 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"github.com/theQRL/zond/common"
-	"github.com/theQRL/zond/common/math"
-	"github.com/theQRL/zond/core/types"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
-	"math/big"
 )
 
 type Transfer struct {
@@ -101,21 +98,6 @@ func NewTransfer(chainID uint64, to []byte, value uint64, gas uint64, gasPrice u
 	//}
 
 	return tx
-}
-
-func (tx *Transfer) AsMessage(baseFee *big.Int) (types.Message, error) {
-	bigIntGasPrice := big.NewInt(int64(tx.GasPrice()))
-	bigIntGasFeeCap := big.NewInt(int64(tx.GasFeeCap()))
-	bigIntGasTipCap := big.NewInt(int64(tx.GasTipCap()))
-	bigIntValue := big.NewInt(int64(tx.Value()))
-	// If baseFee provided, set gasPrice to effectiveGasPrice.
-	if baseFee != nil {
-		bigIntGasPrice = math.BigMin(bigIntGasPrice.Add(bigIntGasTipCap, baseFee), bigIntGasFeeCap)
-	}
-
-	msg := types.NewMessage(tx.AddrFrom(), tx.To(), tx.Nonce(), bigIntValue, tx.Gas(), bigIntGasPrice, bigIntGasFeeCap, bigIntGasTipCap, tx.Data(), nil, false)
-
-	return msg, nil
 }
 
 func TransferTransactionFromPBData(pbData *protos.Transaction) *Transfer {

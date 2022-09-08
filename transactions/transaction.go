@@ -9,13 +9,11 @@ import (
 	"github.com/theQRL/go-qrllib/dilithium"
 	"github.com/theQRL/go-qrllib/xmss"
 	"github.com/theQRL/zond/common"
-	"github.com/theQRL/zond/core/types"
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/state"
 	"google.golang.org/protobuf/encoding/protojson"
-	"math/big"
 	"reflect"
 )
 
@@ -88,8 +86,6 @@ type TransactionInterface interface {
 	Validate(stateContext *state.StateContext) bool
 
 	ApplyEpochMetaData(epochMetaData *metadata.EpochMetaData) error
-
-	AsMessage(baseFee *big.Int) (types.Message, error)
 }
 
 type Transaction struct {
@@ -254,10 +250,6 @@ func (tx *Transaction) validateData(stateContext *state.StateContext) bool {
 }
 
 func (tx *Transaction) Validate(stateContext *state.StateContext) bool {
-	panic("Not Implemented")
-}
-
-func (tx *Transaction) AsMessage(baseFee *big.Int) (types.Message, error) {
 	panic("Not Implemented")
 }
 
