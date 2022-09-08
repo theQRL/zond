@@ -7,6 +7,8 @@ import (
 	"github.com/theQRL/zond/node"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/rpc"
+	"github.com/theQRL/zond/zond/filters"
+	"time"
 )
 
 type Zond struct {
@@ -22,7 +24,34 @@ func (s *Zond) APIs() []rpc.API {
 	//apis = append(apis, s.engine.APIs(s.BlockChain())...)
 
 	// Append all the local APIs and return
-	return apis
+	return append(apis, []rpc.API{
+		//{
+		//	Namespace: "zond",
+		//	Version:   "1.0",
+		//	Service:   NewEthereumAPI(s),
+		//}, {
+		//	Namespace: "zond",
+		//	Version:   "1.0",
+		//	Service:   downloader.NewDownloaderAPI(s.handler.downloader, s.eventMux),
+		//},
+		{
+			Namespace: "zond",
+			Version:   "1.0",
+			Service:   filters.NewFilterAPI(s.APIBackend, false, 5*time.Minute),
+		}, // {
+		//	Namespace: "admin",
+		//	Version:   "1.0",
+		//	Service:   NewAdminAPI(s),
+		//}, {
+		//	Namespace: "debug",
+		//	Version:   "1.0",
+		//	Service:   NewDebugAPI(s),
+		//}, {
+		//	Namespace: "net",
+		//	Version:   "1.0",
+		//	Service:   s.netRPCService,
+		//}
+	}...)
 }
 
 func (s *Zond) BlockChain() *chain.Chain {

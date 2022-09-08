@@ -8,6 +8,7 @@ import (
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/core"
 	"github.com/theQRL/zond/core/state"
+	"github.com/theQRL/zond/core/types"
 	"github.com/theQRL/zond/core/vm"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/params"
@@ -134,9 +135,10 @@ func (b *ZondAPIBackend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash 
 	return nil, errors.New("invalid arguments; neither block nor hash specified")
 }
 
-//func (b *ZondAPIBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
-//	return b.zond.miner.PendingBlockAndReceipts()
-//}
+func (b *ZondAPIBackend) PendingBlockAndReceipts() (*protos.Block, types.Receipts) {
+	//return b.zond.miner.PendingBlockAndReceipts()
+	return nil, nil
+}
 
 func (b *ZondAPIBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *protos.BlockHeader, error) {
 	// Pending state is only known by the miner
@@ -191,23 +193,15 @@ func (b *ZondAPIBackend) StateAndHeaderByNumberOrHash(ctx context.Context, block
 	return nil, nil, errors.New("invalid arguments; neither block nor hash specified")
 }
 
-//func (b *ZondAPIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
-//	return b.zond.blockchain.GetReceiptsByHash(hash), nil
-//}
-//
-//func (b *ZondAPIBackend) GetLogs(ctx context.Context, hash common.Hash) ([][]*types.Log, error) {
-//	db := b.zond.ChainDb()
-//	number := rawdb.ReadHeaderNumber(db, hash)
-//	if number == nil {
-//		return nil, fmt.Errorf("failed to get block number for hash %#x", hash)
-//	}
-//	logs := rawdb.ReadLogs(db, hash, *number, b.zond.blockchain.Config())
-//	if logs == nil {
-//		return nil, fmt.Errorf("failed to get logs for block #%d (0x%s)", *number, hash.TerminalString())
-//	}
-//	return logs, nil
-//}
-//
+func (b *ZondAPIBackend) GetReceipts(ctx context.Context, hash common.Hash, isProtocolTransaction bool) (types.Receipts, error) {
+	//return b.zond.blockchain.GetReceiptsByHash(hash), nil
+	return b.zond.blockchain.GetReceiptsByHash(hash, isProtocolTransaction), nil
+}
+
+func (b *ZondAPIBackend) GetLogs(ctx context.Context, hash common.Hash) ([][]*types.Log, error) {
+	return b.zond.blockchain.GetLogsByHash(hash)
+}
+
 //func (b *ZondAPIBackend) GetTd(ctx context.Context, hash common.Hash) *big.Int {
 //	if header := b.zond.blockchain.GetHeaderByHash(hash); header != nil {
 //		return b.zond.blockchain.GetTd(hash, header.Number.Uint64())
@@ -277,12 +271,14 @@ func (b *ZondAPIBackend) SendTx(ctx context.Context, signedTx transactions.Trans
 //func (b *ZondAPIBackend) GetPoolTransaction(hash common.Hash) *types.Transaction {
 //	return b.zond.txPool.Get(hash)
 //}
-//
-//func (b *ZondAPIBackend) GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error) {
-//	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(b.zond.ChainDb(), txHash)
-//	return tx, blockHash, blockNumber, index, nil
-//}
-//
+
+func (b *ZondAPIBackend) GetTransaction(ctx context.Context, txHash common.Hash) (*protos.Transaction, common.Hash, uint64, uint64, error) {
+	//tx, blockHash, blockNumber, index := rawdb.ReadTransaction(b.zond.ChainDb(), txHash)
+	//return tx, blockHash, blockNumber, index, nil
+	txMetaData := b.zond.BlockChain().GetTransactionMetaDataByHash(txHash)
+	return txMetaData.Transaction(), txMetaData.BlockHash(), txMetaData.BlockNumber(), txMetaData.Index(), nil
+}
+
 //func (b *ZondAPIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
 //	return b.zond.txPool.Nonce(addr), nil
 //}

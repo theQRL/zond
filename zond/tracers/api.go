@@ -45,8 +45,8 @@ type Backend interface {
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*protos.BlockHeader, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*protos.Block, error)
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*protos.Block, error)
-	//GetTransaction(ctx context.Context, txHash common.Hash) (*protos.Transaction, common.Hash, uint64, uint64, error)
-	//RPCGasCap() uint64
+	GetTransaction(ctx context.Context, txHash common.Hash) (*protos.Transaction, common.Hash, uint64, uint64, error)
+	RPCGasCap() uint64
 	//ChainConfig() *params.ChainConfig
 	//Engine() consensus.Engine
 	//ChainDb() ethdb.Database
