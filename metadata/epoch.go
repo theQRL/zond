@@ -99,8 +99,9 @@ func (e *EpochMetaData) RemoveValidators(dilithiumPK []byte) {
 func (e *EpochMetaData) AllotSlots(randomSeed int64, epoch uint64, prevSlotLastBlockHeaderHash common.Hash) {
 	e.pbData.Epoch = epoch
 	e.pbData.PrevSlotLastBlockHeaderHash = prevSlotLastBlockHeaderHash[:]
-	rand.Seed(randomSeed)
 
+	// TODO (cyyber): math/rand is not secure, needs to be replaced
+	rand.Seed(randomSeed)
 	rand.Shuffle(len(e.pbData.Validators), func(i, j int) {
 		e.pbData.Validators[i], e.pbData.Validators[j] = e.pbData.Validators[j], e.pbData.Validators[i]
 	})

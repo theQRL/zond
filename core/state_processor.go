@@ -213,8 +213,7 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 		return nil, nil, 0, err
 	}
 
-	pendingStakeValidatorsUpdate := make(map[string]uint8)
-	b.GetPendingValidatorsUpdate(pendingStakeValidatorsUpdate)
+	pendingStakeValidatorsUpdate := b.GetPendingValidatorsUpdate()
 
 	err = UpdateStakeValidators(statedb, pendingStakeValidatorsUpdate, epochMetaData)
 	if err != nil {
@@ -226,11 +225,7 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 	epochMetaData.UpdatePrevEpochStakeData(epochMetaData.TotalStakeAmountFound(),
 		epochMetaData.TotalStakeAmountFound())
 
-	var randomSeed int64
-	h := md5.New()
-	pHash := b.ParentHash()
-	h.Write(pHash[:])
-	randomSeed = int64(binary.BigEndian.Uint64(h.Sum(nil)))
+	randomSeed := GetRandomSeed(b.ParentHash())
 
 	currentEpoch := uint64(0)
 	epochMetaData.AllotSlots(randomSeed, currentEpoch, b.ParentHash())
@@ -1050,12 +1045,8 @@ func ProcessEpochMetaData(b *block.Block, statedb *state.StateDB, epochMetaData 
 	return nil
 }
 
-func UpdateStakeValidators(statedb *state.StateDB, pendingStakeValidatorsUpdate map[string]uint8, epochMetaData *metadata.EpochMetaData) error {
-	for strValidatorPK, _ := range pendingStakeValidatorsUpdate {
-		validatorPK, err := misc.HexStrToBytes(strValidatorPK)
-		if err != nil {
-			return fmt.Errorf("[UpdateStakeValidators] Failed to decode validator PK")
-		}
+func UpdateStakeValidators(statedb *state.StateDB, pendingStakeValidatorsUpdate [][]byte, epochMetaData *metadata.EpochMetaData) error {
+	for _, validatorPK := range pendingStakeValidatorsUpdate {
 		account := statedb.GetOrNewStateObject(misc.GetAddressFromUnSizedPK(validatorPK))
 		if account.PendingStakeBalance().Uint64() == 0 {
 			epochMetaData.RemoveValidators(validatorPK)
@@ -1101,4 +1092,12 @@ func TransferTxAsMessage(tx *transactions.Transfer, baseFee *big.Int) (types.Mes
 	msg := types.NewMessage(tx.AddrFrom(), tx.To(), tx.Nonce(), bigIntValue, tx.Gas(), bigIntGasPrice, bigIntGasFeeCap, bigIntGasTipCap, tx.Data(), nil, false)
 
 	return msg, nil
+}
+
+// GetRandomSeed has temporary code for random seed calculation, this will be updated before final release
+func GetRandomSeed(hash common.Hash) int64 {
+	h := md5.New()
+	h.Write(hash[:])
+	randomSeed := int64(binary.BigEndian.Uint64(h.Sum(nil)))
+	return randomSeed
 }

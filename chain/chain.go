@@ -1,8 +1,6 @@
 package chain
 
 import (
-	"crypto/md5"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
@@ -904,7 +902,7 @@ func (c *Chain) CalculateEpochMetaData(statedb *state2.StateDB, slotNumber uint6
 	epochMetaData.UpdatePrevEpochStakeData(0,
 		totalStakeAmountAllotted)
 
-	pendingStakeValidatorsUpdate := make(map[string]uint8)
+	var pendingStakeValidatorsUpdate [][]byte
 	for i := lenPathToFirstBlockOfEpoch - 1; i >= 0; i-- {
 		b, err := block.GetBlock(db, pathToFirstBlockOfEpoch[i])
 		if err != nil {
@@ -917,7 +915,7 @@ func (c *Chain) CalculateEpochMetaData(statedb *state2.StateDB, slotNumber uint6
 		// Ignore genesis block otherwise it will result into issue as we have
 		// already processed while committing genesis block
 		if b.SlotNumber() != 0 {
-			b.GetPendingValidatorsUpdate(pendingStakeValidatorsUpdate)
+			pendingStakeValidatorsUpdate = b.GetPendingValidatorsUpdate()
 		}
 	}
 
@@ -930,11 +928,7 @@ func (c *Chain) CalculateEpochMetaData(statedb *state2.StateDB, slotNumber uint6
 	// then update the stake balance, pending stake balance and the balance
 	// accountState must be loaded based on the trie of parentHeaderHash
 
-	// TODO: Temporary random seed calculation
-	var randomSeed int64
-	h := md5.New()
-	h.Write(parentHeaderHash[:])
-	randomSeed = int64(binary.BigEndian.Uint64(h.Sum(nil)))
+	randomSeed := core.GetRandomSeed(parentHeaderHash)
 
 	currentEpoch := slotNumber / blocksPerEpoch
 	epochMetaData.AllotSlots(randomSeed, currentEpoch, parentHeaderHash)
