@@ -7,6 +7,8 @@ option go_package = "github.com/theQRL/zond/protos";
 
 package protos;
 
+import "protos/transaction.proto";
+
 message DilithiumMetaData {
     // tx_hash, dilithium_pk, address must be updated only once, when the metadata is created for the first time
     bytes tx_hash = 1;
@@ -44,6 +46,10 @@ message BlockMetaData {
 
     bytes total_stake_amount = 6;
     bytes trie_root = 7;
+}
+
+message BlockReceipts {
+    bytes receipts = 1;
 }
 
 message EpochMetaData {
@@ -93,4 +99,18 @@ message PeerInfo {
 message PeerData {
     repeated PeerInfo connected_peers = 1;
     repeated PeerInfo disconnected_peers = 2;
+}
+
+message TransactionMetaData {
+    bytes block_hash = 1;
+    uint64 block_number = 2;
+    uint64 index = 3;
+    Transaction transaction = 4;
+}
+
+message ProtocolTransactionMetaData {
+    bytes block_hash = 1;
+    uint64 block_number = 2;
+    uint64 index = 3;
+    ProtocolTransaction protocol_transaction = 4;
 }
