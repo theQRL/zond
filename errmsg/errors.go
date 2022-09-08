@@ -20,7 +20,7 @@ const (
 	TXInvalidXMSSOTSIndex             = "[%s] invalid xmss ots index | txhash %s | addr %s | ots index %d is already used"
 
 	TXInvalidAttestor   = "[%s] invalid attestor | txhash %s | addr %s is not an attestor for slot number #%d"
-	TXInvalidSlotLeader = "[%s] invalid slot leader/block proposer | txhash %s | addr %s is not a slot leader/block proposer for slot number #%d"
+	TXInvalidSlotLeader = "[%s] invalid slot leader/block proposer | txhash %s | addr %s is not a slot leader/block proposer for slot number #%d | expected slot leader %s"
 
 	TXInvalidBlockReward    = "[%s] invalid block reward | txhash %s | addr %s | block reward %d | expected block reward %d"
 	TXInvalidAttestorReward = "[%s] invalid attestor reward | txhash %s | addr %s | attestor reward %d | expected attestor reward %d"
