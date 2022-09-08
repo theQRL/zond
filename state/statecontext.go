@@ -9,7 +9,6 @@ import (
 	"github.com/theQRL/zond/db"
 	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/misc"
-	"github.com/theQRL/zond/storagekeys"
 	"go.etcd.io/bbolt"
 	"math/big"
 	"reflect"
@@ -48,12 +47,32 @@ func (s *StateContext) GetEpochMetaData() *metadata.EpochMetaData {
 	return s.epochMetaData
 }
 
+func (s *StateContext) GetDB() *db.DB {
+	return s.db
+}
+
 func (s *StateContext) GetSlotNumber() uint64 {
 	return s.slotNumber
 }
 
+func (s *StateContext) GetParentBlockHeaderHash() common.Hash {
+	return s.parentBlockHeaderHash
+}
+
+func (s *StateContext) GetBlockHeaderHash() common.Hash {
+	return s.blockHeaderHash
+}
+
+func (s *StateContext) GetCurrentBlockTotalStakeAmount() *big.Int {
+	return s.currentBlockTotalStakeAmount
+}
+
 func (s *StateContext) GetMainChainMetaData() *metadata.MainChainMetaData {
 	return s.mainChainMetaData
+}
+
+func (s *StateContext) GetEpochBlockHashes() *metadata.EpochBlockHashes {
+	return s.epochBlockHashes
 }
 
 func (s *StateContext) PartialBlockSigningHash() common.Hash {
@@ -138,126 +157,6 @@ func (s *StateContext) ProcessBlockProposerFlag(blockProposerDilithiumPK []byte,
 
 func (s *StateContext) PrepareValidators(dilithiumPK []byte) {
 	s.validatorsFlag[misc.BytesToHexStr(dilithiumPK)] = false
-}
-
-func (s *StateContext) Commit(blockStorageKey []byte, bytesBlock []byte, trieRoot common.Hash, isFinalizedState bool) error {
-	var parentBlockMetaData *metadata.BlockMetaData
-	var err error
-	totalStakeAmount := big.NewInt(0)
-	lastBlockTotalStakeAmount := big.NewInt(0)
-
-	if s.slotNumber != 0 {
-		parentBlockMetaData, err = metadata.GetBlockMetaData(s.db, s.parentBlockHeaderHash)
-		if err != nil {
-			log.Error("[Commit] Failed to load Parent BlockMetaData")
-			return err
-		}
-		parentBlockMetaData.AddChildHeaderHash(s.blockHeaderHash)
-
-		err = totalStakeAmount.UnmarshalText(parentBlockMetaData.TotalStakeAmount())
-		if err != nil {
-			log.Error("[Commit] Unable to unmarshal total stake amount of parent block metadata")
-			return err
-		}
-
-		lastBlockMetaData, err := metadata.GetBlockMetaData(s.db, s.mainChainMetaData.LastBlockHeaderHash())
-		lastBlockHash := s.mainChainMetaData.LastBlockHeaderHash()
-		if err != nil {
-			log.Error("[Commit] Failed to load last block meta data ",
-				misc.BytesToHexStr(lastBlockHash[:]))
-			return err
-		}
-		err = lastBlockTotalStakeAmount.UnmarshalText(lastBlockMetaData.TotalStakeAmount())
-		if err != nil {
-			log.Error("[Commit] Unable to Unmarshal Text for lastblockmetadata total stake amount ",
-				misc.BytesToHexStr(lastBlockHash[:]))
-			return err
-		}
-	}
-
-	totalStakeAmount = totalStakeAmount.Add(totalStakeAmount, s.currentBlockTotalStakeAmount)
-	bytesTotalStakeAmount, err := totalStakeAmount.MarshalText()
-	if err != nil {
-		log.Error("[Commit] Unable to marshal total stake amount")
-		return err
-	}
-
-	blockMetaData := metadata.NewBlockMetaData(s.parentBlockHeaderHash, s.blockHeaderHash,
-		s.slotNumber, bytesTotalStakeAmount, trieRoot)
-	return s.db.DB().Update(func(tx *bbolt.Tx) error {
-		var err error
-		b := tx.Bucket([]byte("DB"))
-		if err := blockMetaData.Commit(b); err != nil {
-			log.Error("[Commit] Failed to commit BlockMetaData")
-			return err
-		}
-		err = s.epochBlockHashes.AddHeaderHashBySlotNumber(s.blockHeaderHash, s.slotNumber)
-		if err != nil {
-			log.Error("[Commit] Failed to Add Hash into EpochBlockHashes")
-			return err
-		}
-		if err := s.epochBlockHashes.Commit(b); err != nil {
-			log.Error("[Commit] Failed to commit EpochBlockHashes")
-			return err
-		}
-
-		if s.slotNumber != 0 {
-			if err := parentBlockMetaData.Commit(b); err != nil {
-				log.Error("[Commit] Failed to commit ParentBlockMetaData")
-				return err
-			}
-		}
-
-		if s.slotNumber == 0 || blockMetaData.Epoch() != parentBlockMetaData.Epoch() {
-			if err := s.epochMetaData.Commit(b); err != nil {
-				log.Error("[Commit] Failed to commit EpochMetaData")
-				return err
-			}
-		}
-
-		err = b.Put(blockStorageKey, bytesBlock)
-		if err != nil {
-			log.Error("[Commit] Failed to commit block")
-			return err
-		}
-
-		if isFinalizedState {
-			// Update Main Chain Finalized Block Data
-			s.mainChainMetaData.UpdateFinalizedBlockData(s.blockHeaderHash, s.slotNumber)
-			s.mainChainMetaData.UpdateLastBlockData(s.blockHeaderHash, s.slotNumber)
-			if err := s.mainChainMetaData.Commit(b); err != nil {
-				log.Error("[Commit] Failed to commit MainChainMetaData")
-				return err
-			}
-		}
-
-		if s.slotNumber == 0 || totalStakeAmount.Cmp(lastBlockTotalStakeAmount) == 1 {
-			// Update Main Chain Last Block Data
-			s.mainChainMetaData.UpdateLastBlockData(s.blockHeaderHash, s.slotNumber)
-			if err := s.mainChainMetaData.Commit(b); err != nil {
-				log.Error("[Commit] Failed to commit MainChainMetaData")
-				return err
-			}
-
-			err = b.Put([]byte("mainchain-head-trie-root"), trieRoot[:])
-			if err != nil {
-				log.Error("[Commit] Failed to commit state trie root")
-				return err
-			}
-
-			err = b.Put(storagekeys.GetBlockHashStorageKeyBySlotNumber(s.slotNumber), s.blockHeaderHash[:])
-		}
-
-		if !isFinalizedState {
-			b, err = tx.CreateBucketIfNotExists(metadata.GetBlockBucketName(s.blockHeaderHash))
-			if err != nil {
-				log.Error("[Commit] Failed to create bucket")
-				return err
-			}
-		}
-
-		return nil
-	})
 }
 
 func (s *StateContext) Finalize(blockMetaDataPathForFinalization []*metadata.BlockMetaData) error {
