@@ -734,8 +734,9 @@ github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a h1:1ur3QoCqvE5f
 github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a/go.mod h1:RRCYJbIwD5jmqPI9XoAFR0OcDxqUctll6zUj/+B4S48=
 github.com/theQRL/go-libp2p-qrl v0.0.0-20220905140727-a440bc5ac394 h1:ZvzP0qM9rMMsjw3vcUuNULtY8umgMoquMNfCXlDh52w=
 github.com/theQRL/go-libp2p-qrl v0.0.0-20220905140727-a440bc5ac394/go.mod h1:04MGv6kp81M1mGpAfKclz595nBYcvWqi/7vxDlNW3jQ=
-github.com/theQRL/go-qrllib v0.0.0-20220905123946-c103e7739266 h1:1KQBwwzPI4KGXHHr5KSb0Twio+1RNL/AqS3njHPh1dA=
 github.com/theQRL/go-qrllib v0.0.0-20220905123946-c103e7739266/go.mod h1:IspDEOeIlmm6GujPeTNygL3T72MUluDDyUa20AisjaQ=
+github.com/theQRL/go-qrllib v0.0.0-20220908210903-36e5eb89b5e6 h1:QFHTKhE+eTbDxUPg91Hs71Iv71POBwqDxONTD6Khj0I=
+github.com/theQRL/go-qrllib v0.0.0-20220908210903-36e5eb89b5e6/go.mod h1:IspDEOeIlmm6GujPeTNygL3T72MUluDDyUa20AisjaQ=
 github.com/tklauser/go-sysconf v0.3.10 h1:IJ1AZGZRWbY8T5Vfk04D9WOA5WSejdflXxP03OUqALw=
 github.com/tklauser/go-sysconf v0.3.10/go.mod h1:C8XykCvCb+Gn0oNCWPIlcb0RuglQTYaQ2hGm7jmxEFk=
 github.com/tklauser/numcpus v0.4.0 h1:E53Dm1HjH1/R2/aoCtXtPgzmElmn51aOkhCFSuZq//o=
