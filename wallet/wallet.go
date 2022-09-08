@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 type Wallet struct {
@@ -99,19 +100,27 @@ func (w *Wallet) reqBalance(address string) (uint64, error) {
 		return 0, err
 	}
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return 0, err
+	for {
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return 0, err
+		}
+		defer resp.Body.Close()
+		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+
+		var response api.Response
+		err = json.Unmarshal(bodyBytes, &response)
+
+		// if response.Data is nil, then sleep for 6 seconds, as we hit the rate limit
+		if response.Data == nil {
+			time.Sleep(6 * time.Second)
+			continue
+		}
+
+		balance := response.Data.(map[string]interface{})
+		return strconv.ParseUint(balance["balance"].(string), 10, 64)
 	}
-	defer resp.Body.Close()
-	bodyBytes, _ := ioutil.ReadAll(resp.Body)
-
-	var response api.Response
-	err = json.Unmarshal(bodyBytes, &response)
-
-	balance := response.Data.(map[string]interface{})
-	return strconv.ParseUint(balance["balance"].(string), 10, 64)
 }
 
 func (w *Wallet) List() {
@@ -128,7 +137,7 @@ func (w *Wallet) List() {
 
 func (w *Wallet) Secret() {
 	for i, info := range w.pbData.Info {
-		fmt.Println(fmt.Sprintf("%d\t%s\t%s\t%s",
+		fmt.Println(fmt.Sprintf("%d\t%s\t%s\t\t%s",
 			i+1, info.Address, info.HexSeed,
 			info.Mnemonic))
 	}
