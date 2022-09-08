@@ -20,6 +20,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/theQRL/zond/misc"
+	"github.com/theQRL/zond/protos"
+	"github.com/theQRL/zond/transactions"
 	"io"
 	"math/big"
 	"unsafe"
@@ -419,6 +422,83 @@ func (rs Receipts) DeriveFields(config *params.ChainConfig, hash common.Hash, nu
 			from, _ := Sender(signer, txs[i])
 			rs[i].ContractAddress = crypto.CreateAddress(from, txs[i].Nonce())
 		}
+		// The used gas can be calculated based on previous r
+		if i == 0 {
+			rs[i].GasUsed = rs[i].CumulativeGasUsed
+		} else {
+			rs[i].GasUsed = rs[i].CumulativeGasUsed - rs[i-1].CumulativeGasUsed
+		}
+		// The derived log fields can simply be set from the block and transaction
+		for j := 0; j < len(rs[i].Logs); j++ {
+			rs[i].Logs[j].BlockNumber = number
+			rs[i].Logs[j].BlockHash = hash
+			rs[i].Logs[j].TxHash = rs[i].TxHash
+			rs[i].Logs[j].TxIndex = uint(i)
+			rs[i].Logs[j].Index = logIndex
+			logIndex++
+		}
+	}
+	return nil
+}
+
+func (rs Receipts) DeriveFieldsForTransactions(hash common.Hash, number uint64, protoTxs []*protos.Transaction) error {
+	logIndex := uint(0)
+	if len(protoTxs) != len(rs) {
+		return errors.New("transaction and receipt count mismatch")
+	}
+	for i := 0; i < len(rs); i++ {
+		txType := transactions.GetTransactionType(protoTxs[i])
+		// The transaction type and hash can be retrieved from the transaction itself
+		rs[i].Type = (uint8)(txType)
+		rs[i].TxHash = common.BytesToHash(protoTxs[i].Hash)
+
+		// block location fields
+		rs[i].BlockHash = hash
+		rs[i].BlockNumber = new(big.Int).SetUint64(number)
+		rs[i].TransactionIndex = uint(i)
+
+		if txType == transactions.TypeTransfer {
+			// The contract address can be derived from the transaction itself
+			if protoTxs[i].GetTransfer().GetTo() == nil {
+				from := misc.GetAddressFromUnSizedPK(protoTxs[i].GetPk())
+				rs[i].ContractAddress = crypto.CreateAddress(from, protoTxs[i].Nonce)
+			}
+		}
+		// The used gas can be calculated based on previous r
+		if i == 0 {
+			rs[i].GasUsed = rs[i].CumulativeGasUsed
+		} else {
+			rs[i].GasUsed = rs[i].CumulativeGasUsed - rs[i-1].CumulativeGasUsed
+		}
+		// The derived log fields can simply be set from the block and transaction
+		for j := 0; j < len(rs[i].Logs); j++ {
+			rs[i].Logs[j].BlockNumber = number
+			rs[i].Logs[j].BlockHash = hash
+			rs[i].Logs[j].TxHash = rs[i].TxHash
+			rs[i].Logs[j].TxIndex = uint(i)
+			rs[i].Logs[j].Index = logIndex
+			logIndex++
+		}
+	}
+	return nil
+}
+
+func (rs Receipts) DeriveFieldsForProtocolTransactions(hash common.Hash, number uint64, protoTxs []*protos.ProtocolTransaction) error {
+	logIndex := uint(0)
+	if len(protoTxs) != len(rs) {
+		return errors.New("protocol transaction and receipt count mismatch")
+	}
+	for i := 0; i < len(rs); i++ {
+		txType := transactions.GetProtocolTransactionType(protoTxs[i])
+		// The transaction type and hash can be retrieved from the transaction itself
+		rs[i].Type = (uint8)(txType)
+		rs[i].TxHash = common.BytesToHash(protoTxs[i].Hash)
+
+		// block location fields
+		rs[i].BlockHash = hash
+		rs[i].BlockNumber = new(big.Int).SetUint64(number)
+		rs[i].TransactionIndex = uint(i)
+
 		// The used gas can be calculated based on previous r
 		if i == 0 {
 			rs[i].GasUsed = rs[i].CumulativeGasUsed
