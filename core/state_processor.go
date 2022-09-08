@@ -952,8 +952,9 @@ func ValidateCoinBaseTx(tx *transactions.CoinBase, statedb *state.StateDB, slotV
 
 	validatorPK := tx.PK()
 	if !slotValidatorsMetaData.IsSlotLeader(misc.BytesToHexStr(validatorPK[:])) {
+		expectedSlotLeader := misc.GetAddressFromUnSizedPK(slotValidatorsMetaData.GetSlotLeaderPK())
 		return fmt.Errorf(errmsg.TXInvalidSlotLeader,
-			"coinbase", misc.BytesToHexStr(txHash[:]), signerAddr, slotNumber)
+			"coinbase", misc.BytesToHexStr(txHash[:]), signerAddr, slotNumber, expectedSlotLeader)
 	}
 
 	if tx.BlockProposerReward() != rewards.GetBlockReward() {
