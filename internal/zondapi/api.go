@@ -32,8 +32,8 @@ func NewBlockChainAPI(b Backend) *BlockChainAPI {
 	return &BlockChainAPI{b}
 }
 
-func (api *BlockChainAPI) ChainId() *hexutil.Big {
-	return (*hexutil.Big)(api.b.ChainConfig().ChainID)
+func (s *BlockChainAPI) ChainId() *hexutil.Big {
+	return (*hexutil.Big)(s.b.ChainConfig().ChainID)
 }
 
 // BlockNumber returns the block number of the chain head.
@@ -1078,70 +1078,64 @@ func (s *TransactionAPI) GetTransactionByBlockHashAndIndex(ctx context.Context, 
 //	// Serialize to RLP and return
 //	return tx.MarshalBinary()
 //}
-//
-//// GetTransactionReceipt returns the transaction receipt for the given transaction hash.
-//func (s *TransactionAPI) GetTransactionReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
-//	tx, blockHash, blockNumber, index, err := s.b.GetTransaction(ctx, hash)
-//	if err != nil {
-//		// When the transaction doesn't exist, the RPC method should return JSON null
-//		// as per specification.
-//		return nil, nil
-//	}
-//	receipts, err := s.b.GetReceipts(ctx, blockHash)
-//	if err != nil {
-//		return nil, err
-//	}
-//	if len(receipts) <= int(index) {
-//		return nil, nil
-//	}
-//	receipt := receipts[index]
-//
-//	// Derive the sender.
-//	bigblock := new(big.Int).SetUint64(blockNumber)
-//	signer := types.MakeSigner(s.b.ChainConfig(), bigblock)
-//	from, _ := types.Sender(signer, tx)
-//
-//	fields := map[string]interface{}{
-//		"blockHash":         blockHash,
-//		"blockNumber":       hexutil.Uint64(blockNumber),
-//		"transactionHash":   hash,
-//		"transactionIndex":  hexutil.Uint64(index),
-//		"from":              from,
-//		"to":                tx.To(),
-//		"gasUsed":           hexutil.Uint64(receipt.GasUsed),
-//		"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
-//		"contractAddress":   nil,
-//		"logs":              receipt.Logs,
-//		"logsBloom":         receipt.Bloom,
-//		"type":              hexutil.Uint(tx.Type()),
-//	}
-//	// Assign the effective gas price paid
-//	if !s.b.ChainConfig().IsLondon(bigblock) {
-//		fields["effectiveGasPrice"] = hexutil.Uint64(tx.GasPrice().Uint64())
-//	} else {
-//		header, err := s.b.HeaderByHash(ctx, blockHash)
-//		if err != nil {
-//			return nil, err
-//		}
-//		gasPrice := new(big.Int).Add(header.BaseFee, tx.EffectiveGasTipValue(header.BaseFee))
-//		fields["effectiveGasPrice"] = hexutil.Uint64(gasPrice.Uint64())
-//	}
-//	// Assign receipt status or post state.
-//	if len(receipt.PostState) > 0 {
-//		fields["root"] = hexutil.Bytes(receipt.PostState)
-//	} else {
-//		fields["status"] = hexutil.Uint(receipt.Status)
-//	}
-//	if receipt.Logs == nil {
-//		fields["logs"] = []*types.Log{}
-//	}
-//	// If the ContractAddress is 20 0x0 bytes, assume it is not a contract creation
-//	if receipt.ContractAddress != (common.Address{}) {
-//		fields["contractAddress"] = receipt.ContractAddress
-//	}
-//	return fields, nil
-//}
-//
+
+// GetTransactionReceipt returns the transaction receipt for the given transaction hash.
+func (s *TransactionAPI) GetTransactionReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
+	protoTx, blockHash, blockNumber, index, err := s.b.GetTransaction(ctx, hash)
+	if err != nil {
+		// When the transaction doesn't exist, the RPC method should return JSON null
+		// as per specification.
+		return nil, nil
+	}
+	receipts, err := s.b.GetReceipts(ctx, blockHash, false)
+	if err != nil {
+		return nil, err
+	}
+	if len(receipts) <= int(index) {
+		return nil, nil
+	}
+	receipt := receipts[index]
+
+	// Derive the sender.
+	from := misc.GetAddressFromUnSizedPK(protoTx.GetPk())
+	txType := transactions.GetTransactionType(protoTx)
+
+	fields := map[string]interface{}{
+		"blockHash":         blockHash,
+		"blockNumber":       hexutil.Uint64(blockNumber),
+		"transactionHash":   hash,
+		"transactionIndex":  hexutil.Uint64(index),
+		"from":              from,
+		"to":                nil,
+		"gasUsed":           hexutil.Uint64(receipt.GasUsed),
+		"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
+		"effectiveGasPrice": hexutil.Uint64(protoTx.GasPrice),
+		"contractAddress":   nil,
+		"logs":              receipt.Logs,
+		"logsBloom":         receipt.Bloom,
+		"type":              hexutil.Uint(txType),
+	}
+
+	if txType == transactions.TypeTransfer {
+		fields["to"] = misc.GetDilithiumAddressFromUnSizedPK(protoTx.GetTransfer().To)
+	}
+
+	// Assign receipt status or post state.
+	if len(receipt.PostState) > 0 {
+		fields["root"] = hexutil.Bytes(receipt.PostState)
+	} else {
+		fields["status"] = hexutil.Uint(receipt.Status)
+	}
+	if receipt.Logs == nil {
+		fields["logs"] = []*types.Log{}
+	}
+	// If the ContractAddress is 20 0x0 bytes, assume it is not a contract creation
+	if receipt.ContractAddress != (common.Address{}) {
+		fields["contractAddress"] = receipt.ContractAddress
+	}
+	return fields, nil
+}
+
 //// sign is a helper function that signs a transaction with the private key of the given address.
 //func (s *TransactionAPI) sign(addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
 //	// Look up the wallet containing the requested signer
