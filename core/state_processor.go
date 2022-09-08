@@ -10,6 +10,7 @@ import (
 	"github.com/theQRL/zond/block"
 	"github.com/theQRL/zond/block/rewards"
 	"github.com/theQRL/zond/common"
+	"github.com/theQRL/zond/common/math"
 	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/core/state"
 	"github.com/theQRL/zond/core/types"
@@ -21,7 +22,9 @@ import (
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/params"
 	"github.com/theQRL/zond/protos"
+	"github.com/theQRL/zond/rlp"
 	state2 "github.com/theQRL/zond/state"
+	"github.com/theQRL/zond/storagekeys"
 	"github.com/theQRL/zond/transactions"
 	"go.etcd.io/bbolt"
 	"math/big"
@@ -96,13 +99,14 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 	slotValidatorsMetaData := metadata.NewSlotValidatorsMetaData(b.SlotNumber(), stateContext.GetEpochMetaData())
 
 	var (
-		receipts    types.Receipts
-		usedGas     = new(uint64)
-		header      = b.Header()
-		blockHash   = b.Hash()
-		blockNumber = big.NewInt(int64(b.Number()))
-		allLogs     []*types.Log
-		gp          = new(GasPool).AddGas(b.GasLimit())
+		protocolTxReceipts types.Receipts
+		txReceipts         types.Receipts
+		usedGas            = new(uint64)
+		header             = b.Header()
+		blockHash          = b.Hash()
+		blockNumber        = big.NewInt(int64(b.Number()))
+		allLogs            []*types.Log
+		gp                 = new(GasPool).AddGas(b.GasLimit())
 	)
 
 	blockContext := NewEVMBlockContext(header, p.getHashFunc, b.Minter())
@@ -154,7 +158,7 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 				return nil, nil, 0, fmt.Errorf("could not apply attest tx %d [%v]: %w", 0, txHash, err)
 			}
 		}
-		receipts = append(receipts, receipt)
+		protocolTxReceipts = append(protocolTxReceipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
 	}
 
@@ -183,7 +187,7 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 			if err := ValidateTransferTxn(transferTx, statedb); err != nil {
 				return nil, nil, 0, err
 			}
-			msg, err := tx.AsMessage(header.BaseFee())
+			msg, err := TransferTxAsMessage(transferTx, header.BaseFee())
 			if err != nil {
 				return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 			}
@@ -192,7 +196,7 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 				return nil, nil, 0, fmt.Errorf("could not apply transfer tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 			}
 		}
-		receipts = append(receipts, receipt)
+		txReceipts = append(txReceipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
 
 		// If not a contract and an xmss address then update the ots bitfield
@@ -245,27 +249,29 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 		return nil, nil, 0, fmt.Errorf("failed to commit trieDB : %w", err)
 	}
 
-	bytesBlock, err := b.Serialize()
-	if err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to serialize block : %w", err)
-	}
-	err = stateContext.Commit(block.GetBlockStorageKey(b.Hash()), bytesBlock, trieRoot, true)
+	/* Set block bloom before commitment */
+	protocolTxBloom := types.CreateBloom(protocolTxReceipts)
+	txBloom := types.CreateBloom(txReceipts)
+	b.UpdateBloom(protocolTxBloom, txBloom)
+
+	err = p.Commit(stateContext, b, protocolTxReceipts, txReceipts, trieRoot, true)
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("failed to commit statecontext : %w", err)
 	}
 
-	return receipts, allLogs, *usedGas, nil
+	return txReceipts, allLogs, *usedGas, nil
 }
 
 func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateContext *state2.StateContext, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, isFinalizedState bool, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
 	var (
-		receipts    types.Receipts
-		usedGas     = new(uint64)
-		header      = b.Header()
-		blockHash   = b.Hash()
-		blockNumber = big.NewInt(int64(b.Number()))
-		allLogs     []*types.Log
-		gp          = new(GasPool).AddGas(b.GasLimit())
+		protocolTxReceipts types.Receipts
+		txReceipts         types.Receipts
+		usedGas            = new(uint64)
+		header             = b.Header()
+		blockHash          = b.Hash()
+		blockNumber        = big.NewInt(int64(b.Number()))
+		allLogs            []*types.Log
+		gp                 = new(GasPool).AddGas(b.GasLimit())
 	)
 
 	blockContext := NewEVMBlockContext(header, p.getHashFunc, b.Minter())
@@ -317,7 +323,7 @@ func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateCo
 				return nil, nil, 0, fmt.Errorf("could not apply attest tx %d [%v]: %w", 0, txHash, err)
 			}
 		}
-		receipts = append(receipts, receipt)
+		protocolTxReceipts = append(protocolTxReceipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
 	}
 
@@ -345,7 +351,7 @@ func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateCo
 			if err := ValidateTransferTxn(transferTx, statedb); err != nil {
 				return nil, nil, 0, err
 			}
-			msg, err := tx.AsMessage(header.BaseFee())
+			msg, err := TransferTxAsMessage(transferTx, header.BaseFee())
 			if err != nil {
 				return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 			}
@@ -354,7 +360,7 @@ func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateCo
 				return nil, nil, 0, fmt.Errorf("could not apply transfer tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 			}
 		}
-		receipts = append(receipts, receipt)
+		txReceipts = append(txReceipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
 
 		// If code size is 0 in that case it is an account and not a contract
@@ -378,16 +384,194 @@ func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateCo
 		return nil, nil, 0, fmt.Errorf("failed to commit trieDB : %w", err)
 	}
 
-	bytesBlock, err := b.Serialize()
-	if err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to serialize block : %w", err)
-	}
-	err = stateContext.Commit(block.GetBlockStorageKey(b.Hash()), bytesBlock, trieRoot, isFinalizedState)
+	/* Set block bloom before commitment */
+	protocolTxBloom := types.CreateBloom(protocolTxReceipts)
+	txBloom := types.CreateBloom(txReceipts)
+	b.UpdateBloom(protocolTxBloom, txBloom)
+
+	err = p.Commit(stateContext, b, protocolTxReceipts, txReceipts, trieRoot, isFinalizedState)
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("failed to commit statecontext : %w", err)
 	}
 
-	return receipts, allLogs, *usedGas, nil
+	return txReceipts, allLogs, *usedGas, nil
+}
+
+func (p *StateProcessor) Commit(s *state2.StateContext, b *block.Block, protocolTxReceipts, TxReceipts types.Receipts, trieRoot common.Hash, isFinalizedState bool) error {
+	var parentBlockMetaData *metadata.BlockMetaData
+	var err error
+	totalStakeAmount := big.NewInt(0)
+	lastBlockTotalStakeAmount := big.NewInt(0)
+
+	if s.GetSlotNumber() != 0 {
+		parentBlockMetaData, err = metadata.GetBlockMetaData(s.GetDB(), s.GetParentBlockHeaderHash())
+		if err != nil {
+			log.Error("[Commit] Failed to load Parent BlockMetaData")
+			return err
+		}
+		parentBlockMetaData.AddChildHeaderHash(s.GetBlockHeaderHash())
+
+		err = totalStakeAmount.UnmarshalText(parentBlockMetaData.TotalStakeAmount())
+		if err != nil {
+			log.Error("[Commit] Unable to unmarshal total stake amount of parent block metadata")
+			return err
+		}
+
+		lastBlockHash := s.GetMainChainMetaData().LastBlockHeaderHash()
+		lastBlockMetaData, err := metadata.GetBlockMetaData(s.GetDB(), lastBlockHash)
+		if err != nil {
+			log.Error("[Commit] Failed to load last block meta data ",
+				misc.BytesToHexStr(lastBlockHash[:]))
+			return err
+		}
+		err = lastBlockTotalStakeAmount.UnmarshalText(lastBlockMetaData.TotalStakeAmount())
+		if err != nil {
+			log.Error("[Commit] Unable to Unmarshal Text for lastblockmetadata total stake amount ",
+				misc.BytesToHexStr(lastBlockHash[:]))
+			return err
+		}
+	}
+
+	totalStakeAmount = totalStakeAmount.Add(totalStakeAmount, s.GetCurrentBlockTotalStakeAmount())
+	bytesTotalStakeAmount, err := totalStakeAmount.MarshalText()
+	if err != nil {
+		log.Error("[Commit] Unable to marshal total stake amount")
+		return err
+	}
+
+	byteProtocolTxReceipts, err := receiptsToByteReceipts(protocolTxReceipts)
+	if err != nil {
+		log.Error("[Commit] Failed to convert receiptsToByteReceipts for protocolTx")
+		return err
+	}
+
+	byteTxReceipts, err := receiptsToByteReceipts(TxReceipts)
+	if err != nil {
+		log.Error("[Commit] Failed to convert receiptsToByteReceipts for tx")
+		return err
+	}
+
+	blockMetaData := metadata.NewBlockMetaData(s.GetParentBlockHeaderHash(), s.GetBlockHeaderHash(),
+		s.GetSlotNumber(), bytesTotalStakeAmount, trieRoot)
+	return s.GetDB().DB().Update(func(tx *bbolt.Tx) error {
+		var err error
+		bucket := tx.Bucket([]byte("DB"))
+		if err := blockMetaData.Commit(bucket); err != nil {
+			log.Error("[Commit] Failed to commit BlockMetaData")
+			return err
+		}
+
+		err = s.GetEpochBlockHashes().AddHeaderHashBySlotNumber(s.GetBlockHeaderHash(), s.GetSlotNumber())
+		if err != nil {
+			log.Error("[Commit] Failed to Add Hash into EpochBlockHashes")
+			return err
+		}
+		if err := s.GetEpochBlockHashes().Commit(bucket); err != nil {
+			log.Error("[Commit] Failed to commit EpochBlockHashes")
+			return err
+		}
+
+		if s.GetSlotNumber() != 0 {
+			if err := parentBlockMetaData.Commit(bucket); err != nil {
+				log.Error("[Commit] Failed to commit ParentBlockMetaData")
+				return err
+			}
+		}
+
+		if s.GetSlotNumber() == 0 || blockMetaData.Epoch() != parentBlockMetaData.Epoch() {
+			if err := s.GetEpochMetaData().Commit(bucket); err != nil {
+				log.Error("[Commit] Failed to commit EpochMetaData")
+				return err
+			}
+		}
+
+		bytesBlock, err := b.Serialize()
+		if err != nil {
+			return fmt.Errorf("failed to serialize block : %w", err)
+		}
+		err = bucket.Put(block.GetBlockStorageKey(b.Hash()), bytesBlock)
+		if err != nil {
+			log.Error("[Commit] Failed to commit block")
+			return err
+		}
+
+		pbr := metadata.NewBlockReceipts(byteProtocolTxReceipts)
+		bytesProtocolTxReceipt, err := pbr.Serialize()
+		if err != nil {
+			return fmt.Errorf("failed to serialize block : %w", err)
+		}
+		err = bucket.Put(metadata.GetBlockReceiptsKey(b.Hash(), b.Number(), true), bytesProtocolTxReceipt)
+		if err != nil {
+			log.Error("[Commit] Failed to commit protocol tx receipts")
+			return err
+		}
+
+		br := metadata.NewBlockReceipts(byteTxReceipts)
+		bytesTxReceipt, err := br.Serialize()
+		if err != nil {
+			return fmt.Errorf("failed to serialize block : %w", err)
+		}
+		err = bucket.Put(metadata.GetBlockReceiptsKey(b.Hash(), b.Number(), false), bytesTxReceipt)
+		if err != nil {
+			log.Error("[Commit] Failed to commit tx receipts")
+			return err
+		}
+
+		if isFinalizedState {
+			// Update Main Chain Finalized Block Data
+			s.GetMainChainMetaData().UpdateFinalizedBlockData(s.GetBlockHeaderHash(), s.GetSlotNumber())
+			s.GetMainChainMetaData().UpdateLastBlockData(s.GetBlockHeaderHash(), s.GetSlotNumber())
+			if err := s.GetMainChainMetaData().Commit(bucket); err != nil {
+				log.Error("[Commit] Failed to commit MainChainMetaData")
+				return err
+			}
+		}
+
+		if s.GetSlotNumber() == 0 || totalStakeAmount.Cmp(lastBlockTotalStakeAmount) == 1 {
+			// Update Main Chain Last Block Data
+			s.GetMainChainMetaData().UpdateLastBlockData(s.GetBlockHeaderHash(), s.GetSlotNumber())
+			if err := s.GetMainChainMetaData().Commit(bucket); err != nil {
+				log.Error("[Commit] Failed to commit MainChainMetaData")
+				return err
+			}
+
+			err = bucket.Put([]byte("mainchain-head-trie-root"), trieRoot[:])
+			if err != nil {
+				log.Error("[Commit] Failed to commit state trie root")
+				return err
+			}
+			blockHeaderHash := s.GetBlockHeaderHash()
+			err = bucket.Put(storagekeys.GetBlockHashStorageKeyBySlotNumber(s.GetSlotNumber()), blockHeaderHash[:])
+
+			for i, protoProtocolTx := range b.ProtocolTransactions() {
+				protocolTXMetaData := metadata.NewProtocolTransactionMetaData(s.GetBlockHeaderHash(),
+					s.GetSlotNumber(), uint64(i), protoProtocolTx)
+				if err := protocolTXMetaData.Commit(bucket); err != nil {
+					log.Error("[Commit] Failed to commit protocol tx MetaData")
+					return err
+				}
+			}
+
+			for i, protoTx := range b.Transactions() {
+				txMetaData := metadata.NewTransactionMetaData(s.GetBlockHeaderHash(),
+					s.GetSlotNumber(), uint64(i), protoTx)
+				if err := txMetaData.Commit(bucket); err != nil {
+					log.Error("[Commit] Failed to commit tx MetaData")
+					return err
+				}
+			}
+		}
+
+		if !isFinalizedState {
+			bucket, err = tx.CreateBucketIfNotExists(metadata.GetBlockBucketName(s.GetBlockHeaderHash()))
+			if err != nil {
+				log.Error("[Commit] Failed to create bucket")
+				return err
+			}
+		}
+
+		return nil
+	})
 }
 
 func applyTransaction(msg types.Message, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, tx transactions.TransactionInterface, usedGas *uint64, evm *vm.EVM) (*types.Receipt, error) {
@@ -890,4 +1074,31 @@ func UpdateStakeValidators(statedb *state.StateDB, pendingStakeValidatorsUpdate 
 	}
 
 	return nil
+}
+
+func receiptsToByteReceipts(receipts types.Receipts) ([]byte, error) {
+	storageReceipts := make([]*types.ReceiptForStorage, len(receipts))
+	for i, receipt := range receipts {
+		storageReceipts[i] = (*types.ReceiptForStorage)(receipt)
+	}
+	return rlp.EncodeToBytes(storageReceipts)
+}
+
+func Re(receipts types.Receipts) ([]byte, error) {
+	return receiptsToByteReceipts(receipts)
+}
+
+func TransferTxAsMessage(tx *transactions.Transfer, baseFee *big.Int) (types.Message, error) {
+	bigIntGasPrice := big.NewInt(int64(tx.GasPrice()))
+	bigIntGasFeeCap := big.NewInt(int64(tx.GasFeeCap()))
+	bigIntGasTipCap := big.NewInt(int64(tx.GasTipCap()))
+	bigIntValue := big.NewInt(int64(tx.Value()))
+	// If baseFee provided, set gasPrice to effectiveGasPrice.
+	if baseFee != nil {
+		bigIntGasPrice = math.BigMin(bigIntGasPrice.Add(bigIntGasTipCap, baseFee), bigIntGasFeeCap)
+	}
+
+	msg := types.NewMessage(tx.AddrFrom(), tx.To(), tx.Nonce(), bigIntValue, tx.Gas(), bigIntGasPrice, bigIntGasFeeCap, bigIntGasTipCap, tx.Data(), nil, false)
+
+	return msg, nil
 }
