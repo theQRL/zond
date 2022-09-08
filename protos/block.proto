@@ -22,6 +22,9 @@ message BlockHeader {
     bytes root = 8;
     bytes transactions_root = 9;
     bytes receipts_root = 10;
+
+    bytes protocol_tx_bloom = 11;
+    bytes tx_bloom = 12;
 }
 
 message Block {

@@ -283,6 +283,11 @@ func NewBlock(chainId uint64, timestamp uint64, proposerDilithiumPK []byte, slot
 	return b
 }
 
+func (b *Block) UpdateBloom(protocolTxBloom, txBloom [256]byte) {
+	b.pbData.Header.ProtocolTxBloom = protocolTxBloom[:]
+	b.pbData.Header.TxBloom = txBloom[:]
+}
+
 func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext) error {
 	currentEpochMetaData := stateContext.GetEpochMetaData()
 	// Ignore Finalization if TotalStakeAmountFound is less than the 2/3rd of TotalStakeAmountAlloted
