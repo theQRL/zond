@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/theQRL/zond/protos"
 	"math/big"
 	"sort"
 
@@ -701,6 +702,26 @@ func deriveLogFields(receipts []*receiptLogs, hash common.Hash, number uint64, t
 	return nil
 }
 
+func deriveLogFieldsForTransactions(receipts []*receiptLogs, hash common.Hash, number uint64, txs []*protos.Transaction) error {
+	logIndex := uint(0)
+	if len(txs) != len(receipts) {
+		return errors.New("transaction and receipt count mismatch")
+	}
+	for i := 0; i < len(receipts); i++ {
+		txHash := common.BytesToHash(txs[i].Hash)
+		// The derived log fields can simply be set from the block and transaction
+		for j := 0; j < len(receipts[i].Logs); j++ {
+			receipts[i].Logs[j].BlockNumber = number
+			receipts[i].Logs[j].BlockHash = hash
+			receipts[i].Logs[j].TxHash = txHash
+			receipts[i].Logs[j].TxIndex = uint(i)
+			receipts[i].Logs[j].Index = logIndex
+			logIndex++
+		}
+	}
+	return nil
+}
+
 // ReadLogs retrieves the logs for all transactions in a block. The log fields
 // are populated with metadata. In case the receipts or the block body
 // are not found, a nil is returned.
@@ -727,6 +748,28 @@ func ReadLogs(db ethdb.Reader, hash common.Hash, number uint64, config *params.C
 		return nil
 	}
 	if err := deriveLogFields(receipts, hash, number, body.Transactions); err != nil {
+		log.Error("Failed to derive block receipts fields", "hash", hash, "number", number, "err", err)
+		return nil
+	}
+	logs := make([][]*types.Log, len(receipts))
+	for i, receipt := range receipts {
+		logs[i] = receipt.Logs
+	}
+	return logs
+}
+
+func ReadLogsFromReceiptsRLPData(data []byte, hash common.Hash, number uint64, txs []*protos.Transaction) [][]*types.Log {
+	// Retrieve the flattened receipt slice
+	if len(data) == 0 {
+		return nil
+	}
+	receipts := []*receiptLogs{}
+	if err := rlp.DecodeBytes(data, &receipts); err != nil {
+		log.Error("Invalid receipt array RLP", "hash", hash, "err", err)
+		return nil
+	}
+
+	if err := deriveLogFieldsForTransactions(receipts, hash, number, txs); err != nil {
 		log.Error("Failed to derive block receipts fields", "hash", hash, "number", number, "err", err)
 		return nil
 	}
