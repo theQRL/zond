@@ -5,6 +5,7 @@ import (
 	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/core"
 	"github.com/theQRL/zond/core/state"
+	"github.com/theQRL/zond/core/types"
 	"github.com/theQRL/zond/core/vm"
 	"github.com/theQRL/zond/params"
 	"github.com/theQRL/zond/protos"
@@ -42,7 +43,7 @@ type Backend interface {
 	//StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *types.Header, error)
 	StateAndHeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*state.StateDB, *protos.BlockHeader, error)
 	//PendingBlockAndReceipts() (*types.Block, types.Receipts)
-	//GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error)
+	GetReceipts(ctx context.Context, hash common.Hash, isProtocolTransaction bool) (types.Receipts, error)
 	//GetTd(ctx context.Context, hash common.Hash) *big.Int
 	GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *protos.BlockHeader, vmConfig *vm.Config) (*vm.EVM, func() error, error)
 	//SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
@@ -51,7 +52,7 @@ type Backend interface {
 
 	// Transaction pool API
 	SendTx(ctx context.Context, signedTx transactions.TransactionInterface) error
-	//GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
+	GetTransaction(ctx context.Context, txHash common.Hash) (*protos.Transaction, common.Hash, uint64, uint64, error)
 	//GetPoolTransactions() (types.Transactions, error)
 	//GetPoolTransaction(txHash common.Hash) *types.Transaction
 	//GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
@@ -62,7 +63,7 @@ type Backend interface {
 
 	// Filter API
 	//BloomStatus() (uint64, uint64)
-	//GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error)
+	GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error)
 	//ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
 	//SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription
 	//SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription
