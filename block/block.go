@@ -375,13 +375,21 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 	return stateContext.Finalize(blockMetaDataPathForFinalization)
 }
 
-func (b *Block) GetPendingValidatorsUpdate(pendingStakeValidatorsUpdate map[string]uint8) {
+func (b *Block) GetPendingValidatorsUpdate() [][]byte {
+	pendingStakeValidatorsUpdateMap := make(map[string]uint8)
+	var pendingStakeValidatorsUpdate [][]byte
 	for _, pbData := range b.Transactions() {
 		switch pbData.Type.(type) {
 		case *protos.Transaction_Stake:
-			pendingStakeValidatorsUpdate[misc.BytesToHexStr(pbData.GetPk())] = 0
+			strPK := misc.BytesToHexStr(pbData.GetPk())
+			_, ok := pendingStakeValidatorsUpdateMap[strPK]
+			if !ok {
+				pendingStakeValidatorsUpdateMap[strPK] = 0
+				pendingStakeValidatorsUpdate = append(pendingStakeValidatorsUpdate, pbData.GetPk())
+			}
 		}
 	}
+	return pendingStakeValidatorsUpdate
 }
 
 func (b *Block) GetBlockProposer() common.Address {
