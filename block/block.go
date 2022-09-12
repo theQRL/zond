@@ -288,6 +288,10 @@ func (b *Block) UpdateBloom(protocolTxBloom, txBloom [256]byte) {
 	b.pbData.Header.TxBloom = txBloom[:]
 }
 
+func (b *Block) UpdateRoots(trieRoot common.Hash) {
+	b.pbData.Header.Root = trieRoot[:]
+}
+
 func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext) error {
 	currentEpochMetaData := stateContext.GetEpochMetaData()
 	// Ignore Finalization if TotalStakeAmountFound is less than the 2/3rd of TotalStakeAmountAlloted
