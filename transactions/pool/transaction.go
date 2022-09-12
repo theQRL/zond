@@ -17,6 +17,7 @@ type TransactionPool struct {
 	txPool *PriorityQueue
 	config *config.Config
 	ntp    ntp.NTPInterface
+	nonce  map[common.Address]uint64
 }
 
 func (t *TransactionPool) isFull() bool {
@@ -54,7 +55,9 @@ func (t *TransactionPool) Add(tx transactions.TransactionInterface, txHash commo
 		return err
 	}
 
+	t.AddNonceData(tx.PK(), tx.Nonce())
 	log.Info("Added Transaction ", misc.BytesToHexStr(txHash[:]), " to pool")
+
 	return nil
 }
 
@@ -62,7 +65,13 @@ func (t *TransactionPool) Pop() *TransactionInfo {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	return t.txPool.Pop()
+	tx := t.txPool.Pop()
+
+	if tx != nil {
+		t.DeleteNonceData(tx.tx.PK(), tx.tx.Nonce())
+	}
+
+	return tx
 }
 
 func (t *TransactionPool) Remove(tx transactions.TransactionInterface, txHash common.Hash) bool {
@@ -72,6 +81,8 @@ func (t *TransactionPool) Remove(tx transactions.TransactionInterface, txHash co
 	if t.txPool.Remove(tx, txHash) {
 		return true
 	}
+
+	t.DeleteNonceData(tx.PK(), tx.Nonce())
 	return false
 }
 
@@ -80,6 +91,9 @@ func (t *TransactionPool) RemoveTxInBlock(block *block.Block) {
 	defer t.lock.Unlock()
 
 	t.txPool.RemoveTxInBlock(block)
+	for _, protoTX := range block.Transactions() {
+		t.DeleteNonceData(protoTX.Pk, protoTX.Nonce)
+	}
 }
 
 func (t *TransactionPool) AddTxFromBlock(block *block.Block, currentBlockHeight uint64) error {
@@ -89,8 +103,30 @@ func (t *TransactionPool) AddTxFromBlock(block *block.Block, currentBlockHeight 
 		if err != nil {
 			return err
 		}
+		t.AddNonceData(tx.PK(), tx.Nonce())
 	}
 	return nil
+}
+
+func (t *TransactionPool) DeleteNonceData(pk []byte, nonce uint64) {
+	address := misc.GetXMSSAddressFromUnSizedPK(pk)
+	currentNonce, ok := t.nonce[address]
+	if ok && currentNonce == nonce {
+		delete(t.nonce, address)
+	}
+}
+
+func (t *TransactionPool) AddNonceData(pk []byte, nonce uint64) {
+	address := misc.GetAddressFromUnSizedPK(pk)
+	currentNonce, ok := t.nonce[address]
+	if (!ok) || (ok && nonce > currentNonce) {
+		t.nonce[address] = nonce
+	}
+}
+
+func (t *TransactionPool) GetNonceByAddress(address common.Address) (uint64, bool) {
+	nonce, ok := t.nonce[address]
+	return nonce, ok
 }
 
 // TODO: Check Stale txn and rebroadcast if required
@@ -156,6 +192,7 @@ func CreateTransactionPool() *TransactionPool {
 		config: config.GetConfig(),
 		ntp:    ntp.GetNTP(),
 		txPool: &PriorityQueue{},
+		nonce:  make(map[common.Address]uint64),
 	}
 	return t
 }

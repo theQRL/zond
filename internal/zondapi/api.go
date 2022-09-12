@@ -1019,26 +1019,26 @@ func (s *TransactionAPI) GetTransactionByBlockHashAndIndex(ctx context.Context, 
 //	}
 //	return nil
 //}
-//
-//// GetTransactionCount returns the number of transactions the given address has sent for the given block number
-//func (s *TransactionAPI) GetTransactionCount(ctx context.Context, address common.Address, blockNrOrHash rpc.BlockNumberOrHash) (*hexutil.Uint64, error) {
-//	// Ask transaction pool for the nonce which includes pending transactions
-//	if blockNr, ok := blockNrOrHash.Number(); ok && blockNr == rpc.PendingBlockNumber {
-//		nonce, err := s.b.GetPoolNonce(ctx, address)
-//		if err != nil {
-//			return nil, err
-//		}
-//		return (*hexutil.Uint64)(&nonce), nil
-//	}
-//	// Resolve block number and use its state to ask for the nonce
-//	state, _, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
-//	if state == nil || err != nil {
-//		return nil, err
-//	}
-//	nonce := state.GetNonce(address)
-//	return (*hexutil.Uint64)(&nonce), state.Error()
-//}
-//
+
+// GetTransactionCount returns the number of transactions the given address has sent for the given block number
+func (s *TransactionAPI) GetTransactionCount(ctx context.Context, address common.Address, blockNrOrHash rpc.BlockNumberOrHash) (*hexutil.Uint64, error) {
+	// Ask transaction pool for the nonce which includes pending transactions
+	if blockNr, ok := blockNrOrHash.Number(); ok && blockNr == rpc.PendingBlockNumber {
+		nonce, err := s.b.GetPoolNonce(ctx, address)
+		if err != nil {
+			return nil, err
+		}
+		return (*hexutil.Uint64)(&nonce), nil
+	}
+	// Resolve block number and use its state to ask for the nonce
+	state, _, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
+	if state == nil || err != nil {
+		return nil, err
+	}
+	nonce := state.GetNonce(address)
+	return (*hexutil.Uint64)(&nonce), state.Error()
+}
+
 //// GetTransactionByHash returns the transaction for the given hash
 //func (s *TransactionAPI) GetTransactionByHash(ctx context.Context, hash common.Hash) (*RPCTransaction, error) {
 //	// Try to return an already finalized transaction

@@ -55,7 +55,7 @@ type Backend interface {
 	GetTransaction(ctx context.Context, txHash common.Hash) (*protos.Transaction, common.Hash, uint64, uint64, error)
 	//GetPoolTransactions() (types.Transactions, error)
 	//GetPoolTransaction(txHash common.Hash) *types.Transaction
-	//GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
+	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
 	//Stats() (pending int, queued int)
 	//TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions)
 	//TxPoolContentFrom(addr common.Address) (types.Transactions, types.Transactions)
