@@ -248,6 +248,7 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 	protocolTxBloom := types.CreateBloom(protocolTxReceipts)
 	txBloom := types.CreateBloom(txReceipts)
 	b.UpdateBloom(protocolTxBloom, txBloom)
+	b.UpdateRoots(trieRoot)
 
 	err = p.Commit(stateContext, b, protocolTxReceipts, txReceipts, trieRoot, true)
 	if err != nil {
@@ -383,6 +384,7 @@ func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateCo
 	protocolTxBloom := types.CreateBloom(protocolTxReceipts)
 	txBloom := types.CreateBloom(txReceipts)
 	b.UpdateBloom(protocolTxBloom, txBloom)
+	b.UpdateRoots(trieRoot)
 
 	err = p.Commit(stateContext, b, protocolTxReceipts, txReceipts, trieRoot, isFinalizedState)
 	if err != nil {
