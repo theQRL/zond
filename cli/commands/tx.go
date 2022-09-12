@@ -44,9 +44,13 @@ func broadcastTransaction(transaction interface{}, url string, txHash common.Has
 	var response api.Response
 	err = json.Unmarshal(bodyBytes, &response)
 
-	responseData := response.Data.(map[string]interface{})
-	if responseData["transactionHash"].(string) == misc.BytesToHexStr(txHash[:]) {
-		fmt.Println("Transaction successfully broadcasted")
+	if response.Error != 0 {
+		fmt.Println(response.ErrorMessage)
+	} else {
+		responseData := response.Data.(map[string]interface{})
+		if responseData["transactionHash"].(string) == misc.BytesToHexStr(txHash[:]) {
+			fmt.Println("Transaction successfully broadcasted")
+		}
 	}
 	return nil
 }
