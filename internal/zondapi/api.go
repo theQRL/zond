@@ -1028,6 +1028,8 @@ func (s *TransactionAPI) GetTransactionCount(ctx context.Context, address common
 		if err != nil {
 			return nil, err
 		}
+		// Expected nonce +1 than last nonce found in pending pool
+		nonce += 1
 		return (*hexutil.Uint64)(&nonce), nil
 	}
 	// Resolve block number and use its state to ask for the nonce
