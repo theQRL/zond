@@ -279,10 +279,11 @@ func (b *ZondAPIBackend) GetTransaction(ctx context.Context, txHash common.Hash)
 	return txMetaData.Transaction(), txMetaData.BlockHash(), txMetaData.BlockNumber(), txMetaData.Index(), nil
 }
 
-//func (b *ZondAPIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
-//	return b.zond.txPool.Nonce(addr), nil
-//}
-//
+func (b *ZondAPIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
+	//return b.zond.txPool.Nonce(addr), nil
+	return b.zond.blockchain.GetNonce(addr)
+}
+
 //func (b *ZondAPIBackend) Stats() (pending int, queued int) {
 //	return b.zond.txPool.Stats()
 //}

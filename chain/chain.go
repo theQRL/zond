@@ -267,12 +267,26 @@ func (c *Chain) GetMaxPossibleSlotNumber() uint64 {
 	return (currentTimestamp - genesisTimestamp) / d.BlockTime
 }
 
+func (c *Chain) GetLastBlock() *block.Block {
+	return c.lastBlock
+}
+
 func (c *Chain) GetTransactionPool() *pool.TransactionPool {
 	return c.txPool
 }
 
-func (c *Chain) GetLastBlock() *block.Block {
-	return c.lastBlock
+func (c *Chain) GetNonce(address common.Address) (uint64, error) {
+	// TODO (cyyber): doesn't consider the pending nonce for the address involved in Staking
+	nonce, found := c.txPool.GetNonceByAddress(address)
+	if found {
+		return nonce, nil
+	}
+	statedb, err := c.AccountDB()
+	if err != nil {
+		log.Error("failed to get accountdb")
+		return 0, err
+	}
+	return statedb.GetNonce(address), nil
 }
 
 func (c *Chain) GetTotalStakeAmount() (*big.Int, error) {
