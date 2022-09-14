@@ -803,6 +803,25 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 		c.lastBlock = lastBlock
 	}
 
+	if b.Hash() == c.lastBlock.Hash() && b.Epoch() != parentBlock.Epoch() {
+		err = b.UpdateFinalizedEpoch(c.state.DB(), stateContext)
+		if err != nil {
+			log.Error("Failed to update finalized epoch")
+		} else {
+			finalizedHeaderHash, err := c.GetFinalizedHeaderHash()
+			if err != nil {
+				log.Error("Error getting finalized header hash")
+			} else {
+				b, err := c.GetBlock(finalizedHeaderHash)
+				if err != nil {
+					log.Error("Error getting block for finalized header hash")
+				} else {
+					log.Info(fmt.Sprintf("Updated finalized epoch to Epoch %d Slot Number #%d %s ", b.Epoch(), b.SlotNumber(), b.Hash()))
+				}
+			}
+		}
+	}
+
 	log.Info(fmt.Sprintf("Added Block #%d %s", b.SlotNumber(), misc.BytesToHexStr(bHash[:])))
 	log.Info(fmt.Sprintf("Protocol Txs Count %d | Txs Count %d",
 		len(b.ProtocolTransactions()), len(b.Transactions())))
