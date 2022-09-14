@@ -109,7 +109,7 @@ func (t *TransactionPool) AddTxFromBlock(block *block.Block, currentBlockHeight 
 }
 
 func (t *TransactionPool) DeleteNonceData(pk []byte, nonce uint64) {
-	address := misc.GetXMSSAddressFromUnSizedPK(pk)
+	address := misc.GetAddressFromUnSizedPK(pk)
 	currentNonce, ok := t.nonce[address]
 	if ok && currentNonce == nonce {
 		delete(t.nonce, address)
