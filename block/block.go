@@ -349,6 +349,12 @@ func (b *Block) UpdateFinalizedEpoch(db *db.DB, stateContext *state.StateContext
 		return nil
 	}
 
+	bm, err = metadata.GetBlockMetaData(db, bm.ParentHeaderHash())
+	if err != nil {
+		log.Error("[UpdateFinalizedEpoch] Failed to GetBlockMetaData")
+		return err
+	}
+
 	for {
 		newBM, err := metadata.GetBlockMetaData(db, bm.ParentHeaderHash())
 		if err != nil {
