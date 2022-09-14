@@ -3,6 +3,13 @@ package chain
 import (
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
+	"path"
+	"reflect"
+	"sync"
+	"time"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/block"
 	"github.com/theQRL/zond/block/genesis"
@@ -24,12 +31,6 @@ import (
 	"github.com/theQRL/zond/state"
 	"github.com/theQRL/zond/transactions"
 	"github.com/theQRL/zond/transactions/pool"
-	"math"
-	"math/big"
-	"path"
-	"reflect"
-	"sync"
-	"time"
 )
 
 type Chain struct {
@@ -520,7 +521,11 @@ func (c *Chain) GetBlockBySlotNumber(n uint64) (*block.Block, error) {
 }
 
 func (c *Chain) GetBlockHashBySlotNumber(n uint64) common.Hash {
-	panic("not yet implemented")
+	blocks, err := block.GetBlockByNumber(c.state.DB(), n)
+	if err != nil {
+		return common.Hash{}
+	}
+	return blocks.Hash()
 }
 
 //func (c *Chain) GetEpochHeaderHashes(headerHash []byte) ([]*protos.BlockHashesBySlotNumber, error) {
