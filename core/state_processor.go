@@ -71,7 +71,7 @@ func (p *StateProcessor) ProcessGenesisPreState(preState *protos.PreState, b *bl
 	blockProposerDilithiumAddress := misc.GetDilithiumAddressFromUnSizedPK(b.ProtocolTransactions()[0].GetPk())
 	statedb.GetOrNewStateObject(blockProposerDilithiumAddress).SetBalance(big.NewInt(int64(config.GetDevConfig().Genesis.SuppliedCoins)))
 
-	if !reflect.DeepEqual(blockProposerDilithiumAddress, config.GetDevConfig().Genesis.FoundationDilithiumAddress) {
+	if blockProposerDilithiumAddress != config.GetDevConfig().Genesis.FoundationDilithiumAddress {
 		expectedFoundationDilithiumAddress := misc.BytesToHexStr(config.GetDevConfig().Genesis.FoundationDilithiumAddress[:])
 		foundFoundationDilithiumAddress := misc.BytesToHexStr(config.GetDevConfig().Genesis.FoundationDilithiumAddress[:])
 
