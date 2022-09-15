@@ -3,6 +3,13 @@ package chain
 import (
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
+	"path"
+	"reflect"
+	"sync"
+	"time"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/theQRL/zond/block"
 	"github.com/theQRL/zond/block/genesis"
@@ -24,12 +31,6 @@ import (
 	"github.com/theQRL/zond/state"
 	"github.com/theQRL/zond/transactions"
 	"github.com/theQRL/zond/transactions/pool"
-	"math"
-	"math/big"
-	"path"
-	"reflect"
-	"sync"
-	"time"
 )
 
 type Chain struct {
@@ -140,14 +141,14 @@ func (c *Chain) GetBlockByNumber(number uint64) *block.Block {
 	return b
 }
 
-func (c *Chain) GetTransactionMetaDataByHash(txHash common.Hash) *metadata.TransactionMetaData {
+func (c *Chain) GetTransactionMetaDataByHash(txHash common.Hash) (*protos.Transaction, common.Hash, uint64, uint64) {
 	txMetaData, err := metadata.GetTransactionMetaData(c.state.DB(), txHash)
 	if err != nil {
 		log.Error("failed to get transaction metadata for txHash ", txHash)
-		return nil
+		return nil, common.Hash{}, 0, 0
 	}
 
-	return txMetaData
+	return txMetaData.Transaction(), txMetaData.BlockHash(), txMetaData.BlockNumber(), txMetaData.Index()
 }
 
 func (c *Chain) GetReceiptsByHash(headerHash common.Hash, isProtocolTransaction bool) types.Receipts {
@@ -520,7 +521,11 @@ func (c *Chain) GetBlockBySlotNumber(n uint64) (*block.Block, error) {
 }
 
 func (c *Chain) GetBlockHashBySlotNumber(n uint64) common.Hash {
-	panic("not yet implemented")
+	blocks, err := block.GetBlockByNumber(c.state.DB(), n)
+	if err != nil {
+		return common.Hash{}
+	}
+	return blocks.Hash()
 }
 
 //func (c *Chain) GetEpochHeaderHashes(headerHash []byte) ([]*protos.BlockHashesBySlotNumber, error) {
