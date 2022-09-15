@@ -141,14 +141,14 @@ func (c *Chain) GetBlockByNumber(number uint64) *block.Block {
 	return b
 }
 
-func (c *Chain) GetTransactionMetaDataByHash(txHash common.Hash) *metadata.TransactionMetaData {
+func (c *Chain) GetTransactionMetaDataByHash(txHash common.Hash) (*protos.Transaction, common.Hash, uint64, uint64) {
 	txMetaData, err := metadata.GetTransactionMetaData(c.state.DB(), txHash)
 	if err != nil {
 		log.Error("failed to get transaction metadata for txHash ", txHash)
-		return nil
+		return nil, common.Hash{}, 0, 0
 	}
 
-	return txMetaData
+	return txMetaData.Transaction(), txMetaData.BlockHash(), txMetaData.BlockNumber(), txMetaData.Index()
 }
 
 func (c *Chain) GetReceiptsByHash(headerHash common.Hash, isProtocolTransaction bool) types.Receipts {

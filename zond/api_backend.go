@@ -275,8 +275,8 @@ func (b *ZondAPIBackend) SendTx(ctx context.Context, signedTx transactions.Trans
 func (b *ZondAPIBackend) GetTransaction(ctx context.Context, txHash common.Hash) (*protos.Transaction, common.Hash, uint64, uint64, error) {
 	//tx, blockHash, blockNumber, index := rawdb.ReadTransaction(b.zond.ChainDb(), txHash)
 	//return tx, blockHash, blockNumber, index, nil
-	txMetaData := b.zond.BlockChain().GetTransactionMetaDataByHash(txHash)
-	return txMetaData.Transaction(), txMetaData.BlockHash(), txMetaData.BlockNumber(), txMetaData.Index(), nil
+	tx, blockHash, blockNumber, index := b.zond.BlockChain().GetTransactionMetaDataByHash(txHash)
+	return tx, blockHash, blockNumber, index, nil
 }
 
 func (b *ZondAPIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
