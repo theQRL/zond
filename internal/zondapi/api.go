@@ -70,6 +70,17 @@ type StorageResult struct {
 	Proof []string     `json:"proof"`
 }
 
+type ValidatorsResult struct {
+	Epoch                  uint64           `json:"epoch"`
+	ValidatorsBySlotNumber []SlotValidators `json:"validatorsBySlotNumber"`
+}
+
+type SlotValidators struct {
+	SlotNumber uint64           `json:"slotNumber"`
+	Leader     common.Address   `json:"leader"`
+	Attestors  []common.Address `json:"attestors"`
+}
+
 // GetProof returns the Merkle-proof for a given account and optionally some storage keys.
 //func (s *BlockChainAPI) GetProof(ctx context.Context, address common.Address, storageKeys []string, blockNrOrHash rpc.BlockNumberOrHash) (*AccountResult, error) {
 //	state, _, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
@@ -119,6 +130,36 @@ type StorageResult struct {
 //		StorageProof: storageProof,
 //	}, state.Error()
 //}
+
+func (s *BlockChainAPI) GetValidators(ctx context.Context) (*ValidatorsResult, error) {
+	epochMetaData, err := s.b.GetValidators(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var validatorsBySlotNumber []SlotValidators
+	validatorsPK := epochMetaData.Validators()
+	for slotNumber, slotInfo := range epochMetaData.SlotInfo() {
+		slotLeaderDilithiumPK := validatorsPK[slotInfo.SlotLeader]
+		var attestors []common.Address
+		for _, attestor := range slotInfo.Attestors {
+			attestors = append(attestors, misc.GetAddressFromUnSizedPK(validatorsPK[attestor]))
+		}
+		vr := SlotValidators{
+			SlotNumber: uint64(slotNumber),
+			Leader:     misc.GetAddressFromUnSizedPK(slotLeaderDilithiumPK),
+			Attestors:  attestors,
+		}
+		validatorsBySlotNumber = append(validatorsBySlotNumber, vr)
+	}
+
+	v := &ValidatorsResult{
+		Epoch:                  epochMetaData.Epoch(),
+		ValidatorsBySlotNumber: validatorsBySlotNumber,
+	}
+
+	return v, nil
+}
 
 // GetHeaderByNumber returns the requested canonical block header.
 // * When blockNr is -1 the chain head is returned.

@@ -10,6 +10,7 @@ import (
 	"github.com/theQRL/zond/core/state"
 	"github.com/theQRL/zond/core/types"
 	"github.com/theQRL/zond/core/vm"
+	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/ntp"
 	"github.com/theQRL/zond/params"
 	"github.com/theQRL/zond/protos"
@@ -40,6 +41,10 @@ func (b *ZondAPIBackend) ChainConfig() *params.ChainConfig {
 //	b.zond.handler.downloader.Cancel()
 //	b.zond.blockchain.SetHead(number)
 //}
+
+func (b *ZondAPIBackend) GetValidators(ctx context.Context) (*metadata.EpochMetaData, error) {
+	return b.zond.blockchain.GetValidators()
+}
 
 func (b *ZondAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*protos.BlockHeader, error) {
 	// Pending block is only known by the miner

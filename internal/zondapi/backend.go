@@ -7,6 +7,7 @@ import (
 	"github.com/theQRL/zond/core/state"
 	"github.com/theQRL/zond/core/types"
 	"github.com/theQRL/zond/core/vm"
+	"github.com/theQRL/zond/metadata"
 	"github.com/theQRL/zond/params"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/rpc"
@@ -32,6 +33,7 @@ type Backend interface {
 
 	// Blockchain API
 	//SetHead(number uint64)
+	GetValidators(ctx context.Context) (*metadata.EpochMetaData, error)
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*protos.BlockHeader, error)
 	HeaderByHash(ctx context.Context, hash common.Hash) (*protos.BlockHeader, error)
 	//HeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Header, error)
