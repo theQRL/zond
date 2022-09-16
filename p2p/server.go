@@ -224,6 +224,8 @@ func (srv *Server) ConnectPeers() error {
 	srv.loopWG.Add(1)
 	defer srv.loopWG.Done()
 
+	bootstrapPeers := make(map[string]bool)
+
 	for _, multiAddr := range srv.config.User.Node.PeerList {
 		//log.Info("Connecting peer ", peer)
 		err := srv.peerData.AddDisconnectedPeers(multiAddr)
@@ -232,6 +234,7 @@ func (srv *Server) ConnectPeers() error {
 				" Reason: ", err.Error())
 			continue
 		}
+		bootstrapPeers[multiAddr] = true
 	}
 
 	peerList := make([]string, 0)
@@ -272,7 +275,8 @@ func (srv *Server) ConnectPeers() error {
 				log.Info("Trying to Connect ", multiAddr)
 				err := srv.ConnectPeer(multiAddr)
 				count += 1
-				if err != nil {
+				// Skip removal of bootstrapPeers
+				if err != nil && !bootstrapPeers[multiAddr] {
 					log.Info("Failed to connect to ", multiAddr)
 					removePeers = append(removePeers, multiAddr)
 					continue
