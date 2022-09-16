@@ -158,6 +158,14 @@ running:
 				slotLeaderPK, err := p.chain.GetSlotLeaderDilithiumPKBySlotNumber(lastBlockMetaData.TrieRoot(),
 					slotNumber, lastBlock.Hash())
 
+				slotValidatorsMetaData, err := p.chain.GetSlotValidatorsMetaDataBySlotNumber(lastBlockMetaData.TrieRoot(), slotNumber, lastBlock.Hash())
+				if err != nil {
+					log.Error("Failed to Get Parent Block ", err.Error())
+					continue
+				}
+				// This is required in case the node receives attestation for the block from other nodes
+				p.slotValidatorsMetaData = slotValidatorsMetaData
+
 				if err != nil {
 					log.Error("Error getting SlotLeader Dilithium PK By Slot Number ", err.Error())
 					continue
