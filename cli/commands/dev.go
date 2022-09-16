@@ -39,8 +39,9 @@ func getDevSubCommands() []*cli.Command {
 				}
 				dk.Add(foundationDilithiumAccount)
 
+				targetWallets := config.GetDevConfig().BlocksPerEpoch * 2
 				walletStake := wallet.NewWallet(path.Join("bootstrap", "wallet.json"))
-				for i := uint(0); i < 200; i++ {
+				for i := uint(0); i < uint(targetWallets); i++ {
 					walletStake.AddDilithium()
 					stakeDilithiumAccount, err := walletStake.GetDilithiumAccountByIndex(i + 1)
 					if err != nil {
@@ -49,7 +50,7 @@ func getDevSubCommands() []*cli.Command {
 					}
 					dk.Add(stakeDilithiumAccount)
 				}
-				fmt.Println("Successfully generated 200 dilithium address for staking")
+				fmt.Println(fmt.Sprintf("Successfully generated %d dilithium address for staking", targetWallets))
 
 				foundationDilithiumPK := foundationDilithiumAccount.GetPK()
 				// nonce starts with 1 as foundation has signed coinbase transaction with nonce 0 for genesis block
@@ -66,7 +67,7 @@ func getDevSubCommands() []*cli.Command {
 				tl := misc.NewTransactionList(path.Join("bootstrap", "genesisTransactions.json"))
 
 				//Transactions to fund all validators from foundation dilithium account
-				for i := uint(0); i < 200; i++ {
+				for i := uint(0); i < uint(targetWallets); i++ {
 					stakeDilithiumAccount, err := walletStake.GetDilithiumAccountByIndex(i + 1)
 					if err != nil {
 						fmt.Println("failed to get stake dilithium account by index")
@@ -100,7 +101,7 @@ func getDevSubCommands() []*cli.Command {
 				foundationAccountNonce += 1
 				tl.Add(foundationStakeTx.PBData())
 
-				for i := uint(0); i < 200; i++ {
+				for i := uint(0); i < uint(targetWallets); i++ {
 					stakeDilithiumAccount, err := walletStake.GetDilithiumAccountByIndex(i + 1)
 					if err != nil {
 						fmt.Println("failed to get stake dilithium account by index")
