@@ -53,6 +53,7 @@ func (t *PlainStakeTransaction) ToStakeTransactionObject() (*transactions.Stake,
 	}
 
 	stakeTx.PBData().Signature, err = misc.HexStrToBytes(t.Signature)
+	stakeTx.PBData().Hash, err = misc.HexStrToBytes(t.TransactionHash)
 
 	return stakeTx, err
 }
