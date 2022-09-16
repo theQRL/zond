@@ -19,7 +19,6 @@ import (
 	"github.com/theQRL/zond/transactions/pool"
 	"github.com/willf/bloom"
 	"io"
-	"net"
 	"reflect"
 	"strconv"
 	"sync"
@@ -120,8 +119,8 @@ func newPeer(conn network.Stream, inbound bool, chain *chain.Chain,
 		outgoingQueue:               &PriorityQueue{},
 	}
 	p.id = p.stream.Conn().RemotePeer().Pretty()
-	ip, _, _ := net.SplitHostPort(misc.IPFromMultiAddr(p.stream.Conn().RemoteMultiaddr().String()))
-	p.ip = ip
+	p.ip = misc.IPFromMultiAddr(p.stream.Conn().RemoteMultiaddr().String())
+
 	log.Info("New Peer connected ", p.stream.Conn().RemoteMultiaddr())
 	return p
 }
@@ -336,7 +335,7 @@ func (p *Peer) monitorChainState() {
 	p.wg.Add(1)
 	defer p.wg.Done()
 	for {
-		log.Debug("Monitor Chain State running for ", p.ID())
+		log.Debug("Monitor Chain State running for ", p.IP(), " ", p.ID())
 		select {
 		case <-time.After(30 * time.Second):
 			currentTime := p.ntp.Time()
@@ -350,7 +349,7 @@ func (p *Peer) monitorChainState() {
 				log.Warn("Disconnecting Peer due to Ping Timeout",
 					" delta ", delta,
 					" currentTime ", currentTime,
-					" peer ", p.ID())
+					" peer ", p.IP(), " ", p.ID())
 				p.Disconnect()
 				return
 			}
@@ -387,7 +386,7 @@ func (p *Peer) monitorChainState() {
 			}
 
 			if p.chainState == nil {
-				log.Debug("Ignoring MonitorState check as peer chain state is nil for ", p.ID())
+				log.Debug("Ignoring MonitorState check as peer chain state is nil for ", p.IP(), " ", p.ID())
 				continue
 			}
 		case <-p.exitMonitorChainState:
@@ -436,6 +435,7 @@ func (p *Peer) handle(msg *Msg) error {
 			return nil
 		}
 		p.publicPort = strconv.FormatUint(uint64(msg.msg.GetPlData().PublicPort), 10)
+
 		p.multiAddr = fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", p.ip, p.publicPort, p.stream.Conn().RemotePeer())
 		p.isPLShared = true
 		p.addPeerToPeerList <- &PeerIPWithPLData{p.multiAddr, msg.msg.GetPlData()}
@@ -566,7 +566,7 @@ func (p *Peer) handle(msg *Msg) error {
 	case protos.LegacyMessage_AT: // Attest Transaction
 		p.HandleAttestTransaction(msg, msg.msg.GetAtData())
 	case protos.LegacyMessage_SYNC:
-		log.Warn("SYNC has not been Implemented <<<< --- ")
+		//log.Warn("SYNC has not been Implemented <<<< --- ")
 	case protos.LegacyMessage_CHAINSTATE:
 		chainStateData := msg.msg.GetChainStateData()
 		p.HandleChainState(chainStateData)
@@ -589,12 +589,12 @@ func (p *Peer) HandleBlockForAttestation(pbBlock *protos.Block, signature []byte
 	b := block.BlockFromPBData(pbBlock)
 	partialBlockSigningHash := b.PartialBlockSigningHash()
 	if !p.mr.IsRequested(partialBlockSigningHash, p) {
-		log.Error("Unrequested Block Received for Attestation from ", p.ID(),
+		log.Error("Unrequested Block Received for Attestation from ", p.IP(), " ", p.ID(),
 			" #", b.SlotNumber(),
 			" PartialBlockSigningHash ", misc.BytesToHexStr(partialBlockSigningHash[:]))
 		return
 	}
-	log.Info("Received Block for Attestation from ", p.ID(),
+	log.Info("Received Block for Attestation from ", p.IP(), " ", p.ID(),
 		" #", b.SlotNumber(),
 		" PartialBlockSigningHash ", misc.BytesToHexStr(partialBlockSigningHash[:]))
 
@@ -628,11 +628,11 @@ func (p *Peer) HandleBlock(pbBlock *protos.Block) {
 		return
 	}
 	if !p.mr.IsRequested(b.Hash(), p) {
-		log.Error("Unrequested Block Received from ", p.ID(), " #", b.SlotNumber(), " ",
+		log.Error("Unrequested Block Received from ", p.IP(), " ", p.ID(), " #", b.SlotNumber(), " ",
 			misc.BytesToHexStr(hash[:]))
 		return
 	}
-	log.Info("Received Block from ", p.ID(), " #", b.SlotNumber(), " ",
+	log.Info("Received Block from ", p.IP(), " ", p.ID(), " #", b.SlotNumber(), " ",
 		misc.BytesToHexStr(hash[:]))
 
 	if !p.chain.AddBlock(b) {
@@ -656,7 +656,7 @@ func (p *Peer) HandleBlock(pbBlock *protos.Block) {
 	case p.registerAndBroadcastChan <- registerMessage:
 	case <-time.After(10 * time.Second):
 		log.Warn("[HandleBlock] RegisterAndBroadcastChan Timeout ",
-			p.ID())
+			p.IP(), " ", p.ID())
 	}
 }
 
@@ -666,7 +666,7 @@ func (p *Peer) HandleTransaction(msg *Msg, txData *protos.Transaction) error {
 
 	if !p.mr.IsRequested(txHash, p) {
 		log.Warn("[HandleTransaction] Received Unrequested txn ",
-			" Peer", p.ID(),
+			" Peer", p.IP(), " ", p.ID(),
 			" Tx Hash", misc.BytesToHexStr(txHash[:]))
 		return nil
 	}
@@ -694,7 +694,7 @@ func (p *Peer) HandleTransaction(msg *Msg, txData *protos.Transaction) error {
 	case p.registerAndBroadcastChan <- registerMessage:
 	case <-time.After(10 * time.Second):
 		log.Warn("[TX] RegisterAndBroadcastChan Timeout ",
-			p.ID())
+			p.IP(), " ", p.ID())
 	}
 	return nil
 }
@@ -708,7 +708,7 @@ func (p *Peer) HandleAttestTransaction(msg *Msg, txData *protos.ProtocolTransact
 
 	if !p.mr.IsRequested(txHash, p) {
 		log.Warn("[HandleAttestTransaction] Received Unrequested txn",
-			" Peer", p.ID(),
+			" Peer", p.IP(), " ", p.ID(),
 			" Tx Hash", misc.BytesToHexStr(txHash[:]))
 		return nil
 	}
@@ -719,7 +719,7 @@ func (p *Peer) HandleAttestTransaction(msg *Msg, txData *protos.ProtocolTransact
 	parentMetaData, err := p.chain.GetBlockMetaData(parentBlockHash)
 	if err != nil {
 		log.Warn("failed to get parent block metadata",
-			" Peer", p.ID(),
+			" Peer", p.IP(), " ", p.ID(),
 			" Tx Hash", misc.BytesToHexStr(txHash[:]))
 		return nil
 	}
@@ -748,7 +748,7 @@ func (p *Peer) HandleAttestTransaction(msg *Msg, txData *protos.ProtocolTransact
 	case p.registerAndBroadcastChan <- registerMessage:
 	case <-time.After(10 * time.Second):
 		log.Warn("[AT] RegisterAndBroadcastChan Timeout ",
-			p.ID())
+			p.IP(), " ", p.ID())
 	}
 	return nil
 }
