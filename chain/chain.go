@@ -438,30 +438,31 @@ func (c *Chain) Load() error {
 	return nil
 }
 
-func (c *Chain) GetSlotLeaderDilithiumPKBySlotNumber(trieRoot common.Hash,
-	slotNumber uint64, parentHeaderHash common.Hash) ([]byte, error) {
-
+func (c *Chain) GetEpochMetaData(trieRoot common.Hash,
+	slotNumber uint64, parentHeaderHash common.Hash) (*metadata.EpochMetaData, error) {
 	statedb, err := c.AccountDBForTrie(trieRoot)
 	if err != nil {
 		return nil, err
 	}
 
-	epochMetaData, err := c.CalculateEpochMetaData(statedb, slotNumber, parentHeaderHash)
+	return c.CalculateEpochMetaData(statedb, slotNumber, parentHeaderHash)
+}
+
+func (c *Chain) GetSlotLeaderDilithiumPKBySlotNumber(trieRoot common.Hash,
+	slotNumber uint64, parentHeaderHash common.Hash) ([]byte, error) {
+
+	epochMetaData, err := c.GetEpochMetaData(trieRoot, slotNumber, parentHeaderHash)
 	if err != nil {
 		return nil, err
 	}
+
 	slotLeaderIndex := epochMetaData.SlotInfo()[slotNumber%c.config.Dev.BlocksPerEpoch].SlotLeader
 	return epochMetaData.Validators()[slotLeaderIndex], nil
 }
 
 func (c *Chain) GetAttestorsBySlotNumber(trieRoot common.Hash,
 	slotNumber uint64, parentHeaderHash common.Hash) ([][]byte, error) {
-	statedb, err := c.AccountDBForTrie(trieRoot)
-	if err != nil {
-		return nil, err
-	}
-
-	epochMetaData, err := c.CalculateEpochMetaData(statedb, slotNumber, parentHeaderHash)
+	epochMetaData, err := c.GetEpochMetaData(trieRoot, slotNumber, parentHeaderHash)
 	if err != nil {
 		return nil, err
 	}
@@ -475,6 +476,17 @@ func (c *Chain) GetAttestorsBySlotNumber(trieRoot common.Hash,
 	}
 
 	return attestors, nil
+}
+
+func (c *Chain) GetValidators() (*metadata.EpochMetaData, error) {
+	currentBlock := c.CurrentBlock()
+	blockMetaData, err := c.GetBlockMetaData(currentBlock.Hash())
+	if err != nil {
+		log.Error("failed to get last block metadata")
+		return nil, err
+	}
+	return c.GetEpochMetaData(blockMetaData.TrieRoot(),
+		currentBlock.SlotNumber(), currentBlock.ParentHash())
 }
 
 // GetSlotValidatorsMetaDataBySlotNumber returns a map of all the validators for a specific slot number.
