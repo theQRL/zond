@@ -919,21 +919,21 @@ func ValidateAttestTx(tx *transactions.Attest, statedb *state.StateDB, slotValid
 
 	parentEpoch := parentSlotNumber / config.GetDevConfig().BlocksPerEpoch
 	currentEpoch := slotNumber / config.GetDevConfig().BlocksPerEpoch
-	if parentEpoch == currentEpoch {
-		if accountState.StakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
-			return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
-				"attest", tx.Hash(), signerAddr, accountState.StakeBalance())
-		}
-	} else {
+	if accountState.StakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
 		/*
 			This case happens, when the first block of epoch is created.
 			During this case, the pendingStakeBalance is not yet added to the StakeBalance,
 			and so we need to compare it with pendingStakeBalance, as that's the effective
 			balance for this epoch
 		*/
-		if accountState.PendingStakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
+		if parentEpoch == currentEpoch {
 			return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
 				"attest", tx.Hash(), signerAddr, accountState.StakeBalance())
+		} else {
+			if accountState.PendingStakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
+				return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
+					"attest", tx.Hash(), signerAddr, accountState.StakeBalance())
+			}
 		}
 	}
 
@@ -988,21 +988,21 @@ func ValidateCoinBaseTx(tx *transactions.CoinBase, statedb *state.StateDB, slotV
 	if !isGenesis {
 		parentEpoch := parentSlotNumber / config.GetDevConfig().BlocksPerEpoch
 		currentEpoch := slotNumber / config.GetDevConfig().BlocksPerEpoch
-		if parentEpoch == currentEpoch {
-			if accountState.StakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
-				return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
-					"coinbase", tx.Hash(), signerAddr, accountState.StakeBalance())
-			}
-		} else {
+		if accountState.StakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
 			/*
 				This case happens, when the first block of epoch is created.
 				During this case, the pendingStakeBalance is not yet added to the StakeBalance,
 				and so we need to compare it with pendingStakeBalance, as that's the effective
 				balance for this epoch
 			*/
-			if accountState.PendingStakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
+			if parentEpoch == currentEpoch {
 				return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
 					"coinbase", tx.Hash(), signerAddr, accountState.StakeBalance())
+			} else {
+				if accountState.PendingStakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
+					return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
+						"coinbase", tx.Hash(), signerAddr, accountState.StakeBalance())
+				}
 			}
 		}
 	}
