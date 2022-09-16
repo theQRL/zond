@@ -480,13 +480,6 @@ func (c *Chain) GetAttestorsBySlotNumber(trieRoot common.Hash,
 
 func (c *Chain) GetValidators() (*metadata.EpochMetaData, error) {
 	currentBlock := c.CurrentBlock()
-	//blockMetaData, err := c.GetBlockMetaData(currentBlock.Hash())
-	//if err != nil {
-	//	log.Error("failed to get last block metadata")
-	//	return nil, err
-	//}
-	//return c.GetEpochMetaData(blockMetaData.TrieRoot(),
-	//	currentBlock.SlotNumber(), currentBlock.ParentHash())
 	return metadata.GetEpochMetaData(c.state.DB(), currentBlock.SlotNumber(), currentBlock.ParentHash())
 }
 
