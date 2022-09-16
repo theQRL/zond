@@ -28,14 +28,9 @@ func (dk *StakingKeys) Add(dilithiumAccount *dilithium.Dilithium) {
 	strSK := misc.BytesToHexStr(sk[:])
 	hexSeed := dilithiumAccount.GetHexSeed()
 
-	found := false
-	for _, info := range dk.pbData.DilithiumInfo {
-		if reflect.DeepEqual(info.PK, strPK) {
-			found = true
-		}
-	}
+	index := dk.findDilithiumAccountIndex(dilithiumAccount)
 
-	if found {
+	if index != -1 {
 		fmt.Println("Dilithium Key already exists")
 		return
 	}
@@ -56,9 +51,26 @@ func (dk *StakingKeys) List() {
 	}
 }
 
-func (dk *StakingKeys) Remove() {
-
+func (dk *StakingKeys) Remove(dilithiumAccount *dilithium.Dilithium) {
+	index := dk.findDilithiumAccountIndex(dilithiumAccount)
+	if index == -1 {
+		fmt.Println("Dilithium Key doesn't exist in dilithium_keys file")
+		return
+	}
+	dk.pbData.DilithiumInfo = append(dk.pbData.DilithiumInfo[:index], dk.pbData.DilithiumInfo[index+1:]...)
 	dk.Save()
+}
+
+func (dk *StakingKeys) findDilithiumAccountIndex(dilithiumAccount *dilithium.Dilithium) int {
+	pk := dilithiumAccount.GetPK()
+	strPK := misc.BytesToHexStr(pk[:])
+	for i, info := range dk.pbData.DilithiumInfo {
+		if reflect.DeepEqual(info.PK, strPK) {
+			return i
+		}
+	}
+
+	return -1
 }
 
 func (dk *StakingKeys) Save() {

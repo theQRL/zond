@@ -123,8 +123,10 @@ func getTransactionSubCommands() []*cli.Command {
 				stakeAmount := c.Uint64(flags.AmountFlag.Name)
 				minStakeAmount := config.GetDevConfig().StakeAmount
 				if stakeAmount != 0 && stakeAmount < minStakeAmount {
-					fmt.Println("stake amount must be greater than or equals to ",
-						minStakeAmount/config.GetDevConfig().ShorPerQuanta)
+					fmt.Println(fmt.Sprintf("stake amount must be greater than or equals to %d QRL",
+						minStakeAmount/config.GetDevConfig().ShorPerQuanta))
+					fmt.Println("In case you are trying to de-stake use stakeAmount 0")
+					return nil
 				}
 
 				output := c.String("output")
@@ -139,7 +141,11 @@ func getTransactionSubCommands() []*cli.Command {
 				}
 
 				dilithiumKeys := keys.NewDilithiumKeys(dilithiumFile)
-				dilithiumKeys.Add(a)
+				if stakeAmount >= minStakeAmount {
+					dilithiumKeys.Add(a)
+				} else {
+					dilithiumKeys.Remove(a)
+				}
 
 				pk := a.GetPK()
 				tx := transactions.NewStake(c.Uint64(flags.ChainIDFlag.Name),
