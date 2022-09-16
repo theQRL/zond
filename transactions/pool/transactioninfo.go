@@ -32,9 +32,7 @@ func (t *TransactionInfo) TxHash() common.Hash {
 }
 
 func (t *TransactionInfo) CheckOTSExist(tx2 transactions.TransactionInterface) bool {
-	newTx1 := t.tx.(*transactions.Transaction)
-	newTx2 := tx2.(*transactions.Transaction)
-	return newTx1.OTSIndex() == newTx2.OTSIndex()
+	return t.tx.OTSIndex() == tx2.OTSIndex()
 }
 
 func (t *TransactionInfo) IsStale(currentBlockHeight uint64) bool {

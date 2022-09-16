@@ -2,6 +2,7 @@ package pool
 
 import (
 	"errors"
+	"github.com/theQRL/go-qrllib/xmss"
 	"github.com/theQRL/zond/block"
 	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/config"
@@ -30,12 +31,14 @@ func (pq PriorityQueue) Swap(i, j int) {
 }
 
 func (pq *PriorityQueue) Push(newTi *TransactionInfo) error {
+	isValidXMSS := xmss.IsValidXMSSAddress(newTi.tx.AddrFrom())
 	if pq != nil {
 		for _, ti := range *pq {
 			if reflect.DeepEqual(ti.TxHash(), newTi.TxHash()) {
 				return errors.New("transaction already exists in pool")
 			}
-			if reflect.DeepEqual(ti.tx.PK(), newTi.tx.PK()) {
+
+			if isValidXMSS && reflect.DeepEqual(ti.tx.PK(), newTi.tx.PK()) {
 				if ti.CheckOTSExist(newTi.tx) {
 					return errors.New("a transaction already exists signed with same ots key")
 				}
