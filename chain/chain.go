@@ -265,7 +265,7 @@ func (c *Chain) GetMaxPossibleSlotNumber() uint64 {
 	currentTimestamp := ntp.GetNTP().Time()
 	genesisTimestamp := d.Genesis.GenesisTimestamp
 
-	return (currentTimestamp - genesisTimestamp) / d.BlockTime
+	return ((currentTimestamp - genesisTimestamp) / d.BlockTime) + 1
 }
 
 func (c *Chain) GetLastBlock() *block.Block {
