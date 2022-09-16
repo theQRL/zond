@@ -677,30 +677,30 @@ func (c *Chain) ValidateTransaction(protoTx *protos.Transaction) error {
 	return core.ValidateTransaction(protoTx, statedb)
 }
 
-func (c *Chain) ValidateProtocolTransaction(protoTx *protos.ProtocolTransaction, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, slotNumber uint64, isGenesis bool) error {
+func (c *Chain) ValidateProtocolTransaction(protoTx *protos.ProtocolTransaction, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, slotNumber, parentSlotNumber uint64, isGenesis bool) error {
 	statedb, err := c.AccountDB()
 	if err != nil {
 		return fmt.Errorf("failed to get statedb, cannot verify protocol transaction")
 	}
-	return core.ValidateProtocolTransaction(protoTx, statedb, slotValidatorsMetaData, blockSigningHash, slotNumber, isGenesis)
+	return core.ValidateProtocolTransaction(protoTx, statedb, slotValidatorsMetaData, blockSigningHash, slotNumber, parentSlotNumber, isGenesis)
 }
 
-func (c *Chain) ValidateCoinBaseTransaction(protoTx *protos.ProtocolTransaction, validatorsType *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, slotNumber uint64, isGenesis bool) error {
+func (c *Chain) ValidateCoinBaseTransaction(protoTx *protos.ProtocolTransaction, validatorsType *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, slotNumber, parentSlotNumber uint64, isGenesis bool) error {
 	statedb, err := c.AccountDB()
 	if err != nil {
 		return fmt.Errorf("failed to get statedb, cannot verify protocol transaction")
 	}
 	tx := transactions.CoinBaseTransactionFromPBData(protoTx)
-	return core.ValidateCoinBaseTx(tx, statedb, validatorsType, blockSigningHash, slotNumber, isGenesis)
+	return core.ValidateCoinBaseTx(tx, statedb, validatorsType, blockSigningHash, slotNumber, parentSlotNumber, isGenesis)
 }
 
-func (c *Chain) ValidateAttestTransaction(protoTx *protos.ProtocolTransaction, validatorsType *metadata.SlotValidatorsMetaData, partialBlockSigningHash common.Hash, slotNumber uint64) error {
+func (c *Chain) ValidateAttestTransaction(protoTx *protos.ProtocolTransaction, validatorsType *metadata.SlotValidatorsMetaData, partialBlockSigningHash common.Hash, slotNumber, parentSlotNumber uint64) error {
 	statedb, err := c.AccountDB()
 	if err != nil {
 		return fmt.Errorf("failed to get statedb, cannot verify protocol transaction")
 	}
 	tx := transactions.AttestTransactionFromPBData(protoTx)
-	return core.ValidateAttestTx(tx, statedb, validatorsType, partialBlockSigningHash, slotNumber)
+	return core.ValidateAttestTx(tx, statedb, validatorsType, partialBlockSigningHash, slotNumber, parentSlotNumber)
 }
 
 func (c *Chain) AddBlock(b *block.Block) bool {
@@ -779,7 +779,7 @@ func (c *Chain) AddBlock(b *block.Block) bool {
 	stateProcessor := core.NewStateProcessor(&params.ChainConfig{ChainID: c.config.Dev.ChainID}, c.GetBlockHashBySlotNumber)
 
 	//receipts, logs, usedGas, err := stateProcessor.Process(b, statedb, stateContext, validators, false, vm.Config{})
-	_, _, _, err = stateProcessor.Process(b, statedb, stateContext, validators, false, vm.Config{})
+	_, _, _, err = stateProcessor.Process(b, parentBlock, statedb, stateContext, validators, false, vm.Config{})
 	if err != nil {
 		log.Error(fmt.Sprintf("Failed to process block #%d %s | Error %s", b.SlotNumber(),
 			misc.BytesToHexStr(bHash[:]), err.Error()))

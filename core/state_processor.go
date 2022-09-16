@@ -132,7 +132,7 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 
 			coinBaseTx := transactions.CoinBaseTransactionFromPBData(b.ProtocolTransactions()[0])
 
-			if err := ValidateCoinBaseTx(coinBaseTx, statedb, slotValidatorsMetaData, b.BlockSigningHash(), b.SlotNumber(), true); err != nil {
+			if err := ValidateCoinBaseTx(coinBaseTx, statedb, slotValidatorsMetaData, b.BlockSigningHash(), b.SlotNumber(), b.SlotNumber(), true); err != nil {
 				return nil, nil, 0, err
 			}
 
@@ -146,7 +146,7 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 		case *protos.ProtocolTransaction_Attest:
 			attestTx := transactions.AttestTransactionFromPBData(protoTx)
 
-			if err := ValidateAttestTx(attestTx, statedb, slotValidatorsMetaData, b.PartialBlockSigningHash(), b.SlotNumber()); err != nil {
+			if err := ValidateAttestTx(attestTx, statedb, slotValidatorsMetaData, b.PartialBlockSigningHash(), b.SlotNumber(), b.SlotNumber()); err != nil {
 				return nil, nil, 0, err
 			}
 
@@ -258,7 +258,7 @@ func (p *StateProcessor) ProcessGenesis(b *block.Block, statedb *state.StateDB, 
 	return txReceipts, allLogs, *usedGas, nil
 }
 
-func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateContext *state2.StateContext, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, isFinalizedState bool, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
+func (p *StateProcessor) Process(b, parentBlock *block.Block, statedb *state.StateDB, stateContext *state2.StateContext, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, isFinalizedState bool, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
 	var (
 		protocolTxReceipts types.Receipts
 		txReceipts         types.Receipts
@@ -293,7 +293,7 @@ func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateCo
 
 			coinBaseTx := transactions.CoinBaseTransactionFromPBData(b.ProtocolTransactions()[0])
 
-			if err := ValidateCoinBaseTx(coinBaseTx, statedb, slotValidatorsMetaData, b.BlockSigningHash(), b.SlotNumber(), false); err != nil {
+			if err := ValidateCoinBaseTx(coinBaseTx, statedb, slotValidatorsMetaData, b.BlockSigningHash(), b.SlotNumber(), parentBlock.SlotNumber(), false); err != nil {
 				return nil, nil, 0, err
 			}
 
@@ -307,7 +307,7 @@ func (p *StateProcessor) Process(b *block.Block, statedb *state.StateDB, stateCo
 		case *protos.ProtocolTransaction_Attest:
 			attestTx := transactions.AttestTransactionFromPBData(protoTx)
 
-			if err := ValidateAttestTx(attestTx, statedb, slotValidatorsMetaData, b.PartialBlockSigningHash(), b.SlotNumber()); err != nil {
+			if err := ValidateAttestTx(attestTx, statedb, slotValidatorsMetaData, b.PartialBlockSigningHash(), b.SlotNumber(), parentBlock.SlotNumber()); err != nil {
 				return nil, nil, 0, err
 			}
 
@@ -888,7 +888,7 @@ func ValidateStakeTxn(tx *transactions.Stake, statedb *state.StateDB) error {
 	return nil
 }
 
-func ValidateAttestTx(tx *transactions.Attest, statedb *state.StateDB, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, partialBlockSigningHash common.Hash, slotNumber uint64) error {
+func ValidateAttestTx(tx *transactions.Attest, statedb *state.StateDB, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, partialBlockSigningHash common.Hash, slotNumber uint64, parentSlotNumber uint64) error {
 	signedMessage := tx.GetSigningHash(partialBlockSigningHash)
 	txHash := tx.TxHash(signedMessage)
 
@@ -917,15 +917,30 @@ func ValidateAttestTx(tx *transactions.Attest, statedb *state.StateDB, slotValid
 			"attest", misc.BytesToHexStr(txHash[:]), signerAddr, slotNumber)
 	}
 
-	if accountState.StakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
-		return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
-			"attest", tx.Hash(), signerAddr, accountState.StakeBalance())
+	parentEpoch := parentSlotNumber / config.GetDevConfig().BlocksPerEpoch
+	currentEpoch := slotNumber / config.GetDevConfig().BlocksPerEpoch
+	if parentEpoch == currentEpoch {
+		if accountState.StakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
+			return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
+				"attest", tx.Hash(), signerAddr, accountState.StakeBalance())
+		}
+	} else {
+		/*
+			This case happens, when the first block of epoch is created.
+			During this case, the pendingStakeBalance is not yet added to the StakeBalance,
+			and so we need to compare it with pendingStakeBalance, as that's the effective
+			balance for this epoch
+		*/
+		if accountState.PendingStakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
+			return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
+				"attest", tx.Hash(), signerAddr, accountState.StakeBalance())
+		}
 	}
 
 	return nil
 }
 
-func ValidateCoinBaseTx(tx *transactions.CoinBase, statedb *state.StateDB, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, slotNumber uint64, isGenesis bool) error {
+func ValidateCoinBaseTx(tx *transactions.CoinBase, statedb *state.StateDB, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, blockSigningHash common.Hash, slotNumber, parentSlotNumber uint64, isGenesis bool) error {
 	signedMessage := tx.GetSigningHash(blockSigningHash)
 	txHash := tx.TxHash(signedMessage)
 
@@ -971,9 +986,24 @@ func ValidateCoinBaseTx(tx *transactions.CoinBase, statedb *state.StateDB, slotV
 
 	// Genesis block proposer will have 0 stake balance initially
 	if !isGenesis {
-		if accountState.StakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
-			return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
-				"coinbase", tx.Hash(), signerAddr, accountState.StakeBalance())
+		parentEpoch := parentSlotNumber / config.GetDevConfig().BlocksPerEpoch
+		currentEpoch := slotNumber / config.GetDevConfig().BlocksPerEpoch
+		if parentEpoch == currentEpoch {
+			if accountState.StakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
+				return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
+					"coinbase", tx.Hash(), signerAddr, accountState.StakeBalance())
+			}
+		} else {
+			/*
+				This case happens, when the first block of epoch is created.
+				During this case, the pendingStakeBalance is not yet added to the StakeBalance,
+				and so we need to compare it with pendingStakeBalance, as that's the effective
+				balance for this epoch
+			*/
+			if accountState.PendingStakeBalance().Uint64() < config.GetDevConfig().StakeAmount {
+				return fmt.Errorf(errmsg.TXInsufficientStakeBalance,
+					"coinbase", tx.Hash(), signerAddr, accountState.StakeBalance())
+			}
 		}
 	}
 
@@ -1022,14 +1052,14 @@ func ValidateTransaction(protoTx *protos.Transaction, statedb *state.StateDB) er
 	}
 }
 
-func ValidateProtocolTransaction(protoTx *protos.ProtocolTransaction, statedb *state.StateDB, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, hash common.Hash, slotNumber uint64, isGenesis bool) error {
+func ValidateProtocolTransaction(protoTx *protos.ProtocolTransaction, statedb *state.StateDB, slotValidatorsMetaData *metadata.SlotValidatorsMetaData, hash common.Hash, slotNumber, parentSlotNumber uint64, isGenesis bool) error {
 	switch protoTx.Type.(type) {
 	case *protos.ProtocolTransaction_CoinBase:
 		coinBaseTx := transactions.CoinBaseTransactionFromPBData(protoTx)
-		return ValidateCoinBaseTx(coinBaseTx, statedb, slotValidatorsMetaData, hash, slotNumber, isGenesis)
+		return ValidateCoinBaseTx(coinBaseTx, statedb, slotValidatorsMetaData, hash, slotNumber, parentSlotNumber, isGenesis)
 	case *protos.ProtocolTransaction_Attest:
 		attestTx := transactions.AttestTransactionFromPBData(protoTx)
-		return ValidateAttestTx(attestTx, statedb, slotValidatorsMetaData, hash, slotNumber)
+		return ValidateAttestTx(attestTx, statedb, slotValidatorsMetaData, hash, slotNumber, parentSlotNumber)
 	default:
 		return fmt.Errorf("unkown transaction type")
 	}

@@ -730,7 +730,7 @@ func (p *Peer) HandleAttestTransaction(msg *Msg, txData *protos.ProtocolTransact
 		return nil
 	}
 
-	if err := p.chain.ValidateAttestTransaction(pbData, slotValidatorsMetaData, partialBlockSigningHash, txData.SlotNumber); err != nil {
+	if err := p.chain.ValidateAttestTransaction(pbData, slotValidatorsMetaData, partialBlockSigningHash, txData.SlotNumber, parentMetaData.SlotNumber()); err != nil {
 		log.Error("[HandleAttestTransaction] Attest Transaction Validation Failed ", err)
 		return nil
 	}
