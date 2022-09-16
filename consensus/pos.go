@@ -396,8 +396,12 @@ running:
 			//	log.Error("Error creating NewStateContext")
 			//	continue
 			//}
-
-			if err := p.chain.ValidateAttestTransaction(tx.PBData(), p.slotValidatorsMetaData, p.blockBeingAttested.PartialBlockSigningHash(), p.blockBeingAttested.SlotNumber()); err != nil {
+			parentBlock, err := p.chain.GetBlock(p.blockBeingAttested.ParentHash())
+			if err != nil {
+				log.Warn("failed to load parent block ", err)
+				continue
+			}
+			if err := p.chain.ValidateAttestTransaction(tx.PBData(), p.slotValidatorsMetaData, p.blockBeingAttested.PartialBlockSigningHash(), p.blockBeingAttested.SlotNumber(), parentBlock.SlotNumber()); err != nil {
 				log.Warn("Attestor transaction validation failed: ", err)
 				continue
 			}

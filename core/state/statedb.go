@@ -275,6 +275,15 @@ func (s *StateDB) GetStakeBalance(addr common.Address) *big.Int {
 	return common.Big0
 }
 
+func (s *StateDB) GetPendingStakeBalance(addr common.Address) *big.Int {
+	stateObject := s.getStateObject(addr)
+	if stateObject != nil {
+		return stateObject.PendingStakeBalance()
+	}
+
+	return common.Big0
+}
+
 func (s *StateDB) GetNonce(addr common.Address) uint64 {
 	stateObject := s.getStateObject(addr)
 	if stateObject != nil {
