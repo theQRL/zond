@@ -9,6 +9,7 @@ import (
 	"github.com/theQRL/zond/common"
 	"github.com/theQRL/zond/common/hexutil"
 	"github.com/theQRL/zond/common/math"
+	"github.com/theQRL/zond/config"
 	"github.com/theQRL/zond/core"
 	"github.com/theQRL/zond/core/state"
 	"github.com/theQRL/zond/core/types"
@@ -139,7 +140,7 @@ func (s *BlockChainAPI) GetValidators(ctx context.Context) (*ValidatorsResult, e
 
 	var validatorsBySlotNumber []SlotValidators
 	validatorsPK := epochMetaData.Validators()
-	offsetSlotNumber := epochMetaData.Epoch() * 100
+	offsetSlotNumber := epochMetaData.Epoch() * config.GetDevConfig().BlocksPerEpoch
 	for slotNumber, slotInfo := range epochMetaData.SlotInfo() {
 		slotLeaderDilithiumPK := validatorsPK[slotInfo.SlotLeader]
 		var attestors []common.Address
