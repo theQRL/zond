@@ -54,6 +54,23 @@ func (s *BlockChainAPI) GetBalance(ctx context.Context, address common.Address, 
 	return (*hexutil.Big)(state.GetBalance(address)), state.Error()
 }
 
+type StakeBalanceResult struct {
+	StakeBalance        *hexutil.Big `json:"stakeBalance"`
+	PendingStakeBalance *hexutil.Big `json:"pendingStakeBalance"`
+}
+
+// GetStakeBalance returns stake balance and pending stake balance
+func (s *BlockChainAPI) GetStakeBalance(ctx context.Context, address common.Address, blockNrOrHash rpc.BlockNumberOrHash) (*StakeBalanceResult, error) {
+	state, _, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
+	if state == nil || err != nil {
+		return nil, err
+	}
+	return &StakeBalanceResult{
+		StakeBalance:        (*hexutil.Big)(state.GetStakeBalance(address)),
+		PendingStakeBalance: (*hexutil.Big)(state.GetPendingStakeBalance(address)),
+	}, state.Error()
+}
+
 // Result structs for GetProof
 type AccountResult struct {
 	Address      common.Address  `json:"address"`
