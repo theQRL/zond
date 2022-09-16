@@ -480,13 +480,14 @@ func (c *Chain) GetAttestorsBySlotNumber(trieRoot common.Hash,
 
 func (c *Chain) GetValidators() (*metadata.EpochMetaData, error) {
 	currentBlock := c.CurrentBlock()
-	blockMetaData, err := c.GetBlockMetaData(currentBlock.Hash())
-	if err != nil {
-		log.Error("failed to get last block metadata")
-		return nil, err
-	}
-	return c.GetEpochMetaData(blockMetaData.TrieRoot(),
-		currentBlock.SlotNumber(), currentBlock.ParentHash())
+	//blockMetaData, err := c.GetBlockMetaData(currentBlock.Hash())
+	//if err != nil {
+	//	log.Error("failed to get last block metadata")
+	//	return nil, err
+	//}
+	//return c.GetEpochMetaData(blockMetaData.TrieRoot(),
+	//	currentBlock.SlotNumber(), currentBlock.ParentHash())
+	return metadata.GetEpochMetaData(c.state.DB(), currentBlock.SlotNumber(), currentBlock.ParentHash())
 }
 
 // GetSlotValidatorsMetaDataBySlotNumber returns a map of all the validators for a specific slot number.
@@ -965,7 +966,7 @@ func (c *Chain) CalculateEpochMetaData(statedb *state2.StateDB, slotNumber uint6
 		// Ignore genesis block otherwise it will result into issue as we have
 		// already processed while committing genesis block
 		if b.SlotNumber() != 0 {
-			pendingStakeValidatorsUpdate = b.GetPendingValidatorsUpdate()
+			pendingStakeValidatorsUpdate = append(pendingStakeValidatorsUpdate, b.GetPendingValidatorsUpdate()...)
 		}
 	}
 
