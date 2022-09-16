@@ -139,6 +139,7 @@ func (s *BlockChainAPI) GetValidators(ctx context.Context) (*ValidatorsResult, e
 
 	var validatorsBySlotNumber []SlotValidators
 	validatorsPK := epochMetaData.Validators()
+	offsetSlotNumber := epochMetaData.Epoch() * 100
 	for slotNumber, slotInfo := range epochMetaData.SlotInfo() {
 		slotLeaderDilithiumPK := validatorsPK[slotInfo.SlotLeader]
 		var attestors []common.Address
@@ -146,7 +147,7 @@ func (s *BlockChainAPI) GetValidators(ctx context.Context) (*ValidatorsResult, e
 			attestors = append(attestors, misc.GetAddressFromUnSizedPK(validatorsPK[attestor]))
 		}
 		vr := SlotValidators{
-			SlotNumber: uint64(slotNumber),
+			SlotNumber: offsetSlotNumber + uint64(slotNumber),
 			Leader:     misc.GetAddressFromUnSizedPK(slotLeaderDilithiumPK),
 			Attestors:  attestors,
 		}
