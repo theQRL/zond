@@ -73,12 +73,11 @@ func (p *StateProcessor) ProcessGenesisPreState(preState *protos.PreState, b *bl
 
 	if blockProposerDilithiumAddress != config.GetDevConfig().Genesis.FoundationDilithiumAddress {
 		expectedFoundationDilithiumAddress := misc.BytesToHexStr(config.GetDevConfig().Genesis.FoundationDilithiumAddress[:])
-		foundFoundationDilithiumAddress := misc.BytesToHexStr(config.GetDevConfig().Genesis.FoundationDilithiumAddress[:])
 
 		log.Warn("block proposer dilithium address is not matching with the foundation dilithium address in config")
 		log.Warn("expected foundation dilithium address ", expectedFoundationDilithiumAddress)
-		log.Warn("found foundation dilithium address ", foundFoundationDilithiumAddress)
-		fmt.Println(blockProposerDilithiumAddress == config.GetDevConfig().Genesis.FoundationDilithiumAddress)
+		log.Warn("found foundation dilithium address ", blockProposerDilithiumAddress)
+
 		return fmt.Errorf("failed to process genesis pre state")
 	}
 
