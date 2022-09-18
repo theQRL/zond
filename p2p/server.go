@@ -374,7 +374,8 @@ running:
 			go srv.runPeer(p)
 			peers[c.fd.ID()] = p
 
-			ip, _, _ := net.SplitHostPort(c.fd.ID())
+			ip := misc.IPFromMultiAddr(c.fd.Conn().RemoteMultiaddr().String())
+
 			srv.ipCount[ip] += 1
 			srv.totalConnections += 1
 			if p.inbound {
@@ -382,6 +383,7 @@ running:
 			}
 
 			if srv.ipCount[ip] > srv.config.User.Node.MaxRedundantConnections {
+				log.Info("Disconnecting due to max redundant connections")
 				p.Disconnect()
 				// TODO: Ban peer
 			}

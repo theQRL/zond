@@ -178,13 +178,13 @@ func GetConfig() *Config {
 func GetUserConfig() (userConf *UserConfig) {
 	node := &NodeConfig{
 		EnablePeerDiscovery:     true,
-		PeerList:                []string{},
+		PeerList:                []string{"/ip4/45.76.43.83/tcp/15005/p2p/QmU6Uo93bSgU7bA8bkbdNhSfbmp7S5XJEcSqgrdLzH6ksT"},
 		BindingIP:               "0.0.0.0",
 		LocalPort:               15005,
 		PublicPort:              15005,
 		PeerRateLimit:           500,
 		BanMinutes:              20,
-		MaxPeersLimit:           32,
+		MaxPeersLimit:           1000,
 		MaxPeersInPeerList:      100,
 		MaxRedundantConnections: 5,
 	}
@@ -204,7 +204,7 @@ func GetUserConfig() (userConf *UserConfig) {
 
 	publicAPI := &APIConfig{
 		Enabled:          true,
-		Host:             "127.0.0.1",
+		Host:             "0.0.0.0",
 		Port:             19009,
 		Threads:          1,
 		MaxConcurrentRPC: 100,
@@ -275,7 +275,7 @@ func GetDevConfig() (dev *DevConfig) {
 	}
 
 	var foundationDilithiumAddress common.Address
-	binFoundationDilithiumAddress, err := misc.HexStrToBytes("0x20f6e005b12be8ecb7c5be0bc50b1f511dd5d19f")
+	binFoundationDilithiumAddress, err := misc.HexStrToBytes("0x20b86443849021244943cac233c1ed6f76370fd7")
 	if err != nil {
 		panic(fmt.Sprintf("Invalid FoundationAddress %v", err.Error()))
 	}
@@ -292,7 +292,7 @@ func GetDevConfig() (dev *DevConfig) {
 		GenesisDifficulty:          10000000,
 		CoinBaseAddress:            coinBaseAddress,
 		FoundationDilithiumAddress: foundationDilithiumAddress,
-		GenesisTimestamp:           1662399802,
+		GenesisTimestamp:           1663120306,
 	}
 	transaction := &TransactionConfig{
 		MultiOutputLimit: 100,
