@@ -400,7 +400,8 @@ running:
 			if pd.inbound {
 				srv.inboundCount--
 			}
-			ip, _, _ := net.SplitHostPort(pd.stream.ID())
+			ip := pd.ip
+
 			srv.ipCount[ip] -= 1
 			srv.totalConnections -= 1
 			if pd.isPLShared {
