@@ -9,7 +9,6 @@ jobs:
       - run: go build ./cmd/zond-cli
       - run: ./zond-cli dev genesis-bootstrap
       - run: mkdir ~/.zond
-      - run: mkdir block/genesis/devnet
       - run: cp bootstrap/prestate.yml ./block/genesis/devnet/
       - run: cp bootstrap/genesis.yml ./block/genesis/devnet/
       - run: cp bootstrap/dilithium_keys ~/.zond
