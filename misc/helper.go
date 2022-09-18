@@ -130,7 +130,7 @@ func GetOTSIndexFromSignature(signature []byte) uint64 {
 func IsUsedOTSIndex(otsIndex uint64, otsBitfield [][8]byte) bool {
 	offset := otsIndex >> 3
 	// otsBitfield can only be nil if it has not made any transaction yet
-	if otsBitfield == nil {
+	if otsBitfield == nil || len(otsBitfield) == 0 {
 		return false
 	}
 	if offset >= uint64(len(otsBitfield)) {
