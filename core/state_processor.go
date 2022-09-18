@@ -850,7 +850,7 @@ func ValidateStakeTxn(tx *transactions.Stake, statedb *state.StateDB) error {
 			"stake", txHash, addrFrom, tx.Nonce(), accountState.Nonce())
 	}
 
-	if tx.Amount() < config.GetDevConfig().StakeAmount {
+	if tx.Amount() != 0 && tx.Amount() < config.GetDevConfig().StakeAmount {
 		return fmt.Errorf(errmsg.TXInvalidStakeAmount,
 			"stake", tx.Hash(), addrFrom, tx.Amount(), config.GetDevConfig().StakeAmount)
 	}
