@@ -776,9 +776,7 @@ func ValidateTransferTxn(tx *transactions.Transfer, statedb *state.StateDB) erro
 
 	if len(tx.PK()) == xmss.ExtendedPKSize {
 		if misc.IsUsedOTSIndex(tx.OTSIndex(), accountState.OTSBitfield()) {
-			log.Warn(fmt.Sprintf(errmsg.TXInvalidXMSSOTSIndex,
-				"transfer", txHash, addrFrom, tx.OTSIndex()))
-			return fmt.Errorf("")
+			return fmt.Errorf(errmsg.TXInvalidXMSSOTSIndex, "transfer", txHash, addrFrom, tx.OTSIndex())
 		}
 	}
 
