@@ -46,6 +46,7 @@ func New(blockchain *chain.Chain) (*Node, error) {
 	conf := &Config{
 		HTTPHost: "127.0.0.1",
 		HTTPPort: 4545,
+		HTTPCors: []string{"*"}, // Allow all cors
 	}
 
 	if conf.Logger == nil {
