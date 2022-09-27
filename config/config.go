@@ -48,7 +48,8 @@ type StakeConfig struct {
 }
 
 type API struct {
-	PublicAPI *APIConfig
+	PublicAPI    *APIConfig
+	PublicAPIRpc *APIConfig
 }
 
 //type MongoProcessorConfig struct {
@@ -210,8 +211,17 @@ func GetUserConfig() (userConf *UserConfig) {
 		MaxConcurrentRPC: 100,
 	}
 
+	publicRPCAPI := &APIConfig{
+		Enabled:          true,
+		Host:             "127.0.0.1",
+		Port:             4545,
+		Threads:          1,
+		MaxConcurrentRPC: 100,
+	}
+
 	api := &API{
-		PublicAPI: publicAPI,
+		PublicAPI:    publicAPI,
+		PublicAPIRpc: publicRPCAPI,
 	}
 	//	mongoProcessorConfig := &MongoProcessorConfig{
 	//		Enabled:      false,
