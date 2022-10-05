@@ -57,6 +57,14 @@ var RemoteAddrFlag = &cli.StringFlag{
 	Required: false,
 }
 
+var RemoteRPCAddrFlag = &cli.StringFlag{
+	Name: "remote-rpc-addr",
+	Value: fmt.Sprintf("http://%s:%d",
+		config.GetUserConfig().API.PublicAPIRpc.Host,
+		config.GetUserConfig().API.PublicAPIRpc.Port),
+	Required: false,
+}
+
 var AmountFlag = &cli.Uint64Flag{
 	Name:     "amount",
 	Value:    0,

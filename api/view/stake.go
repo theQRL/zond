@@ -2,6 +2,7 @@ package view
 
 import (
 	"errors"
+
 	"github.com/theQRL/zond/common/hexutil"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
@@ -28,19 +29,17 @@ type PlainStakeTransactionRPC struct {
 	PublicKey string `json:"pk"`
 	Signature string `json:"signature"`
 	Nonce     string `json:"nonce"`
-	To        string `json:"to"`
 	Value     string `json:"value"`
 }
 
 func (t *PlainStakeTransactionRPC) TransactionFromPBData(tx *protos.Transaction) {
-	t.ChainID = hexutil.EncodeUint64(tx.ChainId) //tx.ChainId
-	t.Gas = hexutil.EncodeUint64(tx.Gas)
-	t.GasPrice = hexutil.EncodeUint64(tx.GasPrice)
-	t.PublicKey = misc.BytesToHexStr(tx.Pk)
-	t.Signature = misc.BytesToHexStr(tx.Signature)
-	t.Nonce = hexutil.EncodeUint64(tx.Nonce)
-	t.To = misc.BytesToHexStr(tx.GetTransfer().To)
-	t.Value = hexutil.EncodeUint64(tx.GetTransfer().Value)
+	t.ChainID = hexutil.EncodeUint64(tx.GetChainId()) //tx.ChainId
+	t.Gas = hexutil.EncodeUint64(tx.GetGas())
+	t.GasPrice = hexutil.EncodeUint64(tx.GetGasPrice())
+	t.PublicKey = misc.BytesToHexStr(tx.GetPk())
+	t.Signature = misc.BytesToHexStr(tx.GetSignature())
+	t.Nonce = hexutil.EncodeUint64(tx.GetNonce())
+	t.Value = hexutil.EncodeUint64(tx.GetStake().GetAmount())
 }
 
 func (t *PlainStakeTransaction) TransactionFromPBData(tx *protos.Transaction, txHash []byte) {

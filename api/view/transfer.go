@@ -2,6 +2,8 @@ package view
 
 import (
 	"errors"
+
+	"github.com/theQRL/zond/common/hexutil"
 	"github.com/theQRL/zond/misc"
 	"github.com/theQRL/zond/protos"
 	"github.com/theQRL/zond/transactions"
@@ -35,6 +37,28 @@ func (t *PlainTransferTransaction) TransactionFromPBData(tx *protos.Transaction,
 	t.To = misc.BytesToHexStr(tx.GetTransfer().To)
 	t.Value = tx.GetTransfer().Value
 	t.Data = misc.BytesToHexStr(tx.GetTransfer().Data)
+}
+
+type PlainTransferTransactionRPC struct {
+	ChainID   string `json:"chainId"`
+	Gas       string `json:"gas"`
+	GasPrice  string `json:"gasPrice"`
+	PublicKey string `json:"pk"`
+	Signature string `json:"signature"`
+	Nonce     string `json:"nonce"`
+	To        string `json:"to"`
+	Value     string `json:"value"`
+}
+
+func (t *PlainTransferTransactionRPC) TransactionFromPBData(tx *protos.Transaction) {
+	t.ChainID = hexutil.EncodeUint64(tx.GetChainId()) //tx.ChainId
+	t.Gas = hexutil.EncodeUint64(tx.GetGas())
+	t.GasPrice = hexutil.EncodeUint64(tx.GetGasPrice())
+	t.PublicKey = misc.BytesToHexStr(tx.GetPk())
+	t.Signature = misc.BytesToHexStr(tx.GetSignature())
+	t.Nonce = hexutil.EncodeUint64(tx.GetNonce())
+	t.To = misc.BytesToHexStr(tx.GetTransfer().GetTo())
+	t.Value = hexutil.EncodeUint64(tx.GetTransfer().GetValue())
 }
 
 func (t *PlainTransferTransaction) ToTransferTransactionObject() (*transactions.Transfer, error) {

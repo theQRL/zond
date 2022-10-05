@@ -179,6 +179,7 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.TransactionStdOut,
 				flags.BroadcastFlag,
 				flags.RemoteAddrFlag,
+				flags.RemoteRPCAddrFlag,
 				&cli.StringFlag{
 					Name:  "output",
 					Value: "stake_transactions.json",
@@ -294,7 +295,7 @@ func getTransactionSubCommands() []*cli.Command {
 				addressTo := c.String("to")
 				stdOut := c.Bool(flags.TransactionStdOut.Name)
 				broadcastFlag := c.Bool(flags.BroadcastFlag.Name)
-				remoteAddr := c.String(flags.RemoteAddrFlag.Name)
+				remoteAddr := c.String(flags.RemoteRPCAddrFlag.Name)
 				binAddressTo, err := misc.HexStrToBytes(addressTo)
 				if err != nil {
 					return err
@@ -323,11 +324,11 @@ func getTransactionSubCommands() []*cli.Command {
 
 				if broadcastFlag {
 					txHash := tx.Hash()
-					transfer := view.PlainTransferTransaction{}
-					transfer.TransactionFromPBData(tx.PBData(), txHash[:])
+					transfer := view.PlainTransferTransactionRPC{}
+					transfer.TransactionFromPBData(tx.PBData())
 
-					url := fmt.Sprintf("http://%s/api/broadcast/transfer", remoteAddr)
-					return broadcastTransaction(transfer, url, txHash)
+					url := fmt.Sprintf("%s", remoteAddr)
+					return broadcastTransactionViaRPC(transfer, url, txHash)
 				}
 				return nil
 			},
@@ -398,11 +399,11 @@ func getTransactionSubCommands() []*cli.Command {
 
 				if broadcastFlag {
 					txHash := tx.Hash()
-					stake := view.PlainStakeTransactionRPC{}
-					stake.TransactionFromPBData(tx.PBData())
+					transfer := view.PlainTransferTransactionRPC{}
+					transfer.TransactionFromPBData(tx.PBData())
 
 					url := fmt.Sprintf("%s", remoteAddr)
-					return broadcastTransactionViaRPC(stake, url, txHash)
+					return broadcastTransactionViaRPC(transfer, url, txHash)
 				}
 				return nil
 			},
@@ -422,6 +423,7 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.TransactionStdOut,
 				flags.BroadcastFlag,
 				flags.RemoteAddrFlag,
+				flags.RemoteRPCAddrFlag,
 			},
 			Action: func(c *cli.Context) error {
 				data, err := misc.HexStrToBytes(c.String(flags.DataFlag.Name))
@@ -438,7 +440,7 @@ func getTransactionSubCommands() []*cli.Command {
 
 				stdOut := c.Bool(flags.TransactionStdOut.Name)
 				broadcastFlag := c.Bool(flags.BroadcastFlag.Name)
-				remoteAddr := c.String(flags.RemoteAddrFlag.Name)
+				remoteAddr := c.String(flags.RemoteRPCAddrFlag.Name)
 				nonce := c.Uint64(flags.NonceFlag.Name)
 
 				pk := a.GetPK()
@@ -467,11 +469,11 @@ func getTransactionSubCommands() []*cli.Command {
 
 				if broadcastFlag {
 					txHash := tx.Hash()
-					transfer := view.PlainTransferTransaction{}
-					transfer.TransactionFromPBData(tx.PBData(), txHash[:])
+					transfer := view.PlainTransferTransactionRPC{}
+					transfer.TransactionFromPBData(tx.PBData())
 
-					url := fmt.Sprintf("http://%s/api/broadcast/transfer", remoteAddr)
-					return broadcastTransaction(transfer, url, txHash)
+					url := fmt.Sprintf("%s", remoteAddr)
+					return broadcastTransactionViaRPC(transfer, url, txHash)
 				}
 				return nil
 			},
@@ -496,6 +498,7 @@ func getTransactionSubCommands() []*cli.Command {
 				flags.TransactionStdOut,
 				flags.BroadcastFlag,
 				flags.RemoteAddrFlag,
+				flags.RemoteRPCAddrFlag,
 			},
 			Action: func(c *cli.Context) error {
 				data, err := misc.HexStrToBytes(c.String(flags.DataFlag.Name))
@@ -512,7 +515,7 @@ func getTransactionSubCommands() []*cli.Command {
 
 				stdOut := c.Bool(flags.TransactionStdOut.Name)
 				broadcastFlag := c.Bool(flags.BroadcastFlag.Name)
-				remoteAddr := c.String(flags.RemoteAddrFlag.Name)
+				remoteAddr := c.String(flags.RemoteRPCAddrFlag.Name)
 				to := c.String("to")
 				nonce := c.Uint64(flags.NonceFlag.Name)
 
@@ -544,11 +547,11 @@ func getTransactionSubCommands() []*cli.Command {
 
 				if broadcastFlag {
 					txHash := tx.Hash()
-					transfer := view.PlainTransferTransaction{}
-					transfer.TransactionFromPBData(tx.PBData(), txHash[:])
+					transfer := view.PlainTransferTransactionRPC{}
+					transfer.TransactionFromPBData(tx.PBData())
 
-					url := fmt.Sprintf("http://%s/api/broadcast/transfer", remoteAddr)
-					return broadcastTransaction(transfer, url, txHash)
+					url := fmt.Sprintf("%s", remoteAddr)
+					return broadcastTransactionViaRPC(transfer, url, txHash)
 				}
 				return nil
 			},
